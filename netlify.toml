@@ -1,0 +1,136 @@
+# Static site, no build step. The only server-side piece is the AI proxy.
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+# SUPABASE_URL is deliberately public: it's baked into app.html's access-code
+# gate (client-side, by design -- Supabase's own security model is RLS, not
+# secrecy) as well as set as a build env var for the server-side functions.
+# Netlify's scanner otherwise flags that overlap as a leaked secret, which
+# it isn't; this tells it to skip that one key rather than failing the build.
+[build.environment]
+  SECRETS_SCAN_OMIT_KEYS = "SUPABASE_URL"
+
+# The service worker must never be served stale, or testers get stuck on an
+# old build after you redeploy.
+
+# App shell must never be served from an old HTTP/browser cache after a deploy.
+[[headers]]
+  for = "/app.html"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Content-Type = "application/manifest+json"
+    Cache-Control = "no-cache"
+
+# Never cache the AI proxy's responses.
+[[headers]]
+  for = "/.netlify/functions/*"
+  [headers.values]
+    Cache-Control = "no-store"
+
+# Serves app.html at /app as well as /app.html, regardless of whether
+# Pretty URLs is on for this site -- Stripe's post-checkout redirect and
+# anything else that links to "/app" shouldn't depend on that setting.
+[[redirects]]
+  from = "/app"
+  to = "/app.html"
+  status = 200
+
+# Same for the waitlist page -- hosted here instead of as an external
+# Claude Artifact link, since that link going stale is what broke the
+# "Join the waitlist" button in the first place. This one's permanent.
+[[redirects]]
+  from = "/waitlist"
+  to = "/waitlist.html"
+  status = 200
+
+# The tester admin dashboard. Not linked from anywhere on the public
+# site -- reaching it at all requires knowing this exact path, and
+# reading anything requires the ADMIN_PASSWORD on top of that.
+[[redirects]]
+  from = "/admin"
+  to = "/admin.html"
+  status = 200
+
+# Clean public URL for the privacy policy, matching its canonical URL.
+[[redirects]]
+  from = "/privacy"
+  to = "/privacy.html"
+  status = 200
+
+# Clean public URL for the Terms of Use.
+[[redirects]]
+  from = "/terms"
+  to = "/terms.html"
+  status = 200
+
+# Public SEO resource pages.
+[[redirects]]
+  from = "/ndis-support-worker-invoice-template"
+  to = "/ndis-support-worker-invoice-template.html"
+  status = 200
+
+[[redirects]]
+  from = "/ndis-support-worker-progress-notes"
+  to = "/ndis-support-worker-progress-notes.html"
+  status = 200
+
+# Opinly blog. Content is fetched and rendered server-side with the official SDK.
+[[redirects]]
+  from = "/images/*"
+  to = "https://cdn.opinly.ai/189uHQyY_N_n2WQp7qCAh/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/blog"
+  to = "/.netlify/functions/opinly-blog"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/blog/*"
+  to = "/.netlify/functions/opinly-blog?slug=:splat"
+  status = 200
+  force = true
+
+[[headers]]
+  for = "/app.html"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+
+# Build 27: explicit friendly-route fallbacks
+[[redirects]]
+  from = "/app"
+  to = "/app.html"
+  status = 200
+
+[[redirects]]
+  from = "/waitlist"
+  to = "/waitlist.html"
+  status = 200
+
+[[redirects]]
+  from = "/privacy"
+  to = "/privacy.html"
+  status = 200
+
+[[redirects]]
+  from = "/terms"
+  to = "/terms.html"
+  status = 200

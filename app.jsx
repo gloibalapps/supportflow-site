@@ -1,0 +1,8563 @@
+/* global React, ReactDOM */
+const { useState, useEffect, useMemo, useRef } = React;
+
+const storage = {
+  async get(key) { const v = localStorage.getItem(key); return v === null ? null : { value: v }; },
+  async set(key, value) { localStorage.setItem(key, value); return { key, value }; },
+};
+
+/* ==================================================================
+   SupportFlow™, business admin for support work
+   Summary · Work · People   (settings in the header)
+   Each tab groups by purpose: what you owe, getting paid, who you work with.
+   Dual theme, brass accent, flowing bands.
+================================================================== */
+
+const CSS = `
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=Instrument+Sans:wght@400;500;600&display=swap');
+
+*{box-sizing:border-box}
+
+/* Prevents the Android Chrome rubber-band overscroll from briefly showing
+   page content past the fixed bottom nav during a bounce, which reads as
+   the nav "not being solid" even though it genuinely is at rest. */
+html,body{overscroll-behavior-y:none;background:#14150F;height:100%;overflow-x:hidden;max-width:100vw}
+
+.sl{
+  --good:#4E8C6A;
+  --warn:#C2703B;
+  --req:#C0392B;--req-soft:rgba(192,57,43,.07);
+  --sent:#5B7C9D;
+  font-family:'Instrument Sans',ui-sans-serif,sans-serif;
+  font-size:15px;min-height:100vh;background:var(--bg);color:var(--tx);
+  -webkit-font-smoothing:antialiased;transition:background .35s ease,color .35s ease;
+}
+.sl[data-theme="light"]{
+  --brass:#C8913A;--brass-lift:#E0A83F;--brass-ink:#14150F;
+  --nav-bg:#EEECE5;
+  --bg:#F4F2EC;--bg-2:#FAF9F6;--bg-3:#F0EEE7;
+  --tx:#1A1B18;--tx-2:#4A4D45;--tx-3:#6B6E64;
+  --line:#DDDAD1;--line-2:#E5E2D9;--glow:rgba(200,145,58,.10);
+}
+.sl[data-theme="dark"]{
+  --brass:#C8913A;--brass-lift:#E0A83F;--brass-ink:#14150F;
+  --nav-bg:#26281F;
+  --bg:#14150F;--bg-2:#1C1E17;--bg-3:#24261E;
+  --tx:#F5F3EC;--tx-2:#C9C9C2;--tx-3:#A8A89F;
+  --line:#30312B;--line-2:#23261D;--glow:rgba(224,168,63,.14);
+}
+
+/* Stronger reading contrast on long-form legal/about pages in light mode only. */
+.sl[data-theme="light"] .legalcopy{--tx-2:#383B35;--tx-3:#555950}
+.sl[data-theme="light"] .legalcopy .eyebrow{font-weight:700}
+
+.disp{font-family:'Fraunces',Georgia,serif;font-weight:400;letter-spacing:-.02em}
+.num{font-variant-numeric:tabular-nums;font-feature-settings:'tnum' 1}
+.eyebrow{font-size:10px;letter-spacing:.18em;text-transform:uppercase;font-weight:600;color:var(--tx-3)}
+.mono{font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:11.5px;letter-spacing:-.02em;overflow-wrap:anywhere}
+
+.wrap{max-width:820px;margin:0 auto;padding:76px 22px 130px;width:100%}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin:14px auto 0;max-width:280px}
+.dowlab{text-align:center;font-size:9px;color:var(--tx-3);letter-spacing:.06em;padding-bottom:4px}
+.day{position:relative;aspect-ratio:1;border:0;border-radius:8px;background:none;cursor:pointer;
+  font-family:inherit;font-size:11.5px;color:var(--tx-2);display:flex;align-items:center;
+  justify-content:center;transition:background .15s,color .15s}
+.day:hover{background:var(--bg-3)}
+.day[data-today="1"]{color:var(--brass);font-weight:700}
+.day[data-on="1"]{background:var(--brass);color:var(--brass-ink);font-weight:600}
+.day em{position:absolute;bottom:5px;left:50%;transform:translateX(-50%);
+  width:5px;height:5px;border-radius:50%}
+.day[data-on="1"] em{background:var(--brass-ink) !important}
+.stepcard{position:relative;border:1.5px solid var(--req);border-radius:14px;background:var(--req-soft);padding:22px 20px 20px;margin-bottom:18px}
+.stepcard.done{border-color:var(--good);background:transparent}
+.stepnum{position:absolute;top:-13px;left:18px;width:26px;height:26px;border-radius:50%;background:var(--req);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:700;font-family:'Instrument Sans',sans-serif}
+.stepcard.done .stepnum{background:var(--good)}
+.steplead{font-size:12.5px;color:var(--req);font-weight:600;letter-spacing:.02em;margin-bottom:5px}
+.stepcard.done .steplead{color:var(--good)}
+.stepcard-chev{position:absolute;top:22px;right:18px;font-size:18px;color:var(--tx-3);
+  transition:transform .18s ease;cursor:pointer;line-height:1}
+.stepcard-chev[data-open="1"]{transform:rotate(90deg)}
+.stepcard-head{cursor:pointer}
+.stephint{font-size:13px;color:var(--tx-2);line-height:1.6;margin-bottom:16px}
+.dots{display:flex;gap:6px;margin-bottom:20px}
+.dots i{height:3px;flex:1;border-radius:2px;background:var(--line);transition:background .3s}
+.dots i[data-on="1"]{background:var(--brass)}
+.top{position:fixed;top:0;left:0;right:0;z-index:50;background:var(--bg);border-bottom:1px solid var(--line);padding:0 22px;transition:background .35s ease}
+/* Sits directly under .top (same sticky pattern, offset by its 60px
+   height) so the Work/Money/People switcher stays reachable no matter how
+   far down a long screen -- like Travel's log-a-trip form -- you've
+   scrolled, instead of scrolling away with the rest of the page. */
+.segbar{position:sticky;top:60px;z-index:29;background:var(--bg);border-bottom:1px solid var(--line);padding:0 22px}
+.segbarin{max-width:820px;margin:0 auto}
+.topin{max-width:820px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px;height:60px;min-width:0}
+.mark{display:flex;align-items:center;gap:10px;min-width:0}
+.mark .disp{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.seal{width:30px;height:30px;border-radius:8px;background:linear-gradient(145deg,var(--brass-lift),var(--brass));display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:15px;font-weight:500;color:var(--brass-ink)}
+.avatar{width:36px;height:36px;border-radius:50%;border:1px solid var(--line);
+  background:linear-gradient(145deg,var(--brass-lift),var(--brass));color:var(--brass-ink);
+  font-family:'Instrument Sans',sans-serif;font-size:14.5px;font-weight:700;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:all .18s ease;padding:0}
+.avatar:hover{transform:scale(1.05)}
+.avatar[data-on="1"]{box-shadow:0 0 0 3px var(--glow)}
+.helpbtn{width:32px;height:32px;border-radius:50%;border:1px solid var(--line);
+  background:var(--bg-2);color:var(--tx-2);
+  font-family:'Fraunces',serif;font-size:15px;font-weight:600;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:all .18s ease;padding:0}
+.helpbtn:hover{border-color:var(--brass);color:var(--brass-lift)}
+.menuveil{position:fixed;inset:0;z-index:44}
+.menu{position:absolute;top:46px;right:0;z-index:45;min-width:210px;
+  background:var(--bg-2);border:1px solid var(--line);border-radius:13px;
+  box-shadow:0 14px 40px rgba(0,0,0,.28);overflow:hidden;padding:5px}
+.menuhead{padding:13px 14px 12px;border-bottom:1px solid var(--line-2);margin-bottom:5px}
+.menu button{display:block;width:100%;text-align:left;padding:11px 14px;border:0;
+  border-radius:9px;background:none;cursor:pointer;font-family:inherit;font-size:13.5px;
+  font-weight:500;color:var(--tx-2);transition:background .15s,color .15s}
+.menu button:hover{background:var(--bg-3);color:var(--tx)}
+.lockwrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;padding:40px 26px;text-align:center;background:var(--bg)}
+.lockmark{margin-bottom:16px;opacity:.95}
+.pindots{display:flex;gap:13px;margin-bottom:22px}
+.pindots i{width:13px;height:13px;border-radius:50%;border:1.5px solid var(--line);
+  transition:background .15s,border-color .15s}
+.pindots i[data-on="1"]{background:var(--brass);border-color:var(--brass)}
+.pinpad{display:grid;grid-template-columns:repeat(3,1fr);gap:13px;width:min(280px,80vw)}
+.pinpad button{aspect-ratio:1;border-radius:50%;border:1px solid var(--line);
+  background:var(--bg-2);color:var(--tx);font-family:inherit;font-size:21px;font-weight:500;
+  cursor:pointer;transition:background .12s,transform .08s}
+.pinpad button:active{background:var(--bg-3);transform:scale(.95)}
+.pinpad button.ghost{background:none;border-color:transparent;font-size:18px;color:var(--tx-3)}
+.pinpad button:disabled{opacity:.3;cursor:default}
+.iconbtn{width:34px;height:34px;border-radius:8px;border:1px solid var(--line);background:var(--bg-2);color:var(--tx-2);cursor:pointer;font-size:14px;display:inline-flex;align-items:center;justify-content:center;transition:all .18s ease;font-family:inherit}
+.iconbtn:hover{color:var(--tx);border-color:var(--brass)}
+.iconbtn[data-on="1"]{color:var(--brass);border-color:var(--brass)}
+
+.seg{display:flex;gap:2px;background:var(--bg-3);padding:3px;border-radius:11px;margin:10px 0}
+.seg button{flex:1;padding:9px 8px;border:0;border-radius:9px;background:none;cursor:pointer;font-family:inherit;font-size:13.5px;font-weight:600;color:var(--tx-3);transition:all .2s ease;letter-spacing:-.01em}
+.seg button[data-on="1"]{background:var(--bg-2);color:var(--tx);box-shadow:0 1px 3px rgba(0,0,0,.10)}
+.seg.sub{margin:0 0 22px;background:none;padding:0;gap:6px;max-width:100%;min-width:0}
+.seg.sub::-webkit-scrollbar{display:none}
+.seg.sub button{position:relative;flex:1 1 0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  padding:8px 7px;border-radius:99px;border:1px solid transparent;background:var(--bg-2);
+  color:var(--tx-3);font-size:12.5px;font-weight:600;letter-spacing:-.015em;
+  transition:background .18s ease,color .18s ease,box-shadow .18s ease}
+.seg.sub button:hover{background:var(--bg-3);color:var(--tx-2)}
+.seg.sub button[data-on="1"]{background:var(--brass);border-color:var(--brass);color:var(--brass-ink);
+  box-shadow:0 2px 10px rgba(200,145,58,.22)}
+.seg.sub button[data-on="1"]:hover{background:var(--brass-lift);color:var(--brass-ink)}
+
+/* 3: a pill only carries colour when something behind it needs the user */
+.seg.sub button i{position:absolute;top:6px;right:8px;width:6px;height:6px;border-radius:50%;
+  background:var(--brass);box-shadow:0 0 0 2px var(--bg-2)}
+.seg.sub button[data-on="1"] i{background:var(--brass-ink);box-shadow:0 0 0 2px var(--brass)}
+.seg.sub button i[data-tone="warn"]{background:var(--warn)}
+.seg.sub button[data-on="1"] i[data-tone="warn"]{background:var(--brass-ink)}
+
+/* Lighter tab treatment for Money/Work/People's own sections, distinct
+   from .seg.sub so unrelated pill-style tabs elsewhere (Notes filter,
+   Help's internal tabs) are left completely alone. */
+.tabnav{display:flex;gap:20px;overflow-x:auto;-webkit-overflow-scrolling:touch;
+  scrollbar-width:none;border-bottom:1px solid var(--line)}
+/* The title and its tab row move as one pinned unit, rather than each
+   guessing the other's height to stack correctly. Work's title carries an
+   extra subtitle line that Money and People don't, so any fixed pixel
+   offset between two separately-pinned pieces would only be right on one
+   of the three screens. Wrapping them together sidesteps that entirely,
+   the block is exactly as tall as its own content, whatever that is. */
+.pinhead{position:sticky;top:60px;z-index:20;background:var(--bg);margin:0 -22px;padding:16px 22px 14px;transition:background .35s ease}
+.pinhead .tabnav{margin:2px 0 0}
+.featurepin{display:flex;align-items:center;gap:14px;min-height:68px;padding-top:12px;padding-bottom:12px}
+.sectionback{display:inline-flex;align-items:center;gap:7px;flex:0 0 auto;padding:8px 10px 8px 8px;border:1px solid var(--line);border-radius:10px;background:var(--bg-2);color:var(--tx-2);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;transition:border-color .16s,color .16s,background .16s}
+.sectionback:hover{border-color:var(--brass);color:var(--tx);background:var(--bg-3)}
+.sectionback .arr{font-size:17px;line-height:1;color:var(--brass);margin-top:-1px}
+.featuretitle{font-size:27px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:430px){.featurepin{gap:8px}.sectionback{padding:7px 8px 7px 7px;font-size:12px}.featuretitle{font-size:clamp(19px,6vw,24px);line-height:1.05;overflow:visible;text-overflow:clip;white-space:normal;flex:1}}
+.tabnav::-webkit-scrollbar{display:none}
+.tabnav button{position:relative;flex:0 0 auto;padding:0 2px 11px;border:0;background:none;cursor:pointer;
+  font-family:inherit;font-size:14px;font-weight:600;letter-spacing:-.01em;color:var(--tx-3);
+  white-space:nowrap;min-height:44px;display:flex;align-items:center;transition:color .18s ease}
+.tabnav button:hover{color:var(--tx-2)}
+.tabnav button[data-on="1"]{color:var(--tx)}
+.tabnav button[data-on="1"]::after{content:"";position:absolute;left:2px;right:2px;bottom:-1px;height:2px;
+  background:var(--brass);border-radius:2px 2px 0 0}
+.tabnav button i{width:6px;height:6px;border-radius:50%;background:var(--brass);margin-left:6px;flex:0 0 auto}
+.tabnav button i[data-tone="warn"]{background:var(--warn)}
+
+.band{padding:24px 0;border-bottom:1px solid var(--line-2)}
+.band:last-child{border-bottom:0}
+.bandhead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:15px;gap:10px;flex-wrap:wrap;min-width:0}
+
+.hero{position:relative;border-radius:16px;padding:28px 26px 24px;overflow:hidden;background:var(--bg-2);border:1px solid var(--line);box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.hero::after{content:'';position:absolute;inset:0;pointer-events:none;background:radial-gradient(120% 130% at 100% 0%,var(--glow),transparent 62%)}
+.bignum{font-size:clamp(42px,11vw,58px);line-height:.95;margin:10px 0 0}
+.midnum{font-size:27px;line-height:1}
+
+.split{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line-2);border-radius:12px;overflow:hidden;border:1px solid var(--line)}
+.split > div{background:var(--bg-2);padding:17px 18px}
+
+.panel{background:var(--bg-2);border:1px solid var(--line);border-radius:14px;padding:20px 21px}
+.panel + .panel{margin-top:12px}
+
+.bar{height:5px;background:var(--bg-3);border-radius:99px;overflow:hidden}
+.bar > i{display:block;height:100%;background:var(--brass);border-radius:99px;transition:width .6s cubic-bezier(.3,1,.4,1)}
+
+.row{display:flex;align-items:center;gap:11px;padding:13px 0;border-bottom:1px solid var(--line-2);min-width:0}
+.row>div{min-width:0}
+.row:last-child{border-bottom:0}
+.row.tap{cursor:pointer;transition:opacity .15s}
+.row.tap:hover{opacity:.62}
+.dot{width:7px;height:7px;border-radius:99px;flex:0 0 7px}
+
+.qa{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}
+.qa button{padding:15px 10px;border-radius:12px;border:1px solid var(--line);background:var(--bg-2);cursor:pointer;font-family:inherit;color:var(--tx);font-size:12.5px;font-weight:600;transition:all .18s ease;text-align:center}
+.qa button:hover{border-color:var(--brass);transform:translateY(-1px)}
+.qa em{display:block;font-style:normal;font-size:18px;margin-bottom:6px}
+
+.pill{display:inline-block;padding:3px 9px;border-radius:99px;font-size:9.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase}
+.pill.paid{background:rgba(78,140,106,.16);color:var(--good)}
+.pill.sent{background:rgba(91,124,157,.16);color:var(--sent)}
+.pill.overdue{background:rgba(192,57,43,.16);color:var(--req)}
+.pill.draft{background:var(--bg-3);color:var(--tx-3)}
+
+label.f{display:block;margin-bottom:13px}
+label.f > span{display:block;font-size:10px;letter-spacing:.16em;text-transform:uppercase;font-weight:600;color:var(--tx-3);margin-bottom:6px}
+label.f.req > span::after{content:" +";color:var(--brass);font-size:9px;vertical-align:super;font-weight:800;letter-spacing:0}
+input,select,textarea{
+  width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;
+  background:var(--bg);font-family:inherit;font-size:14px;color:var(--tx);transition:all .15s;
+}
+input:focus,select:focus,textarea:focus{outline:0;border-color:var(--brass);box-shadow:0 0 0 3px var(--glow)}
+textarea{resize:vertical;min-height:96px;line-height:1.6}
+select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--tx-3) 50%),linear-gradient(135deg,var(--tx-3) 50%,transparent 50%);background-position:calc(100% - 17px) 19px,calc(100% - 12px) 19px;background-size:5px 5px;background-repeat:no-repeat;padding-right:34px}
+/* A plain number input never tells you what the figure means once you're
+   typing, the placeholder that hinted "0.00" is long gone by then. This
+   pins a real, permanent $ or unit label to the field itself. */
+.affix{position:relative}
+.affix input{padding-left:24px}
+.affix i{position:absolute;left:12px;top:50%;transform:translateY(-50%);font-style:normal;color:var(--tx-3);font-size:14px;pointer-events:none}
+.affix.suffix input{padding-left:12px;padding-right:38px}
+.affix.suffix i{left:auto;right:12px;font-size:12.5px}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:13.5px;cursor:pointer;line-height:1.5;color:var(--tx-2)}
+.check input{width:17px;height:17px;flex:0 0 17px;margin-top:1px;accent-color:var(--brass)}
+
+.btn{white-space:nowrap;max-width:100%;padding:10px 18px;border-radius:10px;border:1px solid var(--brass);background:var(--brass);color:var(--brass-ink);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer;transition:all .18s ease}
+.btn:hover:not(:disabled){background:var(--brass-lift);border-color:var(--brass-lift)}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn.ghost{background:none;color:var(--tx-2);border-color:var(--line)}
+.btn.ghost:hover:not(:disabled){color:var(--tx);border-color:var(--brass);background:none}
+.btn.tiny{padding:6px 12px;font-size:12px;border-radius:8px}
+.btn.x{background:none;border:0;color:var(--warn);padding:6px 7px;font-size:15px;
+  display:inline-flex;align-items:center;justify-content:center}
+.btn.x:hover{color:var(--warn);background:none;border:0}
+
+.callout{background:var(--bg-3);border-left:2px solid var(--brass);border-radius:0 10px 10px 0;padding:13px 16px;font-size:12.5px;color:var(--tx-2);line-height:1.55}
+.startcard{position:relative;border:1.5px solid var(--brass);border-radius:14px;background:var(--bg-2);padding:22px 20px 20px;margin-bottom:18px;box-shadow:0 6px 20px rgba(0,0,0,.14)}
+.startlead{font-size:12.5px;color:var(--brass);font-weight:600;letter-spacing:.02em;margin-bottom:5px;text-transform:uppercase}
+.empty{padding:44px 20px;text-align:center;color:var(--tx-3);font-size:13.5px;line-height:1.65}
+.lineitem{border-top:1px solid var(--line-2);padding-top:16px;margin-top:16px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.fab{position:fixed;right:18px;bottom:86px;z-index:41}
+
+.mob{display:flex;position:fixed;left:50%;transform:translateX(-50%);width:min(100%,820px);bottom:0;z-index:48;background:var(--nav-bg);border-top:1px solid var(--line);padding:7px 8px calc(9px + env(safe-area-inset-bottom));box-shadow:0 -10px 30px rgba(0,0,0,.28)}
+.mobnav{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:9px 4px 8px;border:1px solid transparent;border-radius:14px;background:none;cursor:pointer;font-family:inherit;font-size:11.5px;font-weight:600;color:var(--tx-3);transition:all .2s;min-height:58px}
+.mobnav-icon{display:flex;align-items:center;justify-content:center;min-height:22px;color:inherit}
+.mobnav-icon svg{width:22px;height:22px}
+.mobnav-dollar{font-size:25px;font-weight:700;line-height:.9;font-family:'Instrument Sans',sans-serif}
+.mobnav[data-on="1"]{background:rgba(200,145,58,.08);border-color:rgba(200,145,58,.26);color:var(--brass-lift)}
+.mobnav[data-on="1"] .mobnav-icon{color:var(--brass-lift)}
+@media(max-width:700px){
+  .seg:not(.sub){display:none}
+  .two,.three{grid-template-columns:1fr}
+  .wrap{padding:76px 14px 140px}
+  .top{padding:0 14px}
+  .pinhead{margin:0 -14px;padding:16px 14px 14px}
+  .hero{padding:22px 18px 20px}
+  .panel,.stepcard{padding:18px 16px}
+  .seg.sub{gap:5px}
+  .seg.sub button{padding:7px 4px;font-size:11px}
+  .bignum{font-size:40px}
+  .mob{width:100%}
+  .mobnav{min-width:0}
+}
+/* Home + section shortcut hubs. These are navigation only; existing feature screens stay unchanged.
+   The app header, hub heading/intro and bottom nav stay fixed; only shortcut cards scroll. */
+.hubpage{position:fixed;z-index:16;top:60px;bottom:calc(76px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:min(100%,820px);padding:0 22px;background:var(--bg);display:flex;flex-direction:column;overflow:hidden;transition:background .35s ease}
+.hubfixed{flex:0 0 auto;background:var(--bg);position:relative;z-index:2}
+.hubscroll{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:0 0 20px;scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+.hubscroll::-webkit-scrollbar{width:5px}.hubscroll::-webkit-scrollbar-track{background:transparent}.hubscroll::-webkit-scrollbar-thumb{background:var(--line);border-radius:99px}
+.homehub{padding-top:0}
+.homehello{padding:24px 0 18px}
+.homehello .greet{font-family:'Fraunces',Georgia,serif;font-size:31px;line-height:1.08;letter-spacing:-.025em}
+.homehello .sub{font-size:13.5px;color:var(--tx-3);margin-top:6px}
+.hubhead{padding:24px 0 19px}
+.hubhead .disp{font-size:31px;line-height:1.05}
+.hubhead p{margin:8px 0 0;color:var(--tx-3);font-size:13.5px;line-height:1.55;max-width:560px}
+.shortcutmeta{background:linear-gradient(145deg,var(--bg-3),var(--bg-2));border:1px solid var(--line);border-bottom:0;border-radius:18px 18px 0 0;padding:16px 16px 13px;box-shadow:0 10px 30px rgba(0,0,0,.12)}
+.homecardscroll{background:linear-gradient(145deg,var(--bg-3),var(--bg-2));border:1px solid var(--line);border-top:0;border-radius:0 0 18px 18px;padding:0 16px 16px;box-shadow:0 10px 30px rgba(0,0,0,.12)}
+.shortcuttitle{font-size:13px;font-weight:700;margin-bottom:4px}
+.shortcuthelp{font-size:12px;color:var(--tx-3);line-height:1.5}
+.shortgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
+.homeflowgrid{grid-template-columns:1fr}
+.shortcard{position:relative;min-height:128px;text-align:left;border:1px solid var(--line);border-radius:16px;background:linear-gradient(145deg,var(--bg-3),var(--bg-2));padding:15px;color:var(--tx);font-family:inherit;cursor:pointer;transition:transform .16s,border-color .16s,background .16s;display:flex;flex-direction:column;align-items:flex-start}
+.shortcard:hover{transform:translateY(-1px);border-color:rgba(200,145,58,.5)}
+.shortcard.wide{grid-column:1/-1;min-height:102px}
+.shorticon{width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;background:var(--bg);border:1px solid var(--line);flex:0 0 auto}
+.shorticon svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.shorticon.pink{color:#E16C9A}.shorticon.violet{color:#8B79E5}.shorticon.teal{color:#54BCA4}.shorticon.blue{color:#69A6DF}.shorticon.orange{color:#DC8548}.shorticon.green{color:#67AD79}.shorticon.yellow{color:#DDB34B}
+.shortcard b{display:flex;align-items:flex-start;font-size:15.5px;line-height:1.14;margin-top:9px;margin-right:28px;min-height:38px}
+.shortcard small{display:block;color:var(--tx-3);font-size:11.8px;line-height:1.4;margin-top:4px;margin-right:28px;max-width:none;min-height:50px}
+.shortcard.wide b,.shortcard.wide small{min-height:auto}
+.shortchev{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:22px;color:var(--tx-3)}
+@media(max-width:700px){
+  .hubpage{width:100%;padding:0 14px;bottom:calc(84px + env(safe-area-inset-bottom))}
+  .homehello .greet,.hubhead .disp{font-size:29px}
+  .shortcard{min-height:124px;padding:14px}
+  .shortcutmeta{padding:14px 14px 12px}
+  .homecardscroll{padding:0 14px 14px}
+}
+
+`;
+
+/* ---------------- AI configuration ---------------- */
+// Two optional features use a language model: the deduction checker and the
+// shift-note tidier. Point these at whichever provider you use. Leave endpoint
+// empty and both features hide themselves — everything else works unchanged.
+const AI = {
+  // Served by netlify/functions/assist.js, which holds the API key server-side.
+  // Empty this string to switch both AI features off cleanly.
+  endpoint: "/.netlify/functions/assist",
+  model: "",             // chosen by the function, not the browser
+  enabled: function () { return !!this.endpoint; },
+};
+
+// Daily caps. Two purposes: stop a runaway loop costing real money, and stop a
+// stranger who finds the URL spending the API budget. Client-side is the polite
+// layer; the function enforces its own limit as well.
+const AI_CAPS = { check: 15, tidy: 30, assistant: 20 };
+
+// Simple, honest config switch -- no feature-flag infrastructure exists in
+// this app, so this is that infrastructure: one constant, one place to
+// flip if the SupportFlow Assistant ever needs to be pulled without
+// touching anything else.
+const FEATURES = { supportFlowAssistant: true };
+
+// Best-effort only, checked before a message ever leaves the device.
+// Never claimed as complete -- the warning it drives says "may contain",
+// not "contains", on purpose.
+function looksLikeSensitiveInfo(text) {
+  const patterns = [
+    /\b\d{9}\b/,                                    // NDIS number, 9 digits
+    /\b\d{11}\b/,                                    // ABN, 11 digits
+    /[\w.+-]+@[\w-]+\.[a-z.-]+/i,                     // email address
+    /\b(?:\+?61[ -]?|0)[2-478](?:[ -]?\d){8}\b/,      // AU phone number
+  ];
+  return patterns.some((re) => re.test(text));
+}
+
+// Reuses MANUAL and FAQ as the single source of truth -- the same content
+// the in-app search and the manual itself already show. Only the handful
+// of entries that actually match go to the model, never the whole thing.
+function pickManualContext(question) {
+  const words = [...new Set(question.toLowerCase().match(/[a-z]{4,}/g) || [])];
+  if (!words.length) return "";
+  const hits = [];
+  [...MANUAL, ...FAQ].forEach((sec) => {
+    (sec.q || []).forEach(([q, a]) => {
+      const hay = (q + " " + a).toLowerCase();
+      const score = words.reduce((n, w) => n + (hay.includes(w) ? 1 : 0), 0);
+      if (score > 0) hits.push({ q, a, score });
+    });
+  });
+  hits.sort((a, b) => b.score - a.score);
+  return hits.slice(0, 4).map((h) => `Q: ${h.q}\nA: ${h.a}`).join("\n\n");
+}
+
+// The assistant can only ever navigate, never act -- this is the entire
+// set of places it's allowed to send someone, each mapped to the real
+// tab/sub-tab this app actually uses internally.
+function openAssistantTarget(key, go) {
+  const map = {
+    invoices: () => go("summary", "invoices"),
+    shifts: () => go("invoices", "shifts"),
+    travel: () => go("invoices", "travel"),
+    notes: () => go("invoices", "notes"),
+    people: () => go("people", "participants"),
+    settings: () => go("settings"),
+    expenses: () => go("summary", "expenses"),
+    tax: () => go("summary", "position"),
+    backup: () => go("settings"),
+  };
+  (map[key] || (() => {}))();
+}
+
+function aiUsed(kind) {
+  try {
+    const raw = JSON.parse(localStorage.getItem("ndis:aiuse") || "{}");
+    return raw.d === today() ? (raw[kind] || 0) : 0;
+  } catch (e) { return 0; }
+}
+function aiBump(kind) {
+  try {
+    const raw = JSON.parse(localStorage.getItem("ndis:aiuse") || "{}");
+    const next = raw.d === today() ? raw : { d: today() };
+    next[kind] = (next[kind] || 0) + 1;
+    localStorage.setItem("ndis:aiuse", JSON.stringify(next));
+  } catch (e) { }
+}
+const aiLeft = (kind) => Math.max(0, AI_CAPS[kind] - aiUsed(kind));
+
+async function askModel(prompt, opts) {
+  if (!AI.enabled()) throw new Error("not-configured");
+  const kind = (opts && opts.kind) || "check";
+  if (aiLeft(kind) <= 0) throw new Error("daily-cap");
+  if (aiLeft() === 0) throw new Error("daily-cap");
+  aiBump();
+  // The endpoint takes a prompt and a search flag. It chooses the model, holds
+  // the key, and restricts any search to the ATO — none of that belongs here.
+  const body = { prompt: prompt, search: !!(opts && opts.search) };
+  const res = await fetch(AI.endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (res.status === 503) throw new Error("not-configured");
+  if (res.status === 429) throw new Error("busy");
+  if (!res.ok) {
+    let why = "";
+    try { const e = await res.json(); why = e.error === "upstream" ? `, the model returned ${e.status}` : ""; } catch (x) { }
+    throw new Error(`Lookup failed (${res.status})${why}`);
+  }
+  aiBump(kind);
+  const d = await res.json();
+  const blocks = d.content || d.messages || [];
+  const text = (Array.isArray(blocks) ? blocks : [])
+    .filter((c) => c.type === "text").map((c) => c.text).join("\n").trim();
+  // sources come from the server, which takes them from the search layer
+  return { text, sources: Array.isArray(d.sources) ? d.sources : [] };
+}
+
+/* ---------------- reference data ---------------- */
+// Indicative national (non-remote) price limits — verify against the current
+// NDIS Pricing Arrangements. Every rate is editable per line.
+// Verified against the NDIS Pricing Schedule 2026-27 (v1.2, 22 July 2026),
+// Schedule 1 — Disability Support Workers. National column, effective 1 July 2026.
+// https://www.ndis.gov.au/providers/pricing-arrangements
+const APP_VERSION = "27";
+
+const PRICE_SOURCE = {
+  doc: "NDIS Pricing Schedule 2026-27",
+  version: "v1.2, 22 July 2026",
+  effective: "1 July 2026",
+  column: "National",
+  verified: "2026-08-08",        // when these figures were last checked against the source
+  url: "https://www.ndis.gov.au/providers/pricing-and-payments/pricing/pricing-updates",
+};
+// The app can't update itself, but it can refuse to look current when it isn't.
+const ratesAge = () => Math.floor((new Date(today()) - new Date(PRICE_SOURCE.verified)) / 86400000);
+const ratesStale = () => ratesAge() > 330;
+
+// Everything a person would be upset to lose. Shifts belong here — they are the
+// most frequently created record in the app.
+const countRecords = (d) => d.participants.length + d.managers.length + d.shifts.length
+  + d.trips.length + d.invoices.length + d.expenses.length + d.notes.length;
+
+// Backup reminders remain enabled after required backup setup. Nothing here fires on its own schedule — it shows on first open
+// after the chosen time, because a browser cannot wake itself up.
+const BACKUP_EVERY = [
+  ["none", "Don't remind me", 0],
+  ["daily", "Every day", 1],
+  ["weekly", "Every week", 7],
+  ["fortnightly", "Every fortnight", 14],
+];
+const backupDays = (v) => (BACKUP_EVERY.find((x) => x[0] === v) || BACKUP_EVERY[0])[2];
+
+function backupDue(d) {
+  const p = d.profile || {};
+  if (!p.backupEvery || p.backupEvery === "none") return false;
+  const every = backupDays(p.backupEvery);
+  if (!every) return false;
+  if (p.remindedOn === today()) return false;                 // once a day, at most
+  const since = p.backedUp
+    ? Math.floor((new Date(today()) - new Date(p.backedUp)) / 86400000)
+    : Infinity;
+  if (since < every) return false;
+  const at = p.backupAt || "18:00";                            // first open after this
+  const now = new Date();
+  return now.getHours() * 60 + now.getMinutes() >= mins(at);
+}
+
+// Places a support worker genuinely needs, kept in one list so they are easy to
+// keep correct. Maintainer tooling (status pages, change watchers) stays out.
+const SOURCES = [
+  { t: "NDIS pricing updates", d: "Current prices and every change, with the date each takes effect.",
+    u: "https://www.ndis.gov.au/providers/pricing-and-payments/pricing/pricing-updates" },
+  { t: "NDIA newsletters", d: "The monthly Provider newsletter tells you about changes as they happen.",
+    u: "https://www.ndis.gov.au/about-us/newsletters" },
+  { t: "NDIS Quality and Safeguards Commission", d: "Worker screening, practice alerts, and the complaints line: 1800 035 544.",
+    u: "https://www.ndiscommission.gov.au/" },
+  { t: "ATO occupation guides", d: "What community support and care workers can claim at tax time.",
+    u: "https://www.ato.gov.au/individuals-and-families/income-deductions-offsets-and-records/deductions-you-can-claim/occupation-and-industry-specific-guides" },
+  { t: "Australian Business Register", d: "Apply for or check an ABN. It is free, never pay a site that offers to do it.",
+    u: "https://www.abr.gov.au/" },
+];
+
+const SUPPORT_ITEMS = [
+  // Assistance with Self-Care Activities — Standard (Table 1)
+  { group: "Self-care, standard", code: "01_011_0107_1_1", name: "Self-Care, Weekday Daytime", rate: 73.58, unit: "hr" },
+  { group: "Self-care, standard", code: "01_015_0107_1_1", name: "Self-Care, Weekday Evening", rate: 81.07, unit: "hr" },
+  { group: "Self-care, standard", code: "01_002_0107_1_1", name: "Self-Care, Weekday Night", rate: 82.57, unit: "hr" },
+  { group: "Self-care, standard", code: "01_013_0107_1_1", name: "Self-Care, Saturday", rate: 103.54, unit: "hr" },
+  { group: "Self-care, standard", code: "01_014_0107_1_1", name: "Self-Care, Sunday", rate: 133.50, unit: "hr" },
+  { group: "Self-care, standard", code: "01_012_0107_1_1", name: "Self-Care, Public Holiday", rate: 163.46, unit: "hr" },
+  { group: "Self-care, standard", code: "01_010_0107_1_1", name: "Self-Care, Night-Time Sleepover (per night)", rate: 311.79, unit: "each" },
+
+  // Assistance with Self-Care Activities — High Intensity (Table 2)
+  { group: "Self-care, high intensity", code: "01_400_0104_1_1", name: "Self-Care High Intensity, Weekday Daytime", rate: 79.60, unit: "hr" },
+  { group: "Self-care, high intensity", code: "01_401_0104_1_1", name: "Self-Care High Intensity, Weekday Evening", rate: 87.70, unit: "hr" },
+  { group: "Self-care, high intensity", code: "01_405_0104_1_1", name: "Self-Care High Intensity, Weekday Night", rate: 89.32, unit: "hr" },
+  { group: "Self-care, high intensity", code: "01_402_0104_1_1", name: "Self-Care High Intensity, Saturday", rate: 112.01, unit: "hr" },
+  { group: "Self-care, high intensity", code: "01_403_0104_1_1", name: "Self-Care High Intensity, Sunday", rate: 144.42, unit: "hr" },
+  { group: "Self-care, high intensity", code: "01_404_0104_1_1", name: "Self-Care High Intensity, Public Holiday", rate: 176.84, unit: "hr" },
+
+  // Access Community, Social and Rec Activities (Table 1)
+  { group: "Community participation", code: "04_104_0125_6_1", name: "Community Access, Weekday Daytime", rate: 73.58, unit: "hr" },
+  { group: "Community participation", code: "04_103_0125_6_1", name: "Community Access, Weekday Evening", rate: 81.07, unit: "hr" },
+  { group: "Community participation", code: "04_105_0125_6_1", name: "Community Access, Saturday", rate: 103.54, unit: "hr" },
+  { group: "Community participation", code: "04_106_0125_6_1", name: "Community Access, Sunday", rate: 133.50, unit: "hr" },
+  { group: "Community participation", code: "04_102_0125_6_1", name: "Community Access, Public Holiday", rate: 163.46, unit: "hr" },
+
+  // Group Activities (Table 1)
+  { group: "Group activities", code: "04_102_0136_6_1", name: "Group Activities, Weekday Daytime", rate: 73.58, unit: "hr" },
+  { group: "Group activities", code: "04_103_0136_6_1", name: "Group Activities, Weekday Evening", rate: 81.07, unit: "hr" },
+  { group: "Group activities", code: "04_104_0136_6_1", name: "Group Activities, Saturday", rate: 103.54, unit: "hr" },
+  { group: "Group activities", code: "04_105_0136_6_1", name: "Group Activities, Sunday", rate: 133.50, unit: "hr" },
+  { group: "Group activities", code: "04_106_0136_6_1", name: "Group Activities, Public Holiday", rate: 163.46, unit: "hr" },
+
+  // Supported Independent Living — assistance in (Table 1)
+  { group: "Supported independent living", code: "01_801_0115_1_1", name: "SIL Assistance, Weekday Daytime", rate: 73.58, unit: "hr" },
+  { group: "Supported independent living", code: "01_802_0115_1_1", name: "SIL Assistance, Weekday Evening", rate: 81.07, unit: "hr" },
+  { group: "Supported independent living", code: "01_803_0115_1_1", name: "SIL Assistance, Weekday Night", rate: 82.57, unit: "hr" },
+  { group: "Supported independent living", code: "01_804_0115_1_1", name: "SIL Assistance, Saturday", rate: 103.54, unit: "hr" },
+  { group: "Supported independent living", code: "01_805_0115_1_1", name: "SIL Assistance, Sunday", rate: 133.50, unit: "hr" },
+  { group: "Supported independent living", code: "01_806_0115_1_1", name: "SIL Assistance, Public Holiday", rate: 163.46, unit: "hr" },
+  { group: "Supported independent living", code: "01_832_0115_1_1", name: "SIL, Night-Time Sleepover (per night)", rate: 311.79, unit: "each" },
+
+  // Short Term Accommodation / respite (Table 1)
+  { group: "Short term accommodation", code: "01_200_0115_1_1", name: "STA, Weekday Daytime", rate: 73.58, unit: "hr" },
+  { group: "Short term accommodation", code: "01_201_0115_1_1", name: "STA, Weekday Evening", rate: 81.07, unit: "hr" },
+  { group: "Short term accommodation", code: "01_205_0115_1_1", name: "STA, Weekday Night", rate: 82.57, unit: "hr" },
+  { group: "Short term accommodation", code: "01_202_0115_1_1", name: "STA, Saturday", rate: 103.54, unit: "hr" },
+  { group: "Short term accommodation", code: "01_203_0115_1_1", name: "STA, Sunday", rate: 133.50, unit: "hr" },
+  { group: "Short term accommodation", code: "01_204_0115_1_1", name: "STA, Public Holiday", rate: 163.46, unit: "hr" },
+
+  // Household and domestic (Table 13)
+  { group: "Household tasks", code: "01_004_0107_1_1", name: "Assistance with Personal Domestic Activities", rate: 61.16, unit: "hr" },
+  { group: "Household tasks", code: "01_020_0120_1_1", name: "House Cleaning and Household Activities", rate: 60.10, unit: "hr" },
+  { group: "Household tasks", code: "01_019_0120_1_1", name: "House or Yard Maintenance", rate: 59.01, unit: "hr" },
+  { group: "Household tasks", code: "01_016_0104_1_1", name: "Specialised Home Based Assistance for a Child", rate: 61.16, unit: "hr" },
+
+  // Capacity building delivered by support workers (Table 1)
+  { group: "Skill development", code: "15_037_0117_1_3", name: "Skill Development & Training incl. Public Transport Training", rate: 73.58, unit: "hr" },
+  { group: "Skill development", code: "15_035_0106_1_3", name: "Assistance with Decision Making, Daily Planning & Budgeting", rate: 73.58, unit: "hr" },
+  { group: "Skill development", code: "09_009_0117_6_3", name: "Skills Development and Training (Level 3)", rate: 83.87, unit: "hr" },
+  { group: "Skill development", code: "09_006_0106_6_3", name: "Life Transition Planning incl. Mentoring & Peer Support", rate: 83.87, unit: "hr" },
+  { group: "Skill development", code: "08_005_0106_2_3", name: "Assistance with Accommodation & Tenancy Obligations", rate: 83.87, unit: "hr" },
+  { group: "Skill development", code: "11_024_0117_7_3", name: "Individual Social Skills Development", rate: 83.87, unit: "hr" },
+
+  // Employment (Table 1)
+  { group: "Employment supports", code: "04_801_0133_5_1", name: "Supports in Employment, Weekday Daytime", rate: 73.58, unit: "hr" },
+  { group: "Employment supports", code: "04_802_0133_5_1", name: "Supports in Employment, Weekday Evening", rate: 81.07, unit: "hr" },
+  { group: "Employment supports", code: "04_803_0133_5_1", name: "Supports in Employment, Saturday", rate: 103.54, unit: "hr" },
+  { group: "Employment supports", code: "04_804_0133_5_1", name: "Supports in Employment, Sunday", rate: 133.50, unit: "hr" },
+  { group: "Employment supports", code: "04_805_0133_5_1", name: "Supports in Employment, Public Holiday", rate: 163.46, unit: "hr" },
+
+  // Coordination and recovery coaching (Tables 4 and 53)
+  { group: "Coordination & coaching", code: "07_001_0106_8_3", name: "Support Coordination Level 1, Support Connection", rate: 80.06, unit: "hr" },
+  { group: "Coordination & coaching", code: "07_002_0106_8_3", name: "Support Coordination Level 2, Coordination of Supports", rate: 100.14, unit: "hr" },
+  { group: "Coordination & coaching", code: "07_101_0106_6_3", name: "Psychosocial Recovery Coaching, Weekday Daytime", rate: 110.44, unit: "hr" },
+  { group: "Coordination & coaching", code: "07_104_0106_6_3", name: "Psychosocial Recovery Coaching, Saturday", rate: 155.41, unit: "hr" },
+  { group: "Coordination & coaching", code: "07_105_0106_6_3", name: "Psychosocial Recovery Coaching, Sunday", rate: 200.39, unit: "hr" },
+];
+
+const ITEM_GROUPS = [...new Set(SUPPORT_ITEMS.map((i) => i.group))];
+
+// Provider travel — non-labour costs. The Pricing Schedule lists this as a
+// notional $1.00 unit item, meaning you claim the actual amount. The per-km
+// figure comes from the PAPL rules (a vehicle not modified for accessibility),
+// so it is editable in Settings rather than hardcoded.
+const TRAVEL_ITEM = { code: "01_799_0107_1_1", name: "Provider travel, non-labour costs", rate: 0.99, unit: "km" };
+// A real, existing field on every catalogue item, used purely for display
+// (the invoice PDF's "Core Support"-style category heading). A manually
+// typed line's code won't match anything here, that's fine, the PDF falls
+// back to the line's own description with no category heading rather than
+// guessing one.
+const itemGroup = (code) => (code === TRAVEL_ITEM.code ? "Travel" : (SUPPORT_ITEMS.find((x) => x.code === code) || {}).group || "");
+
+// ATO cents-per-kilometre method, 2026-27 income year: 91c/km, capped at
+// 5,000 business km per car ($4,550). The rate already includes depreciation,
+// registration, fuel, servicing and insurance — those can't be claimed again.
+// https://www.ato.gov.au/.../cents-per-kilometre-method
+// GST turnover is total sales, and GST-free sales COUNT toward it — only
+// input-taxed sales are excluded. NDIS supports being GST-free does not keep a
+// support worker under the threshold. Rolling 12 months, not financial year.
+const GST_THRESHOLD = 75000;
+// Which of onboarding's three steps still has a genuine gap, so "Finish
+// setup" can open directly on that step rather than always restarting from
+// step 1. Deliberately mirrors the same rules Onboarding itself uses for
+// each step's own completion state, not Summary's fuller todo list, since
+// that includes agreements and reviews that don't map to any of these
+// three steps at all.
+const firstIncompleteStep = (data) => {
+  const profileOK = !!(data.profile.name || "").trim() && isValidAbn(data.profile.abn);
+  if (!profileOK) return 1;
+  if (data.managers.length === 0 && data.participants.some((x) => x.planType === "plan")) return 2;
+  if (data.participants.length === 0) return 3;
+  if (data.participants.some((x) => x.planType === "plan" && !x.managerId)) return 2;
+  return 3;
+};
+
+const gstTurnover = (data) => {
+  const end = new Date(today() + "T00:00:00");
+  const start = new Date(end); start.setMonth(start.getMonth() - 11); start.setDate(1);
+  const from = start.toISOString().slice(0, 10);
+  return data.invoices.filter((i) => i.date && i.date >= from).reduce((n, i) => n + invTotal(i), 0);
+};
+
+// A GST credit only exists if the user is registered, the receipt actually
+// shows GST, and the purchase was for the business, only the business-use
+// share counts. Not registered, or nothing entered, or the receipt shows no
+// GST all mean the same thing here: nothing to claim, not "unknown" and not
+// "assume the full amount". One function so every screen that mentions a
+// credit is asking the same question the same way.
+const gstCreditFor = (expense, gstRegistered) => {
+  if (!gstRegistered) return 0;
+  const gst = Number(expense.gstAmount || 0);
+  if (gst <= 0) return 0;
+  const pct = expense.businessUsePct === "" || expense.businessUsePct == null ? 100 : Number(expense.businessUsePct);
+  return gst * (Math.max(0, Math.min(100, pct)) / 100);
+};
+
+const CAR = { rate: 0.91, cap: 5000, year: "2026-27" };
+const carDeduction = (km, rate = CAR.rate) => Math.min(km, CAR.cap) * rate;
+
+// Each category carries which group it belongs to (vehicle vs general work
+// expense) so vehicle-linked calculations, like the logbook comparison
+// below, can filter by group membership rather than matching specific
+// category name strings one at a time. Existing saved expenses using the
+// old flat names ("Vehicle running costs", "Fuel") are mapped forward by
+// EXPENSE_CAT_ALIASES so nobody's real data goes unmatched after this
+// change, that mapping is the actual compatibility guarantee, not the
+// display list itself.
+const EXPENSE_CAT_GROUPS = {
+  vehicle: [
+    "Fuel", "EV charging", "Servicing", "Repairs", "Tyres", "Vehicle registration",
+    "Vehicle insurance", "Car wash / cleaning", "Tolls", "Parking",
+    "Vehicle lease / rental", "Vehicle finance interest", "Vehicle accessories",
+    "Other vehicle expense",
+  ],
+  work: [
+    "Training / Courses", "PPE", "First aid supplies", "Cleaning / sanitation supplies",
+    "Work equipment", "Phone", "Internet", "Software / subscriptions",
+    "Accounting / bookkeeping", "Professional fees", "Training / professional development",
+    "Business insurance", "Police checks / screening", "Printing / stationery",
+    "Office supplies", "Other business expense",
+  ],
+};
+const EXPENSE_CATS = [...EXPENSE_CAT_GROUPS.vehicle, ...EXPENSE_CAT_GROUPS.work];
+const expenseCatGroup = (cat) => (EXPENSE_CAT_GROUPS.vehicle.includes(cat) ? "vehicle" : "work");
+// Old flat category names, saved in real expense records before this
+// change, mapped to their nearest new equivalent so inFY/group filtering
+// keeps matching them. Never rewrites the stored data, this is read-time
+// only, existing records stay exactly as the user entered them.
+const EXPENSE_CAT_ALIASES = {
+  "Vehicle running costs": "Other vehicle expense",
+  "Phone & internet": "Phone",
+  "Equipment & PPE": "PPE",
+  "Registration & checks": "Police checks / screening",
+};
+const normaliseExpenseCat = (cat) => EXPENSE_CAT_ALIASES[cat] || cat;
+
+/* ---------------- tax ---------------- */
+function incomeTax(t) {
+  if (t <= 18200) return 0;
+  if (t <= 45000) return (t - 18200) * 0.16;
+  if (t <= 135000) return 4288 + (t - 45000) * 0.30;
+  if (t <= 190000) return 31288 + (t - 135000) * 0.37;
+  return 51638 + (t - 190000) * 0.45;
+}
+function medicare(t) {
+  if (t <= 27222) return 0;
+  if (t <= 34027) return (t - 27222) * 0.10;
+  return t * 0.02;
+}
+
+const money = (n) => "$" + (Number(n) || 0).toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const money0 = (n) => "$" + Math.round(Number(n) || 0).toLocaleString("en-AU");
+const today = () => new Date().toISOString().slice(0, 10);
+const uid = () => Math.random().toString(36).slice(2, 10);
+
+/* ---------------- ABN validation ---------------- */
+// The real ABR checksum (modulus 89, the same one abr.business.gov.au uses)
+// catches a mistyped digit immediately, without needing a live lookup.
+// A genuine registry lookup needs an ABR API GUID registered to this
+// business, which the app doesn't hold, so this stops at "structurally
+// valid", not "currently registered and active".
+const ABN_WEIGHTS = [10, 1, 3, 5, 7, 9, 11, 13, 15, 17, 19];
+function abnDigits(v) { return (v || "").replace(/\D/g, ""); }
+function isValidAbn(v) {
+  const d = abnDigits(v);
+  if (d.length !== 11) return false;
+  const digits = d.split("").map(Number);
+  digits[0] -= 1;
+  const sum = digits.reduce((s, n, i) => s + n * ABN_WEIGHTS[i], 0);
+  return sum % 89 === 0;
+}
+function formatAbn(v) {
+  const d = abnDigits(v);
+  if (d.length !== 11) return v || "";
+  return `${d.slice(0, 2)} ${d.slice(2, 5)} ${d.slice(5, 8)} ${d.slice(8, 11)}`;
+}
+
+/* ---------------- text case normalisation ---------------- */
+// One shared function, applied on blur/save, never mid-keystroke. Business
+// and person names are left exactly as typed, since forcing sentence case
+// onto "McDonald" or "iCare" or "BJK Pty Ltd" would actively corrupt real
+// names and trading names, the opposite of what this is for.
+const CASE_ACRONYMS = ["NDIS", "ABN", "GST", "TFN", "PAYG", "BAS", "ABR", "ACN", "ATO"];
+function toSentenceCase(text) {
+  if (!text) return text;
+  return text
+    .split(/([.!?]\s+)/)
+    .map((chunk) => {
+      const m = chunk.match(/^(\s*)([a-zA-Z])(.*)$/s);
+      if (!m) return chunk;
+      const [, lead, first, rest] = m;
+      let out = lead + first.toUpperCase() + rest.toLowerCase();
+      CASE_ACRONYMS.forEach((ac) => {
+        out = out.replace(new RegExp(`\\b${ac}\\b`, "gi"), ac);
+      });
+      return out;
+    })
+    .join("");
+}
+function normaliseEmail(v) { return (v || "").trim().toLowerCase(); }
+
+// Formats a recognisable Australian mobile as "04XX XXX XXX"; anything else
+// (landlines, international, partial input) is left as typed rather than
+// forced into a shape that would mangle it, just whitespace-tidied.
+function normalisePhone(v) {
+  const t = (v || "").trim();
+  const digits = t.replace(/[^\d]/g, "");
+  const local = digits.startsWith("61") && digits.length === 11 ? "0" + digits.slice(2) : digits;
+  if (/^04\d{8}$/.test(local)) {
+    return `${local.slice(0, 4)} ${local.slice(4, 7)} ${local.slice(7)}`;
+  }
+  return t.replace(/\s+/g, " ");
+}
+
+/* ---------------- name and address casing ---------------- */
+// A real proper-name caser, not a blind first-letter capitaliser: handles
+// hyphenated and apostrophised names, and the Mc/Mac prefixes that a plain
+// title-case pass gets wrong ("Mcdonald" instead of "McDonald").
+function capitaliseNamePart(part) {
+  if (!part) return part;
+  const lower = part.toLowerCase();
+  const mc = lower.match(/^(mc)([a-z])(.*)$/);
+  if (mc) return "Mc" + mc[2].toUpperCase() + mc[3];
+  const mac = lower.match(/^(mac)([a-z])(.*)$/);
+  if (mac && lower.length > 4) return "Mac" + mac[2].toUpperCase() + mac[3];
+  return lower.charAt(0).toUpperCase() + lower.slice(1);
+}
+function toProperName(v) {
+  if (!v) return v;
+  return v
+    .split(" ")
+    .map((word) => word.split("-").map(capitaliseNamePart).join("-"))
+    .map((word) => word.split("'").map((p, i) => i === 0 ? p : capitaliseNamePart(p)).join("'"))
+    .join(" ");
+}
+
+// Title-cases free-text address lines while leaving Australian state
+// abbreviations upper-cased and postcodes exactly as typed, digits and
+// leading zeros intact, since those are two things a blind title-case pass
+// would otherwise quietly corrupt.
+const AU_STATES = ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"];
+function toAddressCase(v) {
+  if (!v) return v;
+  return v
+    .split(/(\s+)/)
+    .map((tok) => {
+      if (/^\s+$/.test(tok) || tok === "") return tok;
+      if (/^\d{4}$/.test(tok)) return tok;                         // postcode, untouched
+      const bare = tok.replace(/[.,]/g, "");
+      if (AU_STATES.includes(bare.toUpperCase())) {
+        return tok.toUpperCase();                                    // state, upper-cased
+      }
+      return capitaliseNamePart(tok.toLowerCase());
+    })
+    .join("");
+}
+
+/* ---------------- NDIS participant number ---------------- */
+// Canonical form is digits only, always 9 digits, always starting with 43.
+// Never text-cased (it's a number), never silently truncated: an invalid
+// number is flagged and left exactly as typed so nothing is lost.
+function ndisDigits(v) { return (v || "").replace(/\D/g, ""); }
+function isValidNdisNumber(v) {
+  const d = ndisDigits(v);
+  return d.length === 9 && d.startsWith("43");
+}
+const NDIS_NUMBER_ERROR = "Enter a valid 9-digit NDIS number beginning with 43.";
+
+const fyLabel = (y) => `${y}\u2013${String(y + 1).slice(2)}`;
+const fyOf = (d) => { const x = new Date(d + "T00:00:00"); return x.getMonth() >= 6 ? x.getFullYear() : x.getFullYear() - 1; };
+const inFY = (d, y) => d && fyOf(d) === y;
+
+// A date field that always shows and types in Australian DD/MM/YYYY, no
+// matter what the device's own locale does with a bare <input type="date">.
+// Android in particular defaults that field's collapsed text to US
+// MM/DD/YYYY even when the calendar popup itself is correctly localised, so
+// the mismatch has to be fixed here rather than trusted to the browser.
+// The native picker (the actual calendar UI) is kept exactly as is, since
+// that part already renders correctly; only the visible text overlay
+// changes, backed by the same underlying yyyy-mm-dd value everywhere else
+// in the app already expects.
+function AuDateInput({ value, onChange, style, placeholder, ...rest }) {
+  const toAu = (iso) => {
+    if (!iso) return "";
+    const [y, m, d] = iso.split("-");
+    if (!y || !m || !d) return "";
+    return `${d}/${m}/${y}`;
+  };
+  const fromAu = (au) => {
+    const m = String(au || "").trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (!m) return null;
+    const d = Number(m[1]), mo = Number(m[2]), y = Number(m[3]);
+    const check = new Date(y, mo - 1, d);
+    if (check.getFullYear() !== y || check.getMonth() !== mo - 1 || check.getDate() !== d) return null;
+    return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  };
+
+  const [text, setText] = useState(toAu(value));
+  useEffect(() => { setText(toAu(value)); }, [value]);
+  const pickerRef = useRef(null);
+
+  const typeDate = (next) => {
+    setText(next);
+    const iso = fromAu(next);
+    if (iso) onChange(iso);
+    if (!next.trim()) onChange("");
+  };
+
+  const openPicker = () => {
+    const el = pickerRef.current;
+    if (!el) return;
+    try {
+      if (typeof el.showPicker === "function") el.showPicker();
+      else el.click();
+    } catch (_) {
+      try { el.click(); } catch (_) {}
+    }
+  };
+
+  return (
+    <div style={{ position: "relative" }}>
+      <input
+        type="text"
+        inputMode="numeric"
+        placeholder={placeholder || "DD/MM/YYYY"}
+        value={text}
+        onChange={(e) => typeDate(e.target.value)}
+        onBlur={() => {
+          if (!text.trim()) return;
+          const iso = fromAu(text);
+          if (iso) {
+            onChange(iso);
+            setText(toAu(iso));
+          } else {
+            setText(toAu(value));
+          }
+        }}
+        style={{ ...style, paddingRight: 44 }}
+        {...rest}
+      />
+      <button
+        type="button"
+        aria-label="Open calendar"
+        onClick={openPicker}
+        style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 42,
+          background: "none", border: 0, cursor: "pointer", display: "flex",
+          alignItems: "center", justifyContent: "center", color: "var(--tx-3)" }}>
+        <svg viewBox="0 0 20 20" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+          <rect x="3" y="4" width="14" height="13" rx="2"/><line x1="3" y1="8" x2="17" y2="8"/>
+          <line x1="7" y1="2" x2="7" y2="6"/><line x1="13" y1="2" x2="13" y2="6"/>
+        </svg>
+      </button>
+      <input
+        ref={pickerRef}
+        type="date"
+        value={value || ""}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setText(toAu(e.target.value));
+        }}
+        aria-hidden="true"
+        tabIndex={-1}
+        style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none", right: 0, top: 0 }}
+      />
+    </div>
+  );
+}
+// Three plain <select> dropdowns rather than a native time picker. The
+// native one renders as OS chrome, a bright system dial that has nothing
+// to do with the app's theme and can't be restyled from CSS. Selects
+// already carry the app's real dark styling everywhere else, so this
+// blends in completely instead of fighting the browser for control of it.
+function AuTimeInput({ value, onChange }) {
+  const has = !!value;
+  const [hh, mm] = has ? value.split(":").map(Number) : [null, null];
+  const h12 = hh == null ? "" : (hh % 12 === 0 ? 12 : hh % 12);
+  const ampm = hh == null ? "" : (hh < 12 ? "AM" : "PM");
+
+  const setPart = (part, raw) => {
+    const nH12 = part === "h" ? Number(raw) : (h12 === "" ? 6 : h12);
+    const nMM = part === "m" ? Number(raw) : (mm == null ? 0 : mm);
+    const nAmpm = part === "a" ? raw : (ampm === "" ? "AM" : ampm);
+    let h24 = nH12 % 12;
+    if (nAmpm === "PM") h24 += 12;
+    onChange(`${String(h24).padStart(2, "0")}:${String(nMM).padStart(2, "0")}`);
+  };
+
+  return (
+    <div style={{ display: "flex", gap: 6 }}>
+      <select style={{ flex: 1.1 }} value={h12} onChange={(e) => setPart("h", e.target.value)}>
+        {!has && <option value="" disabled>--</option>}
+        {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => <option key={h} value={h}>{h}</option>)}
+      </select>
+      <select style={{ flex: 1.1 }} value={mm == null ? "" : mm} onChange={(e) => setPart("m", e.target.value)}>
+        {!has && <option value="" disabled>--</option>}
+        {Array.from({ length: 60 }, (_, i) => i).map((m) => <option key={m} value={m}>{String(m).padStart(2, "0")}</option>)}
+      </select>
+      <select style={{ flex: 1 }} value={ampm} onChange={(e) => setPart("a", e.target.value)}>
+        {!has && <option value="" disabled>--</option>}
+        <option value="AM">AM</option>
+        <option value="PM">PM</option>
+      </select>
+    </div>
+  );
+}
+
+// Standard confirm-before-delete used everywhere a record is permanently
+// removed (expenses, trips, notes, shifts, directory entries, prior totals).
+// One place so the wording and behaviour are identical across the app.
+function confirmAndRun(what, fn) {
+  if (window.confirm(`Delete ${what}? This can't be undone.`)) fn();
+}
+
+// The classic, instantly-recognisable outline trash bin -- used wherever a
+// tap deletes a single record from a list. Deliberately tiny (14px) and
+// inherits color from the button around it, kept as one shared icon so
+// every delete affordance in the app looks and sizes identically.
+function TrashIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <line x1="10" y1="11" x2="10" y2="17" />
+      <line x1="14" y1="11" x2="14" y2="17" />
+    </svg>
+  );
+}
+
+const normalisePlanDate = (value) => {
+  const v = String(value || "").trim();
+  if (!v) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+  const m = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!m) return v;
+  const d = Number(m[1]), mo = Number(m[2]), y = Number(m[3]);
+  const dt = new Date(y, mo - 1, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return v;
+  return `${y}-${String(mo).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+};
+const fmtDate = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString("en-AU", { day: "numeric", month: "short" }) : "—";
+const invTotal = (i) => (i.lines || []).reduce((s, l) => s + Number(l.qty || 0) * Number(l.rate || 0), 0);
+
+/* ---------------- directory resolution ---------------- */
+// One place that turns an invoice's participantId into every detail the
+// invoice, the email and the PDF need.
+function resolve(inv, data) {
+  const pt = data.participants.find((x) => x.id === inv.participantId) || null;
+  const mgr = pt ? data.managers.find((x) => x.id === pt.managerId) || null : null;
+  const selfManaged = pt?.planType !== "plan";
+  const terms = Number((selfManaged ? pt?.terms : mgr?.terms) || 0);
+  return {
+    pt, mgr, selfManaged, terms,
+    termsFrom: selfManaged ? (pt?.name || "") : (mgr?.name || ""),
+    client: pt?.name || "",
+    participantNo: pt?.ndisNumber || "",
+    billToName: selfManaged ? pt?.name || "" : mgr?.name || pt?.name || "",
+    billToEmail: (selfManaged ? pt?.email : mgr?.email || pt?.email) || "",
+    billToAddress: (selfManaged ? pt?.address : mgr?.address) || "",
+  };
+}
+// Trips are linked to invoices by id, so nothing is ever typed twice and
+// a trip can never end up on two invoices at once.
+const billedTripIds = (invoices, exceptId) => {
+  const set = new Set();
+  invoices.forEach((i) => { if (i.id !== exceptId) (i.tripIds || []).forEach((t) => set.add(t)); });
+  return set;
+};
+const tripInvoice = (trip, invoices) => invoices.find((i) => (i.tripIds || []).includes(trip.id));
+
+// Minutes since midnight — used by both the shift log and the rules engine.
+const mins = (t) => { const [h, m] = String(t || "").split(":").map(Number); return (h || 0) * 60 + (m || 0); };
+
+// Shifts work the same way: logged once, attached to exactly one invoice.
+const billedShiftIds = (invoices, exceptId) => {
+  const set = new Set();
+  invoices.forEach((i) => { if (i.id !== exceptId) (i.shiftIds || []).forEach((x) => set.add(x)); });
+  return set;
+};
+const shiftInvoice = (sh, invoices) => invoices.find((i) => (i.shiftIds || []).includes(sh.id));
+// A shift is either coming up, done, or cancelled. Only completed shifts can be
+// billed — otherwise adding next Tuesday would prompt you to invoice for work
+// you haven't done.
+const SHIFT_STATUS = [
+  ["scheduled", "Scheduled", "var(--tx-3)"],
+  ["done", "Completed", "var(--brass)"],
+  ["cancelled", "Cancelled", "var(--warn)"],
+];
+// Scheduled vs Completed is purely a function of the date, never a stored
+// choice, so it can't drift out of sync if someone edits the date after
+// the shift was first saved. Cancelled is the one genuine manual decision,
+// since nothing about a date can tell you a shift didn't happen.
+const statusOf = (sh) => sh.status === "cancelled" ? "cancelled" : (sh.date > today() ? "scheduled" : "done");
+const statusColour = (v) => (SHIFT_STATUS.find((x) => x[0] === v) || SHIFT_STATUS[1])[2];
+// Past-dated but still marked scheduled — worth confirming it went ahead.
+const needsConfirm = (sh) => statusOf(sh) === "scheduled" && sh.date < today();
+
+// A shift dated today already reads as "done" everywhere else, that's
+// deliberate, the date arriving is enough to call it Completed rather than
+// leave it stuck on Scheduled. But billing for support that hasn't actually
+// finished yet would be wrong, so invoicing specifically checks the real
+// clock against the shift's own end time, not just its date. Same
+// midnight-crossing handling as the classifier: an end time that's earlier
+// than the start means the shift actually finishes the following day.
+const shiftFinished = (sh) => {
+  if (!sh.date) return false;
+  if (sh.date < today()) return true;
+  if (sh.date > today()) return false;
+  if (!sh.start || !sh.end) return true;
+  const [sh1, sm1] = sh.start.split(":").map(Number);
+  const [eh1, em1] = sh.end.split(":").map(Number);
+  let endMin = eh1 * 60 + em1;
+  if (endMin <= sh1 * 60 + sm1) endMin += 1440;
+  const end = new Date(sh.date + "T00:00:00").getTime() + endMin * 60000;
+  return Date.now() >= end;
+};
+
+// A completed shift is billable once finished. A cancelled one is billable
+// too, but only if the notice was short enough to be claimable, same rule
+// the shift's own status already explains to the person logging it.
+const isBillable = (x) => {
+  const st = statusOf(x);
+  if (st === "done") return shiftFinished(x);
+  if (st === "cancelled" && x.cancelledOn) return !!cancellationCheck(x.date, x.cancelledOn)?.claimable;
+  return false;
+};
+
+const shiftHours = (sh) => {
+  if (!sh.start || !sh.end) return 0;
+  const a = mins(sh.start); let b = mins(sh.end);
+  if (b <= a) b += 1440;
+  return Math.round(((b - a) / 60) * 100) / 100;
+};
+
+// The due date is never guessed — it comes from the payment terms recorded
+// against whoever actually pays: the plan manager, or the participant themselves.
+const dueFrom = (date, pt, data) => {
+  if (!pt || !date) return "";
+  const self = pt.planType !== "plan";
+  const t = self ? pt.terms : ((data.managers || []).find((m) => m.id === pt.managerId) || {}).terms;
+  return t ? addDays(date, t) : "";
+};
+
+const addDays = (iso, n) => { const x = new Date(iso + "T00:00:00"); x.setDate(x.getDate() + Number(n || 0)); return x.toISOString().slice(0, 10); };
+
+
+// Every participant carries the item you usually bill them for, so a new
+// invoice opens on the right code and rate instead of a generic default.
+// Field-binding helper shared by every form that edits an object in local
+// state. Lives at module level because BusinessDetailsFields and
+// PaymentDetailsFields are their own top-level components, they can't see
+// anything scoped inside Onboarding, which is exactly what broke here.
+const F = (obj, setObj) => (k) => ({ value: obj[k] || "", onChange: (e) => setObj({ ...obj, [k]: e.target.value }) });
+
+const defaultLine = (pt) => {
+  const it = SUPPORT_ITEMS.find((x) => x.code === pt?.defaultCode) || SUPPORT_ITEMS[0];
+  return { id: uid(), code: it.code, desc: it.name, qty: "", rate: pt?.defaultRate || it.rate, unit: it.unit || "hr" };
+};
+const pristine = (lines) => lines.length === 1 && !String(lines[0].qty || "").trim() && lines[0].id !== "auto-travel";
+
+const termsHint = (n) => {
+  const d = Number(n || 0);
+  if (!d) return "";
+  const eg = addDays(today(), d);
+  return `Invoices will be due ${d} days after the invoice date, bill today and it's due ${fmtDate(eg)}.`;
+};
+
+const PLAN_TYPES = [["plan", "Plan managed"], ["self", "Self managed"], ["agency", "NDIA / agency managed"]];
+const planLabel = (v) => (PLAN_TYPES.find((p) => p[0] === v) || PLAN_TYPES[0])[1];
+
+/* ---------------- email ---------------- */
+/* ---------------- PDF ---------------- */
+let _pdfLoad = null;
+function loadJsPDF() {
+  if (window.jspdf?.jsPDF) return Promise.resolve(window.jspdf.jsPDF);
+  if (_pdfLoad) return _pdfLoad;
+  _pdfLoad = new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+    s.onload = () => resolve(window.jspdf.jsPDF);
+    s.onerror = () => reject(new Error("Could not load the PDF library"));
+    document.head.appendChild(s);
+  });
+  return _pdfLoad;
+}
+
+async function makeInvoicePDF(inv, profile, r, asFile = false) {
+  const JsPDF = await loadJsPDF();
+  const doc = new JsPDF({ unit: "mm", format: "a4" });
+  const L = 20, R = 190, W = R - L;
+  const long = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" }) : "—";
+  // The app's own brass/ink palette, matched exactly to the on-screen theme
+  // tokens rather than approximated, so the printed document and the app
+  // itself never look like two different products.
+  const BRASS = [200, 145, 58], INK = [20, 21, 15], TX2 = [90, 92, 86], TX3 = [140, 140, 132], LINE = [225, 222, 214], SOFT = [250, 247, 240];
+  let y = 26;
+
+  // ---- masthead ----
+  doc.setFont("helvetica", "bold").setFontSize(15).setTextColor(...INK);
+  doc.text(profile.name || "Independent support worker", L, y);
+  doc.setFont("helvetica", "bold").setFontSize(21).setTextColor(...BRASS);
+  doc.text(profile.gstRegistered ? "TAX INVOICE" : "INVOICE", R, y, { align: "right" });
+
+  if (profile.tradingName && profile.tradingName.trim()) {
+    y += 4.6;
+    doc.setFont("helvetica", "normal").setFontSize(9).setTextColor(...TX2);
+    doc.text(`Trading as ${profile.tradingName.trim()}`, L, y);
+  }
+
+  y += 6.5;
+  doc.setFont("helvetica", "bold").setFontSize(9.5).setTextColor(...BRASS);
+  doc.text(`ABN ${profile.abn || "—"}`, L, y);
+
+  doc.setFillColor(...SOFT).setDrawColor(...BRASS).setLineWidth(0.35);
+  doc.roundedRect(R - 46, y - 5.7, 46, 8.5, 1.4, 1.4, "FD");
+  doc.setFont("helvetica", "bold").setFontSize(9.5).setTextColor(...INK);
+  doc.text(`INV-${inv.number}`, R - 23, y, { align: "center" });
+
+  y += 7;
+  doc.setFont("helvetica", "normal").setFontSize(9).setTextColor(...TX2);
+  [profile.phone, profile.email].filter(Boolean).forEach((t) => { doc.text(t, L, y); y += 4.6; });
+
+  y = Math.max(y, 44) + 4;
+  doc.setDrawColor(...BRASS).setLineWidth(0.6).line(L, y, R, y);
+  y += 11;
+
+  // ---- bill to (left) / invoice details (right) ----
+  const infoX = L + 96;
+  const topY = y;
+  doc.setFont("helvetica", "normal").setFontSize(7.5).setTextColor(...BRASS);
+  doc.text("BILL TO", L, y);
+  y += 5.5;
+  doc.setFont("helvetica", "bold").setFontSize(11).setTextColor(...INK);
+  doc.text(r.client || r.billToName || "—", L, y);
+  y += 5.5;
+  doc.setFont("helvetica", "normal").setFontSize(9).setTextColor(...TX2);
+  // Who the invoice is naming (the participant) and who actually pays it
+  // are genuinely two different facts, real for plan-managed participants,
+  // so both are shown rather than only whichever name happened to end up
+  // as the payer.
+  const billLines = [
+    r.selfManaged ? "Self-managed" : (r.mgr ? `Plan managed by ${r.mgr.name}` : ""),
+    r.billToAddress, r.billToEmail,
+  ].filter(Boolean);
+  billLines.forEach((t) => { doc.text(t, L, y); y += 4.6; });
+
+  // The date(s) a support was actually delivered, a genuine NDIS invoice
+  // requirement distinct from the invoice's own issue date. Collected once
+  // here for the Service Period summary, and again per line below since a
+  // single invoice can genuinely span more than one visit.
+  const allDates = [...new Set(inv.lines.flatMap((l) => l.dates || []))].sort();
+  const period = allDates.length
+    ? (allDates.length === 1 ? long(allDates[0]) : `${long(allDates[0])} – ${long(allDates[allDates.length - 1])}`)
+    : long(inv.date);
+
+  let iy = topY;
+  const infoRow = (label, value) => {
+    doc.setFont("helvetica", "normal").setFontSize(7.5).setTextColor(...BRASS);
+    doc.text(label, infoX, iy);
+    iy += 4.6;
+    doc.setFont("helvetica", "bold").setFontSize(9.5).setTextColor(...INK);
+    doc.text(value || "—", infoX, iy);
+    iy += 7.4;
+  };
+  infoRow("DATE ISSUED", long(inv.date));
+  infoRow("SERVICE PERIOD", period);
+  infoRow("NDIS PARTICIPANT", r.client);
+  infoRow("NDIS NUMBER", r.participantNo);
+
+  y = Math.max(y, iy) + 8;
+
+  // ---- table ----
+  const cD = L, cDesc = L + 32, cItem = L + 88, cQty = L + 132, cRate = L + 154, cAmt = R;
+  doc.setFillColor(...SOFT).rect(L, y - 5.5, W, 9, "F");
+  doc.setFont("helvetica", "bold").setFontSize(7.5).setTextColor(...BRASS);
+  doc.text("DATE", cD + 1, y);
+  doc.text("DESCRIPTION", cDesc, y);
+  doc.text("NDIS ITEM", cItem, y);
+  doc.text("HOURS / QTY", cQty, y, { align: "right" });
+  doc.text("RATE", cRate, y, { align: "right" });
+  doc.text("AMOUNT", cAmt, y, { align: "right" });
+  y += 8;
+
+  const lineDates = (l) => {
+    if (l.dates && l.dates.length) {
+      if (l.dates.length === 1) return [long(l.dates[0])];
+      return [`${long(l.dates[0])} –`, long(l.dates[l.dates.length - 1])];
+    }
+    return [long(inv.date)];
+  };
+
+  inv.lines.forEach((l, i) => {
+    if (y > 240) { doc.addPage(); y = 26; }
+    // Rows with a group (an NDIS item like "Self-Care") print two lines --
+    // the group name, then the fuller description underneath. A row
+    // without one only ever prints one line. Using the same fixed height
+    // for both meant every two-line row's second line ran straight into
+    // the next row's shading and text.
+    const group = itemGroup(l.code);
+    const rowTop = y - 5.5, rowH = group ? 18.5 : 14.5;
+    if (i % 2 === 0) doc.setFillColor(250, 249, 246).rect(L, rowTop, W, rowH, "F");
+
+    const amt = Number(l.qty || 0) * Number(l.rate || 0);
+
+    doc.setFont("helvetica", "normal").setFontSize(8.5).setTextColor(...TX2);
+    doc.text(lineDates(l), cD + 1, y);
+
+    if (group) {
+      doc.setFont("helvetica", "bold").setFontSize(9.5).setTextColor(...INK);
+      doc.text(group, cDesc, y);
+      doc.setFont("helvetica", "normal").setFontSize(8.5).setTextColor(...TX2);
+      doc.text(doc.splitTextToSize(l.desc || "", 52)[0] || "", cDesc, y + 4.4);
+    } else {
+      doc.setFont("helvetica", "bold").setFontSize(9.5).setTextColor(...INK);
+      doc.text(doc.splitTextToSize(l.desc || "", 52)[0] || "", cDesc, y);
+    }
+
+    doc.setFont("courier", "normal").setFontSize(7.5).setTextColor(...TX2);
+    doc.text(doc.splitTextToSize(l.code || "", 32), cItem, y);
+
+    doc.setFont("helvetica", "normal").setFontSize(9.5).setTextColor(...INK);
+    doc.text(`${l.qty || 0}`, cQty, y, { align: "right" });
+    doc.text(money(l.rate), cRate, y, { align: "right" });
+    doc.setFont("helvetica", "bold");
+    doc.text(money(amt), cAmt, y, { align: "right" });
+
+    y = rowTop + rowH;
+  });
+
+  doc.setDrawColor(...LINE).setLineWidth(0.3).line(L, y, R, y);
+  y += 10;
+
+  // ---- support notes + payment (left) / totals (right) ----
+  const leftW = 82, rightX = L + leftW + 8, rightW = W - leftW - 8, blockTop = y;
+  let ly = y;
+
+  if ((inv.notes || "").trim()) {
+    doc.setFont("helvetica", "normal").setFontSize(7.5).setTextColor(...BRASS);
+    doc.text("SUPPORT NOTES", L, ly);
+    ly += 5;
+    doc.setFont("helvetica", "normal").setFontSize(9).setTextColor(...TX2);
+    const noteLines = doc.splitTextToSize(inv.notes.trim(), leftW);
+    doc.text(noteLines, L, ly);
+    ly += noteLines.length * 4.4 + 6;
+  }
+
+  doc.setFont("helvetica", "normal").setFontSize(7.5).setTextColor(...BRASS);
+  doc.text("PAYMENT DETAILS", L, ly);
+  ly += 5;
+  doc.setFont("helvetica", "bold").setFontSize(9.5).setTextColor(...INK);
+  doc.text(profile.bankName || "—", L, ly);
+  ly += 4.8;
+  doc.setFont("helvetica", "normal").setFontSize(9).setTextColor(...TX2);
+  doc.text(`BSB ${profile.bsb || "—"}   Account ${profile.account || "—"}`, L, ly);
+  ly += 4.8;
+  doc.text(`Reference: INV${inv.number}`, L, ly);
+  ly += 4.8;
+
+  const subtotal = invTotal(inv);
+  const boxH = 40;
+  doc.setFillColor(...SOFT).rect(rightX, blockTop - 5, rightW, boxH, "F");
+  let ty2 = blockTop + 2;
+  doc.setFont("helvetica", "normal").setFontSize(9.5).setTextColor(...TX2);
+  doc.text("Subtotal", rightX + 5, ty2);
+  doc.setTextColor(...INK).text(money(subtotal), rightX + rightW - 5, ty2, { align: "right" });
+  ty2 += 7;
+  doc.setTextColor(...TX2).text("GST (0%)", rightX + 5, ty2);
+  doc.setTextColor(...INK).text("$0.00", rightX + rightW - 5, ty2, { align: "right" });
+  ty2 += 5;
+  doc.setDrawColor(...LINE).setLineWidth(0.3).line(rightX + 5, ty2, rightX + rightW - 5, ty2);
+  ty2 += 8;
+  doc.setFont("helvetica", "bold").setFontSize(9.5).setTextColor(...INK);
+  doc.text("TOTAL DUE", rightX + 5, ty2);
+  doc.setFont("helvetica", "normal").setFontSize(8).setTextColor(...TX2);
+  doc.text(inv.due ? `Due ${long(inv.due)}` : "", rightX + 5, ty2 + 4.5);
+  doc.setFont("helvetica", "bold").setFontSize(18).setTextColor(...BRASS);
+  doc.text(money(subtotal), rightX + rightW - 5, ty2 + 3, { align: "right" });
+
+  y = Math.max(ly, blockTop - 5 + boxH) + 10;
+
+  // A long invoice can genuinely push this far down the page, in which
+  // case the footer belongs on a fresh page rather than crowding or
+  // overlapping the totals box above it.
+  if (y > 230) { doc.addPage(); }
+
+  // ---- footer ----
+  doc.setDrawColor(...BRASS).setLineWidth(0.5).line(L, 262, R, 262);
+
+  doc.setFont("helvetica", "bold").setFontSize(9.5).setTextColor(...BRASS);
+  doc.text("Thank you for your prompt payment.", L, 269);
+  doc.setFont("helvetica", "normal").setFontSize(8).setTextColor(...TX2);
+  doc.text(doc.splitTextToSize("If you have any questions about this invoice, please get in touch.", 95), L, 274);
+
+  doc.setFont("helvetica", "normal").setFontSize(7.5).setTextColor(...TX2);
+  doc.text(profile.gstRegistered
+    ? "GST $0.00, GST-free NDIS supports under s38-38 of the GST Act."
+    : "No GST has been charged. Supplier is not registered for GST.", L, 283);
+
+  // Small brand mark, deliberately subtle, matching the app's own icon
+  // treatment (a brass square with a white S) rather than inventing a new
+  // logo style just for print.
+  doc.setFillColor(...BRASS);
+  doc.roundedRect(88, 286.6, 4, 4, 1, 1, "F");
+  doc.setFont("helvetica", "bold").setFontSize(6.5).setTextColor(255, 255, 255);
+  doc.text("S", 90, 289.4, { align: "center" });
+  doc.setFont("helvetica", "normal").setFontSize(7.5).setTextColor(...TX2);
+  doc.text("Created with SupportFlow™", 94, 289.2);
+  doc.setTextColor(...BRASS);
+  doc.text("www.supportflow.work", R, 289.2, { align: "right" });
+
+  const safe = (r.client || "invoice").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+  const filename = `invoice-${inv.number}-${safe}.pdf`;
+
+  // Download and Share must be the same PDF, so the document is built once
+  // here and only the final step differs. Passing asFile returns it instead
+  // of saving, rather than duplicating any of the drawing code above.
+  if (asFile) {
+    const blob = doc.output("blob");
+    return new File([blob], filename, { type: "application/pdf" });
+  }
+  doc.save(filename);
+}
+
+function invoiceText(inv, profile, r) {
+  const lines = inv.lines.map((l) => {
+    const amt = Number(l.qty || 0) * Number(l.rate || 0);
+    return `  ${l.desc}\n    ${l.code}\n    ${l.qty || 0} ${l.unit} @ ${money(l.rate)}   ${money(amt)}`;
+  }).join("\n\n");
+
+  return [
+    `INVOICE #${inv.number}`,
+    ``,
+    `From:     ${profile.name || "—"}`,
+    `ABN:      ${profile.abn || "—"}`,
+    profile.phone ? `Phone:    ${profile.phone}` : "",
+    profile.email ? `Email:    ${profile.email}` : "",
+    ``,
+    `To:       ${r.billToName || "—"}`,
+    !r.selfManaged && r.client ? `For:      ${r.client}` : "",
+    r.participantNo ? `NDIS no:  ${r.participantNo}` : "",
+    ``,
+    `Issued:   ${inv.date ? new Date(inv.date + "T00:00:00").toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" }) : "—"}`,
+    inv.due ? `Due:      ${new Date(inv.due + "T00:00:00").toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" })}` : "",
+    ``,
+    `SUPPORTS DELIVERED`,
+    ``,
+    lines,
+    ``,
+    `TOTAL DUE:  ${money(invTotal(inv))}`,
+    profile.gstRegistered
+      ? `GST:        $0.00, GST-free NDIS supports (s38-38 GST Act)`
+      : `No GST has been charged. Supplier is not registered for GST.`,
+    ``,
+    `PAYMENT`,
+    `  ${profile.bankName || ""}`.trimEnd(),
+    `  BSB ${profile.bsb || "—"}   Account ${profile.account || "—"}`,
+    `  Reference: INV${inv.number}`,
+    ``,
+    `Thank you.`,
+  ].filter((x) => x !== "").join("\n");
+}
+
+function composeURL(kind, to, subject, body) {
+  const s = encodeURIComponent(subject);
+  const b = encodeURIComponent(body);
+  const t = encodeURIComponent(to || "");
+  if (kind === "gmail") return `https://mail.google.com/mail/?view=cm&fs=1&to=${t}&su=${s}&body=${b}`;
+  if (kind === "outlook") return `https://outlook.office.com/mail/deeplink/compose?to=${t}&subject=${s}&body=${b}`;
+  return `mailto:${t}?subject=${s}&body=${b}`;
+}
+
+const BLANK = {
+  // gstLookupConflict holds the outcome the one time an ABN/GST lookup
+  // genuinely runs: null while nothing has ever been checked, or
+  // { looked_up: "yes"|"no", checkedAt } when a lookup result disagreed
+  // with the status already saved. The stored gstRegistered value is never
+  // overwritten by a lookup automatically, per the rule that a conflict
+  // gets surfaced for the person to confirm, not silently applied.
+  profile: { name: "", abn: "", email: "", phone: "", bankName: "", bsb: "", account: "", nextInv: 1, gstLookupConflict: null,
+    // Reminders default to on, daily, for a brand-new install, since the
+    // real risk with local-only data is someone never backing up at all
+    // and finding out only once it's too late. Existing installs are never
+    // touched by this, it only shapes what a fresh profile starts with.
+    backupEvery: "daily", backupAt: "18:00" },
+  participants: [], managers: [], shifts: [], claimCache: {}, onboarded: false, clients: [], invoices: [], expenses: [], trips: [], notes: [], incidents: [], priorTotals: null,
+};
+// Three simple stroked-line icons, matching the weight of the app's own
+// mark rather than pulling in an icon package this file has no bundler to
+// install. Icons only ever appear beside their own NAV label, id kept
+// separate from label so existing routes/keys never change.
+const NAV_ICONS = {
+  home: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m3 11 9-8 9 8"/><path d="M5 10v11h14V10"/><path d="M9 21v-7h6v7"/>
+    </svg>
+  ),
+  workhub: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/>
+    </svg>
+  ),
+  moneyhub: <span className="mobnav-dollar" aria-hidden="true">$</span>,
+  participantshub: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 6.2a3 3 0 0 1 0 5.8"/><path d="M21 20c0-2.8-1.8-5.1-4.3-5.8"/>
+    </svg>
+  ),
+};
+const NAV = [["home", "Home"], ["workhub", "Work"], ["moneyhub", "Money"], ["participantshub", "Participants"]];
+
+function ShortcutIcon({ type, tone }) {
+  const paths = {
+    shift: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></>,
+    travel: <><path d="M5 16l1.4-4.3A2 2 0 0 1 8.3 10h7.4a2 2 0 0 1 1.9 1.7L19 16"/><path d="M4 16h16v3a1 1 0 0 1-1 1h-1M4 16v3a1 1 0 0 0 1 1h1"/><circle cx="7" cy="17" r="1.5"/><circle cx="17" cy="17" r="1.5"/><path d="M8 10l1.5-4h5L16 10"/></>,
+    notes: <><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></>,
+    incident: <><path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3Z"/><path d="M12 9v4M12 17h.01"/></>,
+    invoice: <><path d="M12 2v20"/><path d="M17 5.5H9.5a3.5 3.5 0 0 0 0 7H14a3.5 3.5 0 0 1 0 7H6"/></>,
+    expense: <><path d="M6 2l2 2 2-2 2 2 2-2 2 2 2-2v20l-2-2-2 2-2-2-2 2-2-2-2 2Z"/><path d="M8 9h8M8 13h8M8 17h5"/></>,
+    income: <><path d="M3 3v18h18"/><path d="m7 16 4-4 3 3 5-7"/></>,
+    tax: <><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></>,
+    claim: <><path d="M12 3a9 9 0 1 0 9 9h-9Z"/><path d="M12 3v9h9"/></>,
+    people: <><path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16.5 3.1a4 4 0 0 1 0 7.8"/></>,
+    personAdd: <><circle cx="9" cy="8" r="4"/><path d="M2 21v-2a6 6 0 0 1 6-6h2"/><path d="M19 8v6M16 11h6"/></>,
+    document: <><path d="M6 2h9l5 5v15H6Z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></>,
+    agreement: <><path d="M5 3h14v18H5Z"/><path d="M8 7h8M8 11h8M8 15h5"/></>,
+  };
+  return <span className={`shorticon ${tone || "yellow"}`}><svg viewBox="0 0 24 24" aria-hidden="true">{paths[type]}</svg></span>;
+}
+
+function ShortcutCard({ icon, tone, title, sub, onClick, wide }) {
+  return <button className={`shortcard${wide ? " wide" : ""}`} onClick={onClick}>
+    <ShortcutIcon type={icon} tone={tone}/><b>{title}</b><small>{sub}</small><span className="shortchev">›</span>
+  </button>;
+}
+
+function SectionReturnHeader({ section, title, onBack }) {
+  const compactBack = section === "Participants";
+  return <div className="pinhead featurepin">
+    <button className="sectionback" onClick={onBack} aria-label={`Back to ${section} shortcuts`}>
+      <span className="arr" aria-hidden="true">←</span><span>{compactBack ? section : `Back to ${section}`}</span>
+    </button>
+    <div className="disp featuretitle">{title}</div>
+  </div>;
+}
+
+
+
+/* ---------------- app lock ---------------- */
+// A screen lock, not encryption. It keeps someone who picks up an unlocked
+// phone from reading participant details. The data underneath is still plain
+// browser storage — the backup passphrase is what actually encrypts anything.
+const LOCK_KEY = "ndis:lock";
+const LOCK_IDLE_MS = 10 * 60 * 1000;  // re-lock after this long in the background
+const LOCK_HIDDEN_AT_KEY = "ndis:lockHiddenAt";
+
+// Whether the app should show the lock screen right now. Checked both on
+// first mount and whenever the tab becomes visible again, using a
+// timestamp in localStorage rather than an in-memory ref -- a ref resets
+// to nothing the moment the page actually reloads, which on mobile happens
+// often just from backgrounding for a while (the OS reclaims the tab). An
+// in-memory-only timer would then lock instantly on the next open no
+// matter how long it had actually been, which is the bug this avoids.
+function shouldLockNow() {
+  if (!readLock()) return false;
+  let hiddenAt = null;
+  try { hiddenAt = Number(localStorage.getItem(LOCK_HIDDEN_AT_KEY)) || null; } catch (e) { }
+  if (!hiddenAt) return false; // never recorded as backgrounded -- e.g. just set the PIN
+  return Date.now() - hiddenAt > LOCK_IDLE_MS;
+}
+
+// PIN is hashed before storage, with a random salt, so the stored value can't
+// be read back off the device as a number to type in.
+async function hashPin(pin, salt) {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey("raw", enc.encode(pin), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", salt: enc.encode(salt), iterations: 120000, hash: "SHA-256" }, key, 256);
+  return btoa(String.fromCharCode(...new Uint8Array(bits)));
+}
+
+function readLock() {
+  try { return JSON.parse(localStorage.getItem(LOCK_KEY) || "null"); } catch (e) { return null; }
+}
+function writeLock(v) {
+  try { v ? localStorage.setItem(LOCK_KEY, JSON.stringify(v)) : localStorage.removeItem(LOCK_KEY); } catch (e) { }
+}
+
+// Biometrics via WebAuthn. Support is uneven across browsers, so this is only
+// ever offered as a shortcut — the PIN always works as a fallback.
+async function biometricsAvailable() {
+  try {
+    if (!window.PublicKeyCredential) return false;
+    return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+  } catch (e) { return false; }
+}
+
+async function enrolBiometric() {
+  const cred = await navigator.credentials.create({
+    publicKey: {
+      challenge: crypto.getRandomValues(new Uint8Array(32)),
+      rp: { name: "SupportFlow™" },
+      user: { id: crypto.getRandomValues(new Uint8Array(16)), name: "supportflow", displayName: "SupportFlow" },
+      pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
+      authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required" },
+      timeout: 60000,
+    },
+  });
+  return btoa(String.fromCharCode(...new Uint8Array(cred.rawId)));
+}
+
+async function verifyBiometric(idB64) {
+  const raw = Uint8Array.from(atob(idB64), (c) => c.charCodeAt(0));
+  await navigator.credentials.get({
+    publicKey: {
+      challenge: crypto.getRandomValues(new Uint8Array(32)),
+      allowCredentials: [{ type: "public-key", id: raw }],
+      userVerification: "required",
+      timeout: 60000,
+    },
+  });
+  return true;
+}
+
+
+/* ---------------- trial ended notice ---------------- */
+function TrialEndedNotice({ onClose }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [showRestore, setShowRestore] = useState(false);
+  const [restoreEmail, setRestoreEmail] = useState("");
+  const [restoreBusy, setRestoreBusy] = useState(false);
+  const [restoreErr, setRestoreErr] = useState("");
+  const [restoreDone, setRestoreDone] = useState(false);
+
+  const subscribe = (plan) => {
+    setBusy(true); setErr("");
+    let ref;
+    try { ref = localStorage.getItem("ndis:deviceRef"); } catch (e) { }
+    if (!ref) {
+      ref = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
+      try { localStorage.setItem("ndis:deviceRef", ref); } catch (e) { }
+    }
+    fetch("/.netlify/functions/create-checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ plan, clientReferenceId: ref }),
+    })
+      .then((r) => r.json().then((data) => ({ ok: r.ok, data })))
+      .then(({ ok, data }) => {
+        if (ok && data && data.url) { window.location.href = data.url; return; }
+        throw new Error((data && data.error) || "Couldn't start checkout.");
+      })
+      .catch((e) => { setErr(e.message || "Something went wrong."); setBusy(false); });
+  };
+
+  // Reconnects this device to a subscription that already exists, rather
+  // than letting someone accidentally start (and pay for) a second one
+  // after reinstalling or switching phones. Adopts the original device's
+  // id locally, then reloads so the normal status check picks it straight
+  // up -- no separate code path needed for "how does the app now know".
+  const restore = () => {
+    const email = restoreEmail.trim();
+    if (!email) { setRestoreErr("Enter the email you used to subscribe."); return; }
+    setRestoreBusy(true); setRestoreErr("");
+    fetch("/.netlify/functions/restore-purchase", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    })
+      .then((r) => r.json().then((data) => ({ ok: r.ok, data })))
+      .then(({ ok, data }) => {
+        if (ok && data && data.deviceRef) {
+          try { localStorage.setItem("ndis:deviceRef", data.deviceRef); } catch (e) { }
+          setRestoreDone(true);
+          setTimeout(() => window.location.reload(), 900);
+          return;
+        }
+        throw new Error((data && data.error) || "Couldn't restore that subscription.");
+      })
+      .catch((e) => { setRestoreErr(e.message || "Something went wrong."); setRestoreBusy(false); });
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(0,0,0,.55)",
+                  display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+      onClick={onClose}>
+      <div className="panel" style={{ maxWidth: 440, width: "100%", margin: 16,
+        borderColor: "var(--brass)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="disp" style={{ fontSize: 20, marginBottom: 8 }}>Your free trial has ended</div>
+        <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.7, marginBottom: 16 }}>
+          Everything you've already entered is still here, you can view, edit, back up and export
+          all of it. Adding new invoices, shifts, trips, expenses, participants and plan managers
+          needs an active subscription.
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+          <button className="btn" onClick={() => subscribe("monthly")} disabled={busy}>
+            {busy ? "One moment…" : "$19.99 a month"}
+          </button>
+          <button className="btn ghost" onClick={() => subscribe("yearly")} disabled={busy}>$219 a year</button>
+        </div>
+        {err && <div style={{ fontSize: 12.5, color: "var(--warn)", marginBottom: 10 }}>{err}</div>}
+
+        {!showRestore ? (
+          <button className="btn ghost tiny" style={{ marginBottom: 4 }} onClick={() => setShowRestore(true)}>
+            Already subscribed on another device?
+          </button>
+        ) : restoreDone ? (
+          <div style={{ fontSize: 12.5, color: "var(--good, #3F7B57)", marginBottom: 10 }}>
+            Found it, reconnecting this device…
+          </div>
+        ) : (
+          <div style={{ marginTop: 4, marginBottom: 10, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
+            <div style={{ fontSize: 12, color: "var(--tx-3)", marginBottom: 8 }}>
+              Enter the email you subscribed with, this device will pick up where that subscription left off.
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input type="email" value={restoreEmail} onChange={(e) => setRestoreEmail(e.target.value)}
+                placeholder="you@example.com" style={{ flex: 1 }}
+                onKeyDown={(e) => { if (e.key === "Enter") restore(); }} />
+              <button className="btn ghost tiny" onClick={restore} disabled={restoreBusy}>
+                {restoreBusy ? "…" : "Restore"}
+              </button>
+            </div>
+            {restoreErr && <div style={{ fontSize: 12, color: "var(--warn)", marginTop: 8 }}>{restoreErr}</div>}
+          </div>
+        )}
+
+        <button className="btn ghost tiny" onClick={onClose}>Not now</button>
+      </div>
+    </div>
+  );
+}
+
+function TrialEndingBanner({ daysLeft, onSubscribe }) {
+  if (daysLeft === null || daysLeft > 7 || daysLeft < 0) return null;
+  return (
+    <div className="band">
+      <div className="callout" style={{ borderColor: "var(--brass)" }}>
+        <b>{daysLeft === 0 ? "Your trial ends today." : `Your trial ends in ${daysLeft} day${daysLeft === 1 ? "" : "s"}.`}</b>{" "}
+        Add a plan to keep creating new invoices, shifts and records without a break.
+        <div style={{ marginTop: 10 }}>
+          <button className="btn tiny" onClick={onSubscribe}>Choose a plan</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LockScreen({ onUnlock, onForgot }) {
+  const cfg = readLock();
+  const [pin, setPin] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [canBio, setCanBio] = useState(false);
+  const [confirmWipe, setConfirmWipe] = useState(false);
+
+  useEffect(() => {
+    if (cfg && cfg.bioId) biometricsAvailable().then(setCanBio);
+  }, []);
+
+  const tryBio = async () => {
+    setErr(""); setBusy(true);
+    try { await verifyBiometric(cfg.bioId); onUnlock(); }
+    catch (e) { setErr("Didn't recognise that. Use your PIN instead."); }
+    finally { setBusy(false); }
+  };
+
+  // offer biometrics straight away, so it feels like a normal phone unlock
+  useEffect(() => { if (canBio) tryBio(); }, [canBio]);
+
+  const submit = async (value) => {
+    setBusy(true); setErr("");
+    try {
+      const h = await hashPin(value, cfg.salt);
+      if (h === cfg.hash) { onUnlock(); }
+      else { setErr("Wrong PIN."); setPin(""); }
+    } catch (e) { setErr("Something went wrong. Try again."); }
+    finally { setBusy(false); }
+  };
+
+  const press = (d) => {
+    if (busy) return;
+    const next = (pin + d).slice(0, cfg.len);
+    setPin(next); setErr("");
+    if (next.length === cfg.len) submit(next);
+  };
+
+  return (
+    <div className="sl" data-theme="dark">
+      <div className="lockwrap">
+        <div className="lockmark">
+          <svg viewBox="0 0 512 512" width="44" height="44" aria-hidden="true">
+            <path d="M344 118C344 118 300 90 232 90C152 90 100 132 100 190C100 244 142 272 214 284L298 298C350 306 380 328 380 366C380 412 336 442 264 442C190 442 148 414 148 414"
+              fill="none" stroke="#C8913A" strokeWidth="72" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </div>
+        <div className="disp" style={{ fontSize: 21, marginBottom: 6 }}>SupportFlow</div>
+        <div style={{ fontSize: 13, color: "var(--tx-3)", marginBottom: 26 }}>Enter your PIN to continue</div>
+
+        <div className="pindots">
+          {Array.from({ length: cfg.len }).map((_, i) => (
+            <i key={i} data-on={i < pin.length ? 1 : 0} />
+          ))}
+        </div>
+        {err && <div style={{ fontSize: 12.5, color: "var(--warn)", marginBottom: 14 }}>{err}</div>}
+
+        <div className="pinpad">
+          {[1,2,3,4,5,6,7,8,9].map((n) => (
+            <button key={n} onClick={() => press(String(n))}>{n}</button>
+          ))}
+          <button className="ghost" onClick={() => canBio && tryBio()} disabled={!canBio}>
+            {canBio ? "☉" : ""}
+          </button>
+          <button onClick={() => press("0")}>0</button>
+          <button className="ghost" onClick={() => setPin(pin.slice(0, -1))}>⌫</button>
+        </div>
+
+        {!confirmWipe ? (
+          <button className="btn ghost tiny" style={{ marginTop: 22 }} onClick={() => setConfirmWipe(true)}>
+            Forgotten your PIN?
+          </button>
+        ) : (
+          <div className="callout" style={{ marginTop: 22, borderColor: "var(--req)", textAlign: "left" }}>
+            <b>There's no way to recover it.</b> Nothing was sent to a server that could check who you
+            are, so the only way back in is to clear this device and restore from a backup file.
+            <div style={{ marginTop: 11, display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button className="btn tiny" style={{ background: "var(--req)", borderColor: "var(--req)", color: "#fff" }}
+                onClick={onForgot}>Clear and start again</button>
+              <button className="btn ghost tiny" onClick={() => setConfirmWipe(false)}>Cancel</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
+// Early Access tester telemetry: privacy-safe event names only. Never send record content.
+const TESTER_ACTIVITY_EVENTS = new Set(["app_opened","section_shifts","section_notes","section_travel","section_incidents","section_invoices","section_expenses","section_tax","section_help","shift_created","trip_created","invoice_created","expense_created","note_created","feedback_submitted"]);
+function emitTesterActivity(eventName) {
+  if (!TESTER_ACTIVITY_EVENTS.has(eventName)) return;
+  let deviceRef = "";
+  try { deviceRef = localStorage.getItem("ndis:deviceRef") || ""; } catch (e) { }
+  if (!deviceRef) return;
+  fetch("/.netlify/functions/tester-activity", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ deviceRef, event: eventName, appVersion: APP_VERSION,
+      deviceType: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? "mobile" : "desktop" }),
+    keepalive: true,
+  }).catch(() => {});
+}
+
+try {
+  const now = Date.now(), last = Number(localStorage.getItem("sf_tester_last_open_ping") || 0);
+  if (now - last > 15 * 60 * 1000) {
+    localStorage.setItem("sf_tester_last_open_ping", String(now));
+    emitTesterActivity("app_opened");
+  }
+} catch (_) {}
+
+function App() {
+  const [theme, setTheme] = useState("dark");
+  const [tab, setTab] = useState("home");
+  const [sumTab, setSumTab] = useState("invoices");   // invoices | expenses | position | bas
+  const [invTab, setInvTab] = useState("shifts");     // shifts | travel | notes
+  const [openNewShiftRequest, setOpenNewShiftRequest] = useState(false);
+  // Shifts get ticked on Money → Invoices, trips get ticked on Work →
+  // Travel, but they can both belong to the same invoice, so the ticked
+  // set has to live here and survive moving between the two screens,
+  // rather than reset every time either component unmounts.
+  const [billTick, setBillTick] = useState({ shiftIds: [], tripIds: [] });
+  // After saving a brand new shift, offer quick next steps for the same
+  // visit, logging its travel or raising an invoice from it. Lives here,
+  // not inside Shifts, because "log travel" sends the person to a
+  // different tab entirely, and this has to still be here when they come
+  // back, rather than resetting the moment Shifts unmounts.
+  const [visitFollowUp, setVisitFollowUp] = useState(null);        // { participantId, date, shiftId } | null
+  const [suppressVisitFollowUp, setSuppressVisitFollowUp] = useState(false);
+  const [travelPrefill, setTravelPrefill] = useState(null);        // { participantId, date, shiftId } | null, hides the follow-up while active
+  const [travelFollowUp, setTravelFollowUp] = useState(null);      // { participantId, date, shiftId } | null, asks about a note once travel is logged
+  const [notesPrefill, setNotesPrefill] = useState(null);          // { participantId, date } | null, carries the same participant into Notes
+  const [pplTab, setPplTab] = useState("participants"); // participants | managers | agreements
+  const [openPt, setOpenPt] = useState(null);
+  const [openPane, setOpenPane] = useState(null); // null | "help" | "privacy"
+  useEffect(() => {
+    let eventName = null;
+    if (tab === "invoices") eventName = ({ shifts: "section_shifts", travel: "section_travel", notes: "section_notes", incidents: "section_incidents" })[invTab] || null;
+    else if (tab === "summary") eventName = ({ invoices: "section_invoices", expenses: "section_expenses", position: "section_tax", bas: "section_tax" })[sumTab] || null;
+    else if (tab === "settings" && (openPane === "help" || openPane === "support")) eventName = "section_help";
+    if (eventName) emitTesterActivity(eventName);
+  }, [tab, invTab, sumTab, openPane]);
+  const [helpInitialView, setHelpInitialView] = useState("manual"); // manual | support
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [helpMenuOpen, setHelpMenuOpen] = useState(false);
+  const [showAssistant, setShowAssistant] = useState(false);
+  const [locked, setLocked] = useState(() => shouldLockNow());
+  const [claimSeed, setClaimSeed] = useState("");
+  const [editing, setEditing] = useState(null);
+  const [data, setData] = useState(BLANK);
+
+  /* ---------------- trial / subscription status ---------------- */
+  // "canCreate" is the one flag that matters app-wide: once the trial ends
+  // without a payment method, new invoices, shifts, trips, expenses,
+  // participants and plan managers stop being creatable. Everything already
+  // in the app -- viewing, editing existing records, backup, export, PDFs --
+  // stays fully available. The point is never to hold someone's own data
+  // hostage, only to stop new billable work piling up unpaid.
+  const [subStatus, setSubStatus] = useState(null); // null while unknown
+  const [trialEnd, setTrialEnd] = useState(null);
+
+  useEffect(() => {
+    const ref = (() => {
+      try { return localStorage.getItem("ndis:deviceRef"); } catch (e) { return null; }
+    })();
+    if (!ref) { setSubStatus("unconfigured"); return; }
+
+    let cancelled = false;
+    const check = () => {
+      fetch(`/.netlify/functions/check-status?ref=${encodeURIComponent(ref)}`)
+        .then((r) => r.json())
+        .then((d) => {
+          if (cancelled) return;
+          setSubStatus(d.status || "error");
+          setTrialEnd(d.trialEnd || null);
+        })
+        .catch(() => { if (!cancelled) setSubStatus((s) => s || "error"); });
+    };
+    check();
+    const iv = setInterval(check, 6 * 60 * 60 * 1000); // recheck a few times a day, not on every render
+    return () => { cancelled = true; clearInterval(iv); };
+  }, []);
+
+  const daysUntilTrialEnd = trialEnd ? Math.ceil((new Date(trialEnd) - new Date()) / 86400000) : null;
+
+  // Read-only once the trial has genuinely ended without converting, or a
+  // subscription was cancelled/failed with nothing else active. Anything we
+  // could not confirm ("unconfigured", "error", "none", still loading) is
+  // treated as fully open -- a broken status check should never lock someone
+  // out of their own records.
+  const canCreate = !(subStatus === "canceled" || subStatus === "past_due" ||
+    (subStatus === "trialing" && trialEnd && new Date(trialEnd) < new Date()));
+
+  // The one shared guard. Every "create a new record" action calls this
+  // first; every edit, view, backup and export path never touches it at all.
+  const [showTrialNotice, setShowTrialNotice] = useState(false);
+  const guardCreate = (fn) => (...args) => {
+    if (!canCreate) { setShowTrialNotice(true); return; }
+    fn(...args);
+  };
+  const [loaded, setLoaded] = useState(false);
+  const fy = fyOf(today());
+
+  useEffect(() => {
+    const s = document.createElement("style"); s.textContent = CSS;
+    document.head.appendChild(s); return () => s.remove();
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await storage.get("ndis:data");
+        if (r?.value) {
+          const d = { ...BLANK, ...JSON.parse(r.value) };
+          // A stored file can carry an explicit null for a field, not just
+          // leave it absent, an object spread only backfills genuinely
+          // missing keys from BLANK, not ones present-but-null. That gap is
+          // invisible on load itself, since none of this migration step
+          // touches "managers", it only surfaces later, silently, inside
+          // whatever event handler first tries to .find/.filter/.map it,
+          // somewhere React's error boundary can't see or report it.
+          ["participants", "managers", "shifts", "invoices", "expenses", "trips", "notes", "clients"].forEach((k) => {
+            if (!Array.isArray(d[k])) d[k] = [];
+          });
+          // profile isn't an array, but the same explicit-null gap applies,
+          // and virtually every screen in the app reads data.profile.X
+          // directly with no guard at all, so this one has to be whole,
+          // not just present, backfilling any sub-field a stored file is
+          // missing from an older version of the profile shape.
+          d.profile = (d.profile && typeof d.profile === "object" && !Array.isArray(d.profile))
+            ? { ...BLANK.profile, ...d.profile } : { ...BLANK.profile };
+          if (!d.claimCache || typeof d.claimCache !== "object" || Array.isArray(d.claimCache)) d.claimCache = {};
+          // legacy: plain client names become directory entries
+          // 2025-26 codes that pointed at the wrong support in earlier builds
+          const RECODE = { "01_002_0107_1_1_OLDSAT": "01_013_0107_1_1" };
+          const fixCode = (c) => RECODE[c] || c;
+          d.participants = d.participants.map((x) => {
+            // A private client's defaultCode is meant to be empty, that's
+            // not a stale NDIS code to fix up, don't touch their custom
+            // rate. This check has to come first, or every reload would
+            // silently wipe the rate they'd set for themselves.
+            if (x.nonNdis) return x;
+            const it = SUPPORT_ITEMS.find((i) => i.code === fixCode(x.defaultCode));
+            return it ? { ...x, defaultCode: it.code } : { ...x, defaultCode: "", defaultRate: "" };
+          });
+          const linkByName = (r) => (r.participantId || !r.client) ? r
+            : { ...r, participantId: (d.participants.find((x) => x.name === r.client) || {}).id || "" };
+          d.trips = d.trips.map(linkByName);
+          d.notes = d.notes.map(linkByName);
+          if (d.clients.length && !d.participants.length) {
+            d.participants = d.clients.map((name) => ({ id: uid(), name, ndisNumber: "", email: "", phone: "", address: "", managerId: "", planType: "plan", planEnd: "", notes: "" }));
+          }
+          setData(d);
+          if (!d.onboarded) setTab(d.profile.welcomed ? "setup" : "welcome");
+        } else {
+          setTab("welcome"); // nothing stored at all, brand new
+        }
+      } catch (e) { }
+      // Follow the phone's own light/dark setting until the person picks a
+      // theme themselves. Once they choose, that saved choice wins and the
+      // system setting is ignored, changing it in Settings should stick.
+      try {
+        const t = await storage.get("ndis:theme");
+        if (t?.value) setTheme(t.value);
+        else if (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches) setTheme("light");
+      } catch (e) { }
+      setLoaded(true);
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!loaded || !data.onboarded || !googleDriveConnected() || !hasBackupMasterKey()) return;
+    let pending=false; try { pending=localStorage.getItem("sf_backup_pending_v1")==="1"; } catch(_){}
+    const changed=countRecords(data)!==(data.profile.backedUpCount||0);
+    if (pending || changed) scheduleGoogleAutoBackup(data);
+  }, [loaded]);
+
+  const save = async (next, skipAutoBackup = false) => {
+    // Count only newly created work records as meaningful tester activity.
+    // No record content, participant information, amounts or notes leave the device.
+    const eventMap = [["shifts", "shift_created"], ["trips", "trip_created"], ["invoices", "invoice_created"], ["expenses", "expense_created"], ["notes", "note_created"]];
+    eventMap.forEach(([key, eventName]) => {
+      if (Array.isArray(next[key]) && Array.isArray(data[key]) && next[key].length > data[key].length) emitTesterActivity(eventName);
+    });
+    setData(next);
+    try { await storage.set("ndis:data", JSON.stringify(next)); } catch (e) { console.error(e); }
+    if (!skipAutoBackup && next.onboarded) scheduleGoogleAutoBackup(next);
+  };
+  const flip = async () => {
+    const n = theme === "dark" ? "light" : "dark";
+    setTheme(n);
+    try { await storage.set("ndis:theme", n); } catch (e) { }
+  };
+
+  const m = useMemo(() => {
+    const inv = data.invoices.filter((i) => inFY(i.date, fy));
+    const income = inv.filter((i) => i.status === "paid").reduce((s, i) => s + invTotal(i), 0);
+    const invoiced = inv.reduce((s, i) => s + invTotal(i), 0);
+    const expenses = data.expenses.filter((e) => inFY(e.date, fy)).reduce((s, e) => s + Number(e.amount || 0), 0);
+    const km = data.trips.filter((t) => inFY(t.date, fy)).reduce((s, t) => s + Number(t.km || 0), 0);
+    // Deductible kilometres are a genuinely different figure from total
+    // logged kilometres: every trip counts toward the total, but only trips
+    // marked as genuine business travel count toward the vehicle deduction.
+    // A trip can be billable to a participant, tax-deductible, both, or
+    // neither, they are two separate questions. Trips saved before this
+    // field existed have taxDeductible === undefined, treated as deductible
+    // to match the app's prior behaviour rather than silently dropping
+    // deductions someone already had.
+    const deductibleKm = data.trips
+      .filter((t) => inFY(t.date, fy) && t.taxDeductible !== false)
+      .reduce((s, t) => s + Number(t.km || 0), 0);
+    const carOn = data.profile.carMethod !== "off";
+    const carRate = Number(data.profile.carRate || CAR.rate);
+    const kmRate = Number(data.profile.kmRate || TRAVEL_ITEM.rate);
+    // A rough starting point for someone switching to SupportFlow partway
+    // through the year. Only counted when it's tagged to this exact financial
+    // year, so it can never silently carry over once the year rolls.
+    const prior = data.priorTotals && data.priorTotals.fy === fy ? data.priorTotals : null;
+    const priorIncome = prior ? Number(prior.income || 0) : 0;
+    const priorExpenses = prior ? Number(prior.expenses || 0) : 0;
+    const priorKm = prior ? Number(prior.km || 0) : 0;
+
+    const car = carOn ? carDeduction(deductibleKm + priorKm, carRate) : 0;
+    const overCap = (deductibleKm + priorKm) > CAR.cap;
+
+    // The comparison the app can honestly make: cents/km against a logbook
+    // estimate built from real logged expenses and a business-use percentage
+    // the user got from their own 12-week logbook. Only shown once a
+    // percentage is actually entered, since a made-up figure would be worse
+    // than no comparison at all.
+    const logbookPct = Number(data.profile.logbookPct || 0);
+    const vehicleExpenseFY = data.expenses
+      .filter((e) => inFY(e.date, fy) && expenseCatGroup(normaliseExpenseCat(e.cat)) === "vehicle")
+      .reduce((s, e) => s + Number(e.amount || 0), 0);
+    const logbookEstimate = logbookPct > 0 ? (logbookPct / 100) * vehicleExpenseFY : null;
+    const centsEstimate = carDeduction(deductibleKm + priorKm, carRate);
+    // A GST credit on a vehicle only makes sense against the logbook method.
+    // Cents/km is a deemed ATO rate standing in for real costs, there's no
+    // actual GST-bearing purchase behind that number to claim a credit
+    // against, so this is genuinely null (not zero, not skipped) whenever
+    // logbook isn't the method in use, meaning "not applicable" is kept
+    // visibly different from "applicable but nothing to claim".
+    const vehicleGstFY = data.expenses
+      .filter((e) => inFY(e.date, fy) && expenseCatGroup(normaliseExpenseCat(e.cat)) === "vehicle")
+      .reduce((s, e) => s + gstCreditFor(e, !!data.profile.gstRegistered), 0);
+    const vehicleGstCredit = (logbookPct > 0 && data.profile.gstRegistered) ? (logbookPct / 100) * vehicleGstFY : null;
+    // Whole-year GST picture for the Money screen's own summary card. Non-
+    // vehicle expenses use their own recorded businessUsePct as normal.
+    // Vehicle expenses are treated differently on purpose: gstCreditFor's
+    // generic businessUsePct field isn't the right test for a vehicle,
+    // whether logbook is even the method in use is, so vehicle credit here
+    // reuses vehicleGstCredit (already correctly gated to logbook-only)
+    // rather than letting a vehicle expense's own businessUsePct silently
+    // produce a credit under the cents/km method, which would be wrong.
+    const gstDetectedFY = data.expenses
+      .filter((e) => inFY(e.date, fy))
+      .reduce((s, e) => s + Number(e.gstAmount || 0), 0);
+    const nonVehicleCreditFY = data.expenses
+      .filter((e) => inFY(e.date, fy) && expenseCatGroup(normaliseExpenseCat(e.cat)) !== "vehicle")
+      .reduce((s, e) => s + gstCreditFor(e, !!data.profile.gstRegistered), 0);
+    const potentialCreditsFY = nonVehicleCreditFY + (vehicleGstCredit || 0);
+    // The "would registering help" comparison needs the credit figure as if
+    // registered, regardless of the person's real, current status, so this
+    // recomputes with gstRegistered forced true rather than reusing
+    // potentialCreditsFY, which correctly returns 0 for someone genuinely
+    // not registered. Same logbook-only rule for vehicle expenses applies
+    // here too, a hypothetical scenario is still not license to imply a
+    // credit under a method that doesn't produce one.
+    const hypotheticalVehicleCredit = logbookPct > 0 ? (logbookPct / 100) * vehicleGstFY : 0;
+    const hypotheticalNonVehicleCredit = data.expenses
+      .filter((e) => inFY(e.date, fy) && expenseCatGroup(normaliseExpenseCat(e.cat)) !== "vehicle")
+      .reduce((s, e) => s + gstCreditFor(e, true), 0);
+    const hypotheticalGstCredits = hypotheticalNonVehicleCredit + hypotheticalVehicleCredit;
+    // "income" and "invoiced" above stay pure, real invoices only, since
+    // they drive the Received / Still owed figures. The prior total only
+    // ever feeds the tax estimate, never those tracking figures.
+    const taxableIncome = income + priorIncome;
+    const deductions = expenses + priorExpenses + car;
+    const taxable = Math.max(0, taxableIncome - deductions);
+    const setAside = incomeTax(taxable) + medicare(taxable);
+    const turnover = gstTurnover(data);
+    const gstReg = !!data.profile.gstRegistered;
+    const gstDue = turnover >= GST_THRESHOLD && !gstReg;
+    const gstNear = !gstReg && !gstDue && turnover >= GST_THRESHOLD * 0.8;
+    const noAgreement = data.participants.filter((x) => !x.agreement);
+    const agReview = data.participants.filter((x) => x.agreement && x.agreementReview && x.agreementReview <= addDays(today(), 30));
+    return { inv, income, invoiced, outstanding: invoiced - income, expenses, km, deductibleKm, car, carOn, carRate, kmRate, overCap,
+      turnover, gstReg, gstDue, gstNear, noAgreement, agReview, priorIncome, priorExpenses, priorKm,
+      taxableIncome, deductions, taxable, setAside, eff: taxable > 0 ? (setAside / taxable) * 100 : 0,
+      logbookEstimate, centsEstimate, vehicleExpenseFY, logbookPct, vehicleGstFY, vehicleGstCredit,
+      gstDetectedFY, potentialCreditsFY, hypotheticalGstCredits };
+  }, [data, fy]);
+
+  // Re-lock if the app has been in the background a while. Not on every
+  // blur — that would be maddening when switching to the mail app to send
+  // an invoice and straight back. The timestamp is written to localStorage
+  // (not just kept in a ref) so it survives an actual page reload, see
+  // shouldLockNow above.
+  useEffect(() => {
+    if (!readLock()) return;
+    const onVis = () => {
+      if (document.hidden) {
+        try { localStorage.setItem(LOCK_HIDDEN_AT_KEY, String(Date.now())); } catch (e) { }
+        return;
+      }
+      if (shouldLockNow()) setLocked(true);
+      try { localStorage.removeItem(LOCK_HIDDEN_AT_KEY); } catch (e) { }
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, []);
+
+  const go = (t, sub) => {
+    setTab(t); setEditing(null); if (t !== "settings") setOpenPane(null);
+    if (sub) { if (t === "summary") setSumTab(sub); if (t === "invoices") setInvTab(sub); if (t === "people") setPplTab(sub); }
+  };
+  const goHub = (t) => { setTab(t); setEditing(null); setOpenPane(null); setMenuOpen(false); setHelpMenuOpen(false); };
+  const navActive = (k) => k === "home" ? tab === "home"
+    : k === "workhub" ? (tab === "workhub" || tab === "invoices")
+    : k === "moneyhub" ? (tab === "moneyhub" || tab === "summary")
+    : k === "participantshub" ? (tab === "participantshub" || tab === "people")
+    : false;
+  const firstName = ((data.profile.name || "").trim().split(/\s+/)[0] || "there");
+  const hourNow = new Date().getHours();
+  const greeting = hourNow < 12 ? "Good morning" : hourNow < 17 ? "Good afternoon" : "Good evening";
+  // A pill shows a dot only when there is something behind it to act on.
+  const flags = {
+    shifts: data.shifts.some((x) => needsConfirm(x)) ? "warn" : null,
+    travel: null,
+    invoices: data.invoices.some((i) => i.status === "sent" && i.due && i.due < today()) ? "warn"
+      : (data.shifts.some((x) => isBillable(x) && !shiftInvoice(x, data.invoices))
+          || data.trips.some((t) => t.billable && t.participantId && !tripInvoice(t, data.invoices))) ? "on" : null,
+    agreements: data.participants.some((x) => !x.agreement) ? "warn"
+      : data.participants.some((x) => x.agreement && x.agreementReview && x.agreementReview <= addDays(today(), 30)) ? "on" : null,
+  };
+
+  const askClaim = (term) => { setClaimSeed(term || ""); setTab("summary"); setSumTab("position"); };
+
+  const wipeAll = () => save({ ...data, managers: [], participants: [], invoices: [], expenses: [], trips: [], notes: [], clients: [], shifts: [], priorTotals: null });
+
+  // The one path every "raise an invoice" action goes through, whether it's
+  // opened blank from a participant or pre-loaded from a specific shift or
+  // trip already sitting in Summary, Work or Trips. A contextual button that
+  // knows which record it's next to should never hand that record's data
+  // over to a blank editor and make someone re-pick it, that's the exact bug
+  // this replaces. accepts either a bare participant id (unchanged, existing
+  // callers keep working) or { participantId, shiftIds, tripIds }.
+  // Wrapped in its own try/catch, not relying on the app's usual crash
+  // screen, since that only catches errors thrown while rendering, never
+  // ones thrown inside a click handler like this. Without this, a genuine
+  // bug here fails completely silently, the screen just sits there and
+  // nothing happens, with no way for anyone, including the person hitting
+  // it, to know what actually went wrong.
+  const [invoiceError, setInvoiceError] = useState(null);
+  const newInvoice = guardCreate((arg) => {
+   try {
+    const opts = (arg && typeof arg === "object") ? arg : { participantId: arg };
+    const participantId = opts.participantId;
+    const shiftIds = opts.shiftIds || [];
+    // A trip on the same date as a ticked shift is included automatically,
+    // even if it was never separately ticked on Travel, since a shift and
+    // the travel to get there almost always belong together on the same
+    // invoice. Only trips that are genuinely available, billable and not
+    // already sitting on some other invoice, get pulled in this way. The
+    // Set dedupes in case the same trip was also explicitly ticked, so it
+    // can never end up counted twice.
+    const shiftDates = new Set(data.shifts.filter((x) => shiftIds.includes(x.id)).map((x) => x.date).filter(Boolean));
+    const autoTripIds = shiftDates.size
+      ? data.trips.filter((t) => t.participantId === participantId && t.billable
+          && shiftDates.has(t.date) && !tripInvoice(t, data.invoices)).map((t) => t.id)
+      : [];
+    const tripIds = [...new Set([...(opts.tripIds || []), ...autoTripIds])];
+
+    const pt = data.participants.find((x) => x.id === participantId) || null;
+
+    const lines = [];
+    if (shiftIds.length) {
+      // One line per shift rather than merging same-item shifts into a
+      // single combined line. NDIS plan managers reconcile claims against
+      // a specific date and time, a line that just says "3 shifts, 18
+      // hours" can't be checked against anything, each date has to stand
+      // on its own so the invoice is self-explanatory without cross
+      // referencing separate shift records.
+      const picked = data.shifts.filter((x) => shiftIds.includes(x.id)).sort((a, b) => (a.date < b.date ? -1 : 1));
+      picked.forEach((x) => {
+        const cancelled = x.status === "cancelled";
+        // A private client has no NDIS item to classify against at all --
+        // bill their agreed description and rate directly, rather than
+        // running them through the NDIS weekday/evening/weekend system
+        // that has nothing to do with a privately agreed rate.
+        if (pt && pt.nonNdis) {
+          const hrs = shiftHours(x);
+          if (!hrs) return;
+          const desc = pt.defaultDescription || "Support work";
+          lines.push({ id: "auto-shift-" + x.id, code: "",
+            desc: cancelled
+              ? `${desc} · short notice cancellation, ${fmtDate(x.date)}`
+              : `${desc} · ${fmtDate(x.date)}, ${x.start}–${x.end}`,
+            qty: String(hrs), rate: Number(pt.defaultRate) || 0, unit: "hr",
+            dates: x.date ? [x.date] : [] });
+          return;
+        }
+        const c = classifyShift(x);
+        if (!c || !c.item) return;
+        const rate = (pt && pt.defaultCode === c.item.code && pt.defaultRate) ? Number(pt.defaultRate) : c.item.rate;
+        lines.push({ id: "auto-shift-" + x.id, code: c.item.code,
+          desc: cancelled
+            ? `${c.item.name} · short notice cancellation, ${fmtDate(x.date)}`
+            : `${c.item.name} · ${fmtDate(x.date)}, ${x.start}–${x.end}`,
+          qty: String(c.hours), rate, unit: c.item.unit || "hr",
+          dates: x.date ? [x.date] : [] });
+      });
+    }
+    if (tripIds.length) {
+      const selectedTrips = data.trips.filter((t) => tripIds.includes(t.id));
+      const km = selectedTrips.reduce((n, t) => n + Number(t.km || 0), 0);
+      if (km > 0) {
+        // A private client's travel isn't an NDIS claim either -- same km
+        // rate (that part was already the account's own configured rate,
+        // not an NDIS figure), but no NDIS code or "non-labour costs"
+        // wording on their invoice.
+        const isNonNdis = pt && pt.nonNdis;
+        lines.push({ id: "auto-travel", code: isNonNdis ? "" : TRAVEL_ITEM.code,
+          desc: isNonNdis
+            ? `Travel · ${tripIds.length} trip${tripIds.length === 1 ? "" : "s"} logged`
+            : `${TRAVEL_ITEM.name} · ${tripIds.length} trip${tripIds.length === 1 ? "" : "s"} logged`,
+          qty: String(km), rate: m.kmRate, unit: "km",
+          dates: [...new Set(selectedTrips.map((t) => t.date).filter(Boolean))].sort() });
+      }
+      // Travel time is a separate claim from kilometres, capped per trip
+      // (each way), not as a total, so each trip's own minutes are capped
+      // before they're added together. This is an NDIS-specific claim
+      // (the PAPL cap by remoteness), not a general concept -- skipped
+      // for a private client rather than guessing at an equivalent; they
+      // can add a line manually if their arrangement includes it.
+      if (!(pt && pt.nonNdis)) {
+      const cap = travelCap(pt?.zone || "mmm13");
+      const withTime = selectedTrips.filter((t) => Number(t.travelMins) > 0);
+      const totalMins = withTime.reduce((n, t) => n + (cap ? Math.min(Number(t.travelMins), cap) : Number(t.travelMins)), 0);
+      if (totalMins > 0) {
+        const base = (pt && pt.defaultCode && SUPPORT_ITEMS.find((x) => x.code === pt.defaultCode)) || SUPPORT_ITEMS[0];
+        const rate = (pt && pt.defaultRate) ? Number(pt.defaultRate) : base.rate;
+        const hrs = Math.round((totalMins / 60) * 100) / 100;
+        lines.push({ id: "auto-travel-time", code: base.code,
+          desc: `${base.name} · provider travel time`,
+          qty: String(hrs), rate, unit: "hr",
+          dates: [...new Set(withTime.map((t) => t.date).filter(Boolean))].sort() });
+      }
+      }
+    }
+
+    const prev = (!lines.length && pt) ? [...data.invoices].reverse().find((i) => i.participantId === pt.id) : null;
+
+    setTab("summary"); setSumTab("invoices");
+    setEditing({
+      id: uid(), number: String((data.profile || {}).nextInv || 1).padStart(4, "0"),
+      participantId: pt?.id || "",
+      date: today(),
+      due: pt ? dueFrom(today(), pt, data) : "",
+      status: "draft",
+      notes: "",
+      tripIds, shiftIds,
+      lines: lines.length ? lines
+        : prev ? prev.lines.filter((l) => l.id !== "auto-travel" && !String(l.id).startsWith("auto-shift")).map((l) => ({ ...l, id: uid() }))
+        : [defaultLine(pt)],
+      _new: true, _prefilled: !lines.length && !!prev,
+    });
+   } catch (err) {
+    setInvoiceError(String((err && (err.stack || err.message)) || err));
+   }
+  });
+
+  const saveInvoice = (inv) => {
+    const clean = { ...inv }; delete clean._new; delete clean._prefilled;
+    clean.tripIds = inv.tripIds || [];
+    clean.shiftIds = inv.shiftIds || [];
+    const exists = data.invoices.some((i) => i.id === inv.id);
+    const invoices = exists ? data.invoices.map((i) => (i.id === inv.id ? clean : i)) : [...data.invoices, clean];
+    const profile = inv._new ? { ...data.profile, nextInv: Number(inv.number) + 1 } : data.profile;
+    save({ ...data, invoices, profile });
+    setEditing(null);
+  };
+
+  // Raised in error, never actually issued to anyone, so the number it
+  // used shouldn't be treated as spent. Only rolls the counter back when
+  // this was genuinely the highest number out there, since reusing a
+  // number that a newer invoice already carries would create a real
+  // collision, two different invoices claiming the same number. Works
+  // off the actual invoices left behind rather than the stored nextInv
+  // counter, so it self-heals if that counter ever drifted, always
+  // landing one past whatever invoice is now the most recent. Any other
+  // deletion just leaves that number unused, which is honest, a real gap
+  // rather than a fabricated continuity.
+  const deleteInvoice = (inv) => {
+    const invoices = data.invoices.filter((i) => i.id !== inv.id);
+    const higherExists = invoices.some((i) => Number(i.number) > Number(inv.number));
+    const maxRemaining = invoices.reduce((m, i) => Math.max(m, Number(i.number) || 0), 0);
+    const profile = higherExists ? data.profile : { ...data.profile, nextInv: maxRemaining + 1 };
+    save({ ...data, invoices, profile });
+    setEditing(null);
+  };
+
+  if (!loaded) return <div className="sl" data-theme="dark" style={{ padding: 60 }}><div className="eyebrow">Loading…</div></div>;
+
+  if (locked) return (
+    <LockScreen
+      onUnlock={() => setLocked(false)}
+      onForgot={() => {
+        writeLock(null);
+        try { localStorage.removeItem("ndis:data"); } catch (e) { }
+        window.location.reload();
+      }}
+    />
+  );
+
+  return (
+    <div className="sl" data-theme={theme}>
+      <div className="top">
+        <div className="topin">
+          <div className="mark">
+            <div className="seal" aria-label="SupportFlow">
+              <svg viewBox="0 0 512 512" width="20" height="20" aria-hidden="true">
+                <path d="M344 118C344 118 300 90 232 90C152 90 100 132 100 190C100 244 142 272 214 284L298 298C350 306 380 328 380 366C380 412 336 442 264 442C190 442 148 414 148 414"
+                  fill="none" stroke="#14150F" strokeWidth="72" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+            <div>
+              <div className="disp" style={{ fontSize: 16, lineHeight: 1.1 }}>SupportFlow</div>
+              <div className="eyebrow" style={{ fontSize: 9, marginTop: 1 }}>{fy}–{String(fy + 1).slice(2)}</div>
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {/* TEMP: testing-phase shortcut, remove after beta */}
+            <button className="btn ghost tiny" onClick={() => { setMenuOpen(false); setHelpInitialView("support"); setOpenPane("help"); go("settings"); }}
+              title="Feedback" aria-label="Feedback">Feedback</button>
+            <div style={{ position: "relative" }}>
+              <button className="helpbtn" onClick={() => { setMenuOpen(false); setHelpMenuOpen(!helpMenuOpen); }}
+                title="Help and SupportFlow Assistant" aria-label="Help and SupportFlow Assistant" aria-expanded={helpMenuOpen}>?</button>
+              {helpMenuOpen && (
+                <>
+                  <div className="menuveil" onClick={() => setHelpMenuOpen(false)} />
+                  <div className="menu" style={{ minWidth: 250 }}>
+                    {FEATURES.supportFlowAssistant && (
+                      <button onClick={() => { setHelpMenuOpen(false); setShowAssistant(true); }}>
+                        <b>Ask SupportFlow</b><br/><span style={{ fontSize: 11, color: "var(--tx-3)" }}>Ask a question and get help using SupportFlow.</span>
+                      </button>
+                    )}
+                    <button onClick={() => { setHelpMenuOpen(false); setHelpInitialView("manual"); setOpenPane("help"); go("settings"); }}>
+                      <b>Manual &amp; Help</b><br/><span style={{ fontSize: 11, color: "var(--tx-3)" }}>Browse the SupportFlow user guide.</span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+            <div style={{ position: "relative" }}>
+              <button className="avatar" data-on={menuOpen ? 1 : 0} onClick={() => { setHelpMenuOpen(false); setMenuOpen(!menuOpen); }}
+                title="Menu" aria-label="Menu" aria-expanded={menuOpen}>
+                {(data.profile.name || "").trim()
+                  ? (data.profile.name || "").trim().charAt(0).toUpperCase()
+                  : (
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <circle cx="12" cy="8" r="3.4" />
+                      <path d="M5 20c0-3.6 3.1-6.5 7-6.5s7 2.9 7 6.5" />
+                    </svg>
+                  )}
+              </button>
+
+            {menuOpen && (
+              <>
+                <div className="menuveil" onClick={() => setMenuOpen(false)} />
+                <div className="menu">
+                  <div className="menuhead">
+                    <div className="disp" style={{ fontSize: 15 }}>{data.profile.name || "Your details"}</div>
+                    <div className="eyebrow" style={{ marginTop: 3 }}>
+                      {data.profile.abn ? `ABN ${data.profile.abn}` : "No ABN set"}
+                    </div>
+                    <div style={{ fontSize: 10.5, color: "var(--tx-3)", marginTop: 6 }}>Version {APP_VERSION}</div>
+                  </div>
+                  <button onClick={() => { setMenuOpen(false); setOpenPane(null); go("settings"); }}>Settings</button>
+                  <button onClick={() => { setMenuOpen(false); setOpenPane("privacy-security"); go("settings"); }}>Privacy &amp; security</button>
+                  <button onClick={() => { setMenuOpen(false); flip(); }}>
+                    {theme === "dark" ? "Light mode" : "Dark mode"}
+                  </button>
+                  {!!readLock() && (
+                    <button onClick={() => { setMenuOpen(false); setLocked(true); }}>Lock now</button>
+                  )}
+                </div>
+              </>
+            )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="wrap">
+
+        {tab === "home" && (
+          <div className="homehub hubpage">
+            <div className="hubfixed">
+              <div className="homehello">
+                <div className="greet">{greeting}, {firstName}</div>
+                <div className="sub">Let's get organised today.</div>
+              </div>
+              <div className="shortcutmeta">
+                <div className="shortcuttitle">Quick start</div>
+                <div className="shortcuthelp">Shortcuts open the SupportFlow screens you already use.</div>
+              </div>
+            </div>
+            <div className="hubscroll homecardscroll">
+              <div className="shortgrid homeflowgrid">
+                <ShortcutCard icon="shift" tone="pink" title="Add a shift" sub="Open the existing Add Shift form." onClick={() => { setOpenNewShiftRequest(true); go("invoices", "shifts"); }}/>
+                <ShortcutCard icon="notes" tone="teal" title="Add a note" sub="Open the existing progress notes screen." onClick={() => go("invoices", "notes")}/>
+                <ShortcutCard icon="travel" tone="violet" title="Travel" sub="Open the existing travel screen." onClick={() => go("invoices", "travel")}/>
+                <ShortcutCard icon="invoice" tone="blue" title="Invoices" sub="Open the existing invoice screen." onClick={() => go("summary", "invoices")}/>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {tab === "workhub" && (
+          <div className="hubpage">
+            <div className="hubfixed">
+              <div className="hubhead"><div className="disp">Work</div><p>Choose what you want to do. No shift or record data is shown on this page.</p></div>
+            </div>
+            <div className="hubscroll">
+              <div className="shortgrid">
+                <ShortcutCard icon="shift" tone="pink" title="Shifts" sub="Add and manage shifts." onClick={() => go("invoices", "shifts")}/>
+                <ShortcutCard icon="travel" tone="violet" title="Travel" sub="Log trips and kilometres." onClick={() => go("invoices", "travel")}/>
+                <ShortcutCard icon="notes" tone="teal" title="Notes" sub="Record progress notes." onClick={() => go("invoices", "notes")}/>
+                <ShortcutCard icon="incident" tone="orange" title="Incidents" sub="Record and manage incidents." onClick={() => go("invoices", "incidents")}/>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {tab === "moneyhub" && (
+          <div className="hubpage">
+            <div className="hubfixed">
+              <div className="hubhead"><div className="disp">Money</div><p>Choose a money tool. Your invoices, expenses and tax records only appear after you open one.</p></div>
+            </div>
+            <div className="hubscroll">
+              <div className="shortgrid">
+                <ShortcutCard icon="invoice" tone="blue" title="Invoices" sub="Open your existing invoice screen." onClick={() => go("summary", "invoices")}/>
+                <ShortcutCard icon="expense" tone="pink" title="Expenses" sub="Open your existing expenses screen." onClick={() => go("summary", "expenses")}/>
+                <ShortcutCard icon="tax" tone="yellow" title="Tax" sub="Income, tax estimate and Claimable checker." onClick={() => { setClaimSeed(""); go("summary", "position"); }} wide={!data.profile.gstRegistered}/>
+                {data.profile.gstRegistered && <ShortcutCard icon="tax" tone="yellow" title="BAS" sub="Open the existing BAS worksheet." onClick={() => go("summary", "bas")}/>}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {tab === "participantshub" && (
+          <div className="hubpage">
+            <div className="hubfixed">
+              <div className="hubhead"><div className="disp">Participants</div><p>Choose what you want to manage. Participant details only appear after you open a section.</p></div>
+            </div>
+            <div className="hubscroll">
+              <div className="shortgrid">
+                <ShortcutCard icon="people" tone="violet" title="Participants" sub="View and manage participants." onClick={() => go("people", "participants")}/>
+                <ShortcutCard icon="personAdd" tone="teal" title="Add participant" sub="Open the existing participant area to add one." onClick={() => go("people", "participants")}/>
+                <ShortcutCard icon="document" tone="blue" title="Plan managers" sub="Manage plan manager details." onClick={() => go("people", "managers")}/>
+                <ShortcutCard icon="agreement" tone="pink" title="Service agreements" sub="Manage participant agreements." onClick={() => go("people", "agreements")}/>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {tab === "summary" && (editing
+          ? <Editor inv={editing} setInv={setEditing} onSave={saveInvoice} onCancel={() => setEditing(null)} onDelete={deleteInvoice} profile={data.profile} data={data} go={go} />
+          : (
+            <>
+              <SectionReturnHeader
+                section="Money"
+                title={({ invoices: "Invoices", expenses: "Expenses", position: "Tax", bas: "BAS" })[sumTab] || "Money"}
+                onBack={() => { setClaimSeed(""); goHub("moneyhub"); }}
+              />
+              {sumTab === "invoices" && <InvoiceList data={data} m={m} fy={fy} save={save} newInvoice={newInvoice} open={setEditing} go={go} billTick={billTick} setBillTick={setBillTick} />}
+              {sumTab === "bas" && <BAS data={data} fy={fy} />}
+              {sumTab === "position" && <Summary data={data} save={save} m={m} go={go} newInvoice={newInvoice} resume={() => setTab("setup")}              snoozeBackup={() => save({ ...data, profile: { ...data.profile, remindedOn: today() } })}
+                dismissBackupNotice={() => save({ ...data, profile: { ...data.profile, backupNoticeSeen: true } })}
+                daysUntilTrialEnd={daysUntilTrialEnd} onSubscribe={() => setShowTrialNotice(true)} claimSeed={claimSeed} />}
+              {sumTab === "expenses" && <Expenses data={data} save={save} m={m} fy={fy} askClaim={askClaim} canCreate={canCreate} onBlocked={() => setShowTrialNotice(true)} />}
+            </>
+          ))}
+
+        {/* Work — the doing, not the getting paid. Invoices moved to Money,
+            since who's been paid is a financial-position question, not a
+            work-log one. */}
+        {tab === "invoices" && (
+          <>
+            <SectionReturnHeader
+              section="Work"
+              title={({ shifts: "Shifts", travel: "Travel", notes: "Notes", incidents: "Incidents" })[invTab] || "Work"}
+              onBack={() => goHub("workhub")}
+            />
+            {invTab === "shifts" && <Shifts data={data} save={save} fy={fy} newInvoice={newInvoice} canCreate={canCreate} onBlocked={() => setShowTrialNotice(true)}
+              openNewRequest={openNewShiftRequest} onOpenNewConsumed={() => setOpenNewShiftRequest(false)}
+              onShiftSaved={(ctx) => { if (!suppressVisitFollowUp) setVisitFollowUp(ctx); }} />}
+            {invTab === "travel" && <Trips data={data} save={save} m={m} fy={fy} canCreate={canCreate} onBlocked={() => setShowTrialNotice(true)}
+              prefill={travelPrefill}
+              onSaved={() => { setTravelFollowUp(travelPrefill); setTravelPrefill(null); }} />}
+            {invTab === "notes" && <Notes data={data} save={save} prefill={notesPrefill} onPrefillConsumed={() => setNotesPrefill(null)} />}
+            {invTab === "incidents" && <Incidents data={data} save={save} />}
+          </>
+        )}
+
+        {/* People — who you work with, and the notes about them. */}
+        {tab === "people" && (
+          <>
+            <SectionReturnHeader
+              section="Participants"
+              title={({ participants: "Participants", managers: "Plan managers", agreements: "Service agreements" })[pplTab] || "Participants"}
+              onBack={() => goHub("participantshub")}
+            />
+            {pplTab === "agreements" && <Agreements data={data} save={save} open={(pt) => { setPplTab("participants"); setOpenPt(pt.id); }} />}
+            {(pplTab === "participants" || pplTab === "managers") &&
+              <Directory data={data} save={save} view={pplTab} setView={setPplTab} openId={openPt} clearOpen={() => setOpenPt(null)} canCreate={canCreate} onBlocked={() => setShowTrialNotice(true)} />}
+          </>
+        )}
+
+        {tab === "welcome" && (
+          <Welcome
+            onSetup={() => { save({ ...data, profile: { ...data.profile, welcomed: true, introTourVersion: 2 } }); setTab("setup"); }}
+          />
+        )}
+
+        {tab === "setup" && <Onboarding data={data} save={save} close={() => go("home")} help={() => go("settings")}
+          openPrivacy={() => { setOpenPane("privacy"); go("settings"); }} startStep={firstIncompleteStep(data)} />}
+
+        {tab === "settings" && <Settings data={data} save={save} theme={theme} flip={flip} wipeAll={wipeAll} rerun={() => setTab("setup")} startPane={openPane || "settings"} helpInitialView={helpInitialView} />}
+      </div>
+
+      <div className="mob">
+        {NAV.map(([k, l]) => (
+          <button key={k} className="mobnav" data-on={navActive(k) ? 1 : 0} onClick={() => goHub(k)}>
+            <span className="mobnav-icon">{NAV_ICONS[k]}</span>
+            <span>{l}</span>
+          </button>
+        ))}
+      </div>
+
+      {showTrialNotice && <TrialEndedNotice onClose={() => setShowTrialNotice(false)} />}
+
+      {FEATURES.supportFlowAssistant && showAssistant && (
+        <SupportFlowAssistant
+          onClose={() => setShowAssistant(false)}
+          go={go}
+          currentScreen={
+            tab === "settings" ? "Settings"
+              : tab === "home" ? "Home"
+              : tab === "workhub" ? "Work"
+              : tab === "moneyhub" ? "Money"
+              : tab === "participantshub" ? "Participants"
+              : tab === "summary" ? { invoices: "Invoices", bas: "BAS", position: "Tax", expenses: "Expenses" }[sumTab] || "Money"
+              : tab === "invoices" ? { shifts: "Shifts", travel: "Trips", notes: "Notes", incidents: "Incidents" }[invTab] || "Work"
+              : tab === "people" ? "Participants"
+              : ""
+          }
+          openHelp={() => { setHelpInitialView("manual"); setOpenPane("help"); go("settings"); }}
+        />
+      )}
+
+      {invoiceError && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", zIndex: 90,
+          display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+          onClick={() => setInvoiceError(null)}>
+          <div className="sl" data-theme={theme} style={{ width: "100%", maxWidth: 460, padding: 20,
+            borderRadius: "16px 16px 0 0", background: "var(--bg)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="disp" style={{ fontSize: 19, marginBottom: 8 }}>Couldn't raise that invoice</div>
+            <div style={{ fontSize: 13, color: "var(--tx-2)", lineHeight: 1.6, marginBottom: 14 }}>
+              Nothing was created or changed, your records are untouched. The detail below is exactly what's needed to fix it, please copy it and send it through.
+            </div>
+            <pre style={{ fontSize: 10.5, lineHeight: 1.5, color: "var(--tx-3)", background: "var(--bg-2)",
+              border: "1px solid var(--line)", borderRadius: 10, padding: 12,
+              whiteSpace: "pre-wrap", wordBreak: "break-word", overflowX: "auto", marginBottom: 14 }}>
+              v{APP_VERSION}{"\n\n"}{invoiceError}
+            </pre>
+            <button className="btn" style={{ width: "100%" }} onClick={() => setInvoiceError(null)}>Close</button>
+          </div>
+        </div>
+      )}
+
+      {visitFollowUp && !travelPrefill && (() => {
+        const vf = visitFollowUp;
+        const pt = data.participants.find((p) => p.id === vf.participantId);
+        const shift = data.shifts.find((x) => x.id === vf.shiftId);
+        const canInvoiceNow = shift && isBillable(shift);
+        return (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", zIndex: 90,
+            display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+            onClick={() => setVisitFollowUp(null)}>
+            <div className="sl" data-theme={theme} style={{ width: "100%", maxWidth: 460, padding: 20,
+              borderRadius: "16px 16px 0 0", background: "var(--bg)" }} onClick={(e) => e.stopPropagation()}>
+              <div className="disp" style={{ fontSize: 19, marginBottom: 4 }}>Shift saved</div>
+              <div style={{ fontSize: 12.5, color: "var(--tx-3)", marginBottom: 16 }}>
+                {pt?.name || "No participant"} · {fmtDate(vf.date)}
+              </div>
+
+              <button className="btn ghost" style={{ width: "100%", justifyContent: "flex-start", textAlign: "left",
+                marginBottom: 10, display: "flex", alignItems: "center", gap: 12, padding: "14px 16px" }}
+                onClick={() => { setTravelPrefill({ participantId: vf.participantId, date: vf.date, shiftId: vf.shiftId }); setInvTab("travel"); setVisitFollowUp(null); }}>
+                <span aria-hidden="true" style={{ fontSize: 16, fontWeight: 700, color: "var(--brass)", flex: "0 0 20px", textAlign: "center" }}>→</span>
+                <span style={{ flex: 1 }}>
+                  <span style={{ display: "block", fontWeight: 600, fontSize: 14 }}>Log travel for this shift</span>
+                  <span style={{ display: "block", fontSize: 11.5, color: "var(--tx-3)", marginTop: 2 }}>Same participant and date, already filled in</span>
+                </span>
+              </button>
+
+              <button className="btn ghost" style={{ width: "100%", justifyContent: "flex-start", textAlign: "left",
+                marginBottom: 16, display: "flex", alignItems: "center", gap: 12, padding: "14px 16px",
+                opacity: canInvoiceNow ? 1 : .5, cursor: canInvoiceNow ? "pointer" : "default" }}
+                disabled={!canInvoiceNow}
+                onClick={() => { if (!canInvoiceNow) return; newInvoice({ participantId: vf.participantId, shiftIds: [vf.shiftId] }); setVisitFollowUp(null); }}>
+                <span aria-hidden="true" style={{ fontSize: 16, fontWeight: 700, color: canInvoiceNow ? "var(--brass)" : "var(--tx-3)", flex: "0 0 20px", textAlign: "center" }}>$</span>
+                <span style={{ flex: 1 }}>
+                  <span style={{ display: "block", fontWeight: 600, fontSize: 14 }}>Create invoice from this shift</span>
+                  <span style={{ display: "block", fontSize: 11.5, color: "var(--tx-3)", marginTop: 2 }}>
+                    {canInvoiceNow ? "Any travel logged for the same day comes with it" : "Available once the shift's finish time has passed"}
+                  </span>
+                </span>
+              </button>
+
+              <button className="btn ghost tiny" style={{ width: "100%", color: "var(--tx-3)", marginBottom: 14 }}
+                onClick={() => setVisitFollowUp(null)}>
+                Not now, just save the shift
+              </button>
+
+              <label className="check" style={{ marginBottom: 0, fontSize: 11.5, color: "var(--tx-3)" }}>
+                <input type="checkbox" onChange={(e) => { if (e.target.checked) { setSuppressVisitFollowUp(true); setVisitFollowUp(null); } }} />
+                <span>Don't show this again while I'm adding shifts</span>
+              </label>
+            </div>
+          </div>
+        );
+      })()}
+
+      {travelFollowUp && (() => {
+        const tf = travelFollowUp;
+        const pt = data.participants.find((p) => p.id === tf.participantId);
+        return (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", zIndex: 90,
+            display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+            onClick={() => setTravelFollowUp(null)}>
+            <div className="sl" data-theme={theme} style={{ width: "100%", maxWidth: 460, padding: 20,
+              borderRadius: "16px 16px 0 0", background: "var(--bg)" }} onClick={(e) => e.stopPropagation()}>
+              <div className="disp" style={{ fontSize: 19, marginBottom: 4 }}>Travel saved</div>
+              <div style={{ fontSize: 12.5, color: "var(--tx-3)", marginBottom: 16 }}>
+                {pt?.name || "No participant"} · {fmtDate(tf.date)}
+              </div>
+
+              <button className="btn ghost" style={{ width: "100%", justifyContent: "flex-start", textAlign: "left",
+                marginBottom: 10, display: "flex", alignItems: "center", gap: 12, padding: "14px 16px" }}
+                onClick={() => { setNotesPrefill({ participantId: tf.participantId, date: tf.date }); setInvTab("notes"); setTravelFollowUp(null); }}>
+                <span aria-hidden="true" style={{ fontSize: 16, fontWeight: 700, color: "var(--brass)", flex: "0 0 20px", textAlign: "center" }}>→</span>
+                <span style={{ flex: 1 }}>
+                  <span style={{ display: "block", fontWeight: 600, fontSize: 14 }}>Yes, add a note</span>
+                  <span style={{ display: "block", fontSize: 11.5, color: "var(--tx-3)", marginTop: 2 }}>Anything worth remembering about the visit</span>
+                </span>
+              </button>
+
+              <button className="btn ghost" style={{ width: "100%", justifyContent: "flex-start", textAlign: "left",
+                marginBottom: 16, display: "flex", alignItems: "center", gap: 12, padding: "14px 16px" }}
+                onClick={() => { newInvoice({ participantId: tf.participantId, shiftIds: tf.shiftId ? [tf.shiftId] : [] }); setTravelFollowUp(null); }}>
+                <span aria-hidden="true" style={{ fontSize: 16, fontWeight: 700, color: "var(--brass)", flex: "0 0 20px", textAlign: "center" }}>$</span>
+                <span style={{ flex: 1 }}>
+                  <span style={{ display: "block", fontWeight: 600, fontSize: 14 }}>No, that's it</span>
+                  <span style={{ display: "block", fontSize: 11.5, color: "var(--tx-3)", marginTop: 2 }}>Straight to the invoice, travel included</span>
+                </span>
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
+/* ---------------- Summary ---------------- */
+function Summary({ data, save, m, go, newInvoice, resume, snoozeBackup, dismissBackupNotice, daysUntilTrialEnd, onSubscribe, claimSeed }) {
+  // taxableIncome, not income: once a prior total exists it includes both,
+  // so "what's genuinely yours" reflects the whole year, not just the part
+  // tracked here, and doesn't silently understate itself.
+  const keep = m.taxableIncome - m.setAside;
+  const pct = m.taxableIncome > 0 ? (m.setAside / m.taxableIncome) * 100 : 0;
+  const feed = [
+    ...data.invoices.map((i) => ({ d: i.date, t: "invoice", label: resolve(i, data).client || "Invoice", v: invTotal(i), s: i.status })),
+    ...data.expenses.map((e) => ({ d: e.date, t: "expense", label: e.desc || e.cat, v: -Number(e.amount || 0) })),
+    ...data.shifts.map((x) => ({ d: x.date, t: "shift",
+      label: `${(data.participants.find((p) => p.id === x.participantId) || {}).name || "Shift"} · ${shiftHours(x).toFixed(1)}h`, v: 0 })),
+    ...data.trips.map((t) => ({ d: t.date, t: "travel", label: `${(data.participants.find((x) => x.id === t.participantId) || {}).name || "Travel"} · ${t.km} km`, v: t.billable ? Number(t.km) * m.kmRate : 0 })),
+  ].filter((x) => x.d).sort((a, b) => (a.d < b.d ? 1 : -1)).slice(0, 6);
+  // Feed alone answers "has any activity been logged", not "has this been
+  // set up at all". Someone who has added a participant and plan manager
+  // but hasn't logged a shift yet is genuinely further along than someone
+  // who has touched nothing, this card previously couldn't tell the
+  // difference and showed the same "start from scratch" prompt to both.
+  const empty = feed.length === 0 && data.participants.length === 0 && data.managers.length === 0;
+  const todo = [
+    !data.profile.name || !data.profile.abn ? "Your name and ABN" : "",
+    data.participants.length === 0 ? "At least one participant" : "",
+    data.participants.some((x) => x.planType === "plan" && !x.managerId) ? "A plan manager linked to every plan-managed participant" : "",
+    data.managers.some((x) => !x.terms) || data.participants.some((x) => x.planType !== "plan" && !x.terms) ? "Payment terms on every payer: they set the invoice due date" : "",
+    data.participants.some((x) => !x.defaultCode) ? "A usual support item on every participant: it opens their invoices" : "",
+    data.participants.some((x) => !x.agreement) ? "A written service agreement with each participant. Participants → Service agreements can write one" : "",
+    (m.agReview || []).length ? `A service agreement review for ${m.agReview.map((x) => x.name).join(", ")}` : "",
+  ].filter(Boolean);
+  const needsSetup = todo.length > 0;
+  const toConfirm = data.shifts.filter(needsConfirm);
+  const recCount = countRecords(data);
+  const newSince = recCount - (data.profile.backedUpCount || 0);
+  // Two separate things: a reminder the user asked for, and a single notice for
+  // someone with real data who has never backed up and never chosen a setting.
+  const remindNow = backupDue(data);
+  const neverWarned = !data.profile.backedUp && !data.profile.backupEvery
+    && !data.profile.backupNoticeSeen && recCount >= 8;
+
+  return (
+    <>
+      <TrialEndingBanner daysLeft={daysUntilTrialEnd} onSubscribe={onSubscribe} />
+      <div className="hero">
+        <div className="eyebrow">Put aside for tax · {fyLabel(fyOf(today()))}</div>
+        <div className="disp num bignum">{money0(m.setAside)}</div>
+        <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.55, marginTop: 12, maxWidth: "48ch", position: "relative" }}>
+          {m.taxableIncome > 0
+            ? <>On {money0(m.taxable)} net income so far, an effective rate of {m.eff.toFixed(1)}%. That leaves <b style={{ color: "var(--tx)" }}>{money0(keep)}</b> genuinely yours{m.car > 0 ? <>, after {money0(m.car)} of vehicle deduction</> : null}.</>
+            : <>Nothing to set aside yet. This updates the moment you mark your first invoice as paid.</>}
+        </div>
+        {data.priorTotals && data.priorTotals.fy === fyOf(today()) && (m.priorIncome > 0 || m.priorExpenses > 0) && (
+          <div style={{ fontSize: 12, color: "var(--brass)", lineHeight: 1.55, marginTop: 8, position: "relative" }}>
+            Counted in this figure: your {money0(m.priorIncome)} income and {money0(m.priorExpenses)} expenses from
+            before you switched, entered as a starting point in Settings.
+          </div>
+        )}
+        {m.taxableIncome > 0 && (
+          <>
+            <div className="bar" style={{ marginTop: 18, position: "relative" }}><i style={{ width: pct + "%" }} /></div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: 11.5, color: "var(--tx-3)", position: "relative" }}>
+              <span>{money0(keep)} yours</span><span>{money0(m.setAside)} the ATO's</span>
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="band" style={{ marginTop: 16 }}>
+        <div className="eyebrow" style={{ marginBottom: 10 }}>Net income · {fyLabel(fyOf(today()))}</div>
+        <div className="split">
+          <div>
+            <div className="eyebrow">Received</div>
+            <div className="disp num" style={{ fontSize: 22, marginTop: 6 }}>{money0(m.income)}</div>
+          </div>
+          <div>
+            <div className="eyebrow">Expenses</div>
+            <div className="disp num" style={{ fontSize: 22, marginTop: 6 }}>{money0(m.expenses)}</div>
+          </div>
+        </div>
+        {data.priorTotals && data.priorTotals.fy === fyOf(today()) && (m.priorIncome > 0 || m.priorExpenses > 0) && (
+          <div style={{ fontSize: 12, color: "var(--tx-3)", marginTop: 10 }}>
+            Doesn't include the {money0(m.priorIncome)} starting point from before you switched, that's
+            already counted in the tax figure above.
+          </div>
+        )}
+      </div>
+
+      <div className="panel" style={{ marginTop: 16 }}>
+        <div className="eyebrow" style={{ marginBottom: 12 }}>This financial year · GST</div>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 8 }}>
+          <span style={{ color: "var(--tx-2)" }}>GST status</span>
+          <span style={{ fontWeight: 600 }}>{m.gstReg ? "Registered" : "Not registered"}</span>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 8 }}>
+          <span style={{ color: "var(--tx-2)" }}>{m.gstReg ? "GST-free NDIS income" : "NDIS/work income"}</span>
+          <span style={{ fontWeight: 600 }}>{money0(m.income)}</span>
+        </div>
+        {m.gstReg && (
+          <>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 8 }}>
+              <span style={{ color: "var(--tx-2)" }}>GST detected on eligible expenses</span>
+              <span style={{ fontWeight: 600 }}>{money0(m.gstDetectedFY)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13,
+                          paddingTop: 10, marginTop: 4, borderTop: "1px solid var(--line-2)" }}>
+              <span style={{ color: "var(--tx-2)" }}>Potential GST credits</span>
+              <span style={{ fontWeight: 600, color: "var(--good)" }}>{money0(m.potentialCreditsFY)}</span>
+            </div>
+          </>
+        )}
+        <div style={{ fontSize: 11, color: "var(--tx-3)", lineHeight: 1.6, marginTop: 14 }}>
+          Estimate based on records entered into SupportFlow, not lodged figures. Qualifying NDIS supports stay
+          GST-free whether or not you're registered, this doesn't add GST to anything you've invoiced.
+        </div>
+      </div>
+
+      {needsSetup && (
+        <div className="stepcard">
+          <span className="stepnum">!</span>
+          <div className="steplead">Setup incomplete</div>
+          <div className="stephint" style={{ marginBottom: 12 }}>
+            {todo.length === 1 ? "Invoices won't be valid until this is done:" : "Invoices won't be valid until these are done:"}
+          </div>
+          {todo.map((t, i) => (
+            <div key={i} style={{ fontSize: 13, color: "var(--tx-2)", lineHeight: 1.9, display: "flex", gap: 9 }}>
+              {todo.length > 1 && <span style={{ color: "var(--req)", fontWeight: 700 }}>{i + 1}</span>}{t}
+            </div>
+          ))}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 15 }}>
+            <button className="btn" onClick={resume}>Finish setup</button>
+            {data.participants.some((x) => !x.agreement) && (
+              <button className="btn ghost" onClick={() => go("people", "agreements")}>Agreements</button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {remindNow && (
+        <div className="callout" style={{ borderColor: "var(--brass)", marginBottom: 16 }}>
+          <b>Time to back up:</b> you asked to be reminded {(BACKUP_EVERY.find((x) => x[0] === data.profile.backupEvery) || [])[1].toLowerCase()}.
+          {newSince > 0 && <> {newSince} record{newSince === 1 ? "" : "s"} added since the last one.</>}
+          <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button className="btn tiny" onClick={() => go("settings")}>Back up now</button>
+            <button className="btn ghost tiny" onClick={snoozeBackup}>Later</button>
+          </div>
+        </div>
+      )}
+
+      {neverWarned && (
+        <div className="callout" style={{ marginBottom: 16 }}>
+          <b>Your records are only on this device.</b> There's no account and no cloud copy, so if
+          this browser's data is cleared they're gone. Backing up takes a few seconds, and you can
+          set a reminder if you'd like one.
+          <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button className="btn tiny" onClick={() => go("settings")}>Open backup</button>
+            <button className="btn ghost tiny" onClick={dismissBackupNotice}>Got it</button>
+          </div>
+        </div>
+      )}
+
+      {ratesStale() && (
+        <div className="callout" style={{ borderColor: "var(--warn)", marginBottom: 16 }}>
+          <b>The NDIS rates in this app are over a year old.</b> A newer pricing schedule has almost
+          certainly been published. Check before you invoice. Settings has the link.
+          <div style={{ marginTop: 10 }}>
+            <button className="btn tiny" onClick={() => go("settings")}>Open Settings</button>
+          </div>
+        </div>
+      )}
+
+      {toConfirm.length > 0 && (
+        <div className="callout" style={{ borderColor: "var(--warn)", marginBottom: 16 }}>
+          <b>{toConfirm.length} shift{toConfirm.length === 1 ? "" : "s"} still marked scheduled</b>, 
+          the date has passed. Mark them completed if they went ahead, or cancelled if they didn't,
+          so they can be invoiced.
+          <div style={{ marginTop: 10 }}>
+            <button className="btn tiny" onClick={() => go("invoices", "shifts")}>Open the calendar</button>
+          </div>
+        </div>
+      )}
+
+      {empty && (
+        <div className="panel" style={{ borderColor: "var(--brass)" }}>
+          <div className="eyebrow" style={{ marginBottom: 8 }}>Nothing in here yet</div>
+          <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.65, marginBottom: 14 }}>
+            Add the people you work with first, their plan manager, NDIS number and usual support item.
+            After that an invoice takes about a minute.
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button className="btn" onClick={() => go("people", "participants")}>Add a participant</button>
+            <button className="btn ghost" onClick={() => go("settings")}>How this works</button>
+          </div>
+        </div>
+      )}
+
+      {needsSetup && (
+        <div className="callout" style={{ marginBottom: 16 }}>
+          Add your name and ABN before issuing invoices. Without an ABN, the payer may have to withhold 47%.
+          <div style={{ marginTop: 10 }}><button className="btn tiny" onClick={() => go("settings")}>Open settings</button></div>
+        </div>
+      )}
+
+      <div className="panel">
+        <div className="split">
+          <div>
+            <div className="eyebrow">Received</div>
+            <div className="disp num midnum" style={{ marginTop: 8, color: "var(--good)" }}>{money0(m.income)}</div>
+            <div style={{ fontSize: 11.5, color: "var(--tx-3)", marginTop: 6 }}>{money0(m.invoiced)} invoiced</div>
+          </div>
+          <div>
+            <div className="eyebrow">Still owed</div>
+            <div className="disp num midnum" style={{ marginTop: 8, color: m.outstanding > 0 ? "var(--warn)" : "var(--tx-3)" }}>{money0(m.outstanding)}</div>
+            <div style={{ fontSize: 11.5, color: "var(--tx-3)", marginTop: 6 }}>{m.expenses > 0 ? money0(m.expenses) + " in deductions" : "no expenses yet"}</div>
+          </div>
+        </div>
+      </div>
+
+
+      {m.carOn && m.km > 0 && (
+        <div className="panel">
+          <div className="eyebrow" style={{ marginBottom: 12 }}>Vehicle deduction</div>
+          <div>
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
+              <div>
+                <div className="disp num" style={{ fontSize: 30 }}>{money0(m.car)}</div>
+                <div style={{ fontSize: 12.5, color: "var(--tx-2)", marginTop: 4 }}>
+                  {m.km.toFixed(0)} km at {(m.carRate * 100).toFixed(0)}c
+                </div>
+              </div>
+              <div style={{ textAlign: "right", fontSize: 11.5, color: "var(--tx-3)", lineHeight: 1.6 }}>
+                cents per km<br />{CAR.year}
+              </div>
+            </div>
+
+            <div className="bar" style={{ marginTop: 16 }}>
+              <i style={{ width: Math.min(100, (m.km / CAR.cap) * 100) + "%", background: m.overCap ? "var(--warn)" : undefined }} />
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 7, fontSize: 11, color: "var(--tx-3)" }}>
+              <span>{Math.min(m.km, CAR.cap).toFixed(0)} of {CAR.cap.toLocaleString()} km claimed</span>
+              <span>{money0(CAR.cap * m.carRate)} ceiling</span>
+            </div>
+
+            {m.overCap ? (
+              <div className="callout" style={{ marginTop: 16, marginBottom: 0, borderColor: "var(--brass)" }}>
+                You've driven {m.km.toFixed(0)} km, past the {CAR.cap.toLocaleString()} km ceiling, so this method
+                stops counting. The logbook method has no cap and would likely give you more, but it needs a
+                12-week logbook and receipts for running costs. Worth raising with an accountant before year end.
+              </div>
+            ) : (
+              <div style={{ marginTop: 15, fontSize: 12, color: "var(--tx-3)", lineHeight: 1.65 }}>
+                This rate already covers fuel, servicing, rego, insurance and depreciation, so don't claim those
+                again as expenses.
+              </div>
+            )}
+
+            <div style={{ marginTop: 16, paddingTop: 15, borderTop: "1px solid var(--line-2)" }}>
+              <div className="eyebrow" style={{ marginBottom: 8, fontSize: 10.5 }}>What counts as a business trip</div>
+              <div style={{ fontSize: 11.5, color: "var(--tx-3)", lineHeight: 1.65 }}>
+                Travelling between participants, taking a participant somewhere as part of the support, and
+                travelling between work locations all count. Ordinary commuting doesn't, home to your first
+                participant and your last participant home are usually private, the same as any other job, even
+                though the work itself is mobile. There are exceptions depending on your circumstances, so if
+                that's how you're logging trips, it's worth checking with an accountant rather than assuming.
+                Each trip you log has its own tax-deductible tick, so a personal errand between visits can be
+                logged without counting it here.
+              </div>
+            </div>
+
+            {m.logbookEstimate !== null && (
+              <div style={{ marginTop: 16, paddingTop: 15, borderTop: "1px solid var(--line-2)" }}>
+                <div className="eyebrow" style={{ marginBottom: 10, fontSize: 10.5 }}>
+                  Cents per km against your logbook estimate
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, color: "var(--tx-2)", marginBottom: 6 }}>
+                  <span>Cents per km</span><span>{money0(m.centsEstimate)}</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, color: "var(--tx-2)", marginBottom: 6 }}>
+                  <span>Logbook, {m.logbookPct}% of {money0(m.vehicleExpenseFY)} vehicle expenses logged</span>
+                  <span>{money0(m.logbookEstimate)}</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, fontWeight: 600,
+                              color: m.logbookEstimate > m.centsEstimate ? "var(--good)" : "var(--tx)",
+                              marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--line-2)" }}>
+                  <span>Difference</span>
+                  <span>{m.logbookEstimate >= m.centsEstimate ? "+" : ""}{money0(m.logbookEstimate - m.centsEstimate)}
+                    {m.logbookEstimate > m.centsEstimate ? ", logbook looks better" : ", cents per km looks better"}</span>
+                </div>
+
+                {m.vehicleGstCredit !== null && (
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, color: "var(--tx-2)",
+                                marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--line-2)" }}>
+                    <span>Potential GST credit on vehicle expenses, logbook method only</span>
+                    <span>{money0(m.vehicleGstCredit)}</span>
+                  </div>
+                )}
+
+                <div style={{ fontSize: 11, color: "var(--tx-3)", lineHeight: 1.6, marginTop: 10 }}>
+                  Both figures are estimates, not tax advice. The logbook one only counts vehicle expenses you've
+                  actually logged in Expenses this year, log everything for it to mean anything. Switching methods
+                  is a real decision, a registered tax agent can confirm which applies to your situation.
+                  {m.vehicleGstCredit !== null && (
+                    <> A GST credit only applies against the logbook method, since cents per km is a set ATO rate,
+                    not a real purchase with GST attached.</>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {m.gstReg && (
+              <div style={{ marginTop: 16, paddingTop: 15, borderTop: "1px solid var(--line-2)" }}>
+                <div className="eyebrow" style={{ marginBottom: 8, fontSize: 10.5 }}>If you're registered for GST</div>
+                <div style={{ fontSize: 11.5, color: "var(--tx-3)", lineHeight: 1.65 }}>
+                  There may be a separate GST credit available on vehicle expenses, depending on which method
+                  you use and how the vehicle was acquired. This app doesn't calculate that figure, the rules
+                  are genuinely specific to your circumstances, and getting it wrong on a BAS has real
+                  consequences. Ask a registered tax agent or BAS agent rather than estimate it yourself.
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+
+      {(m.gstDue || m.gstNear) && (
+        <div className="stepcard" style={m.gstNear ? { borderColor: "var(--warn)", background: "transparent" } : {}}>
+          <span className="stepnum" style={m.gstNear ? { background: "var(--warn)" } : {}}>!</span>
+          <div className="steplead" style={m.gstNear ? { color: "var(--warn)" } : {}}>
+            {m.gstDue ? "You must register for GST" : "Approaching the GST threshold"}
+          </div>
+          <div className="disp" style={{ fontSize: 21, marginBottom: 8 }}>{money0(m.turnover)} in the last 12 months</div>
+          <div className="stephint" style={{ marginBottom: 12 }}>
+            {m.gstDue
+              ? <>You've passed {money0(GST_THRESHOLD)}, so registration is required within 21 days. Your NDIS work
+                 staying GST-free doesn't change this. GST-free income still counts toward the threshold.</>
+              : <>You're at {Math.round((m.turnover / GST_THRESHOLD) * 100)}% of the {money0(GST_THRESHOLD)} threshold.
+                 GST-free NDIS income counts toward it, so plan for this before you cross.</>}
+          </div>
+          <div className="bar"><i style={{ width: Math.min(100, (m.turnover / GST_THRESHOLD) * 100) + "%", background: m.gstDue ? "var(--req)" : "var(--warn)" }} /></div>
+          <div style={{ marginTop: 14, fontSize: 12.5, color: "var(--tx-2)", lineHeight: 1.7 }}>
+            Registering doesn't mean charging GST. Qualifying NDIS supports stay GST-free. You'd lodge a BAS
+            showing nil GST, and you could claim back the GST on fuel, phone and equipment.
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 14 }}>
+            <button className="btn" onClick={() => go("settings")}>Set up GST</button>
+            <a className="btn ghost tiny" href="https://www.ato.gov.au/businesses-and-organisations/gst-excise-and-indirect-taxes/gst/registering-for-gst"
+              target="_blank" rel="noreferrer">ATO: registering for GST ↗</a>
+          </div>
+        </div>
+      )}
+
+      {!m.gstReg && m.hypotheticalGstCredits > 0 && (
+        <div className="panel">
+          <div className="eyebrow" style={{ marginBottom: 12 }}>Would GST registration help?</div>
+          <div style={{ fontSize: 12.5, color: "var(--tx-3)", lineHeight: 1.6, marginBottom: 16 }}>
+            Based on {money0(m.income)} recorded income and {money0(m.gstDetectedFY)} of GST already detected
+            on your expenses this year.
+          </div>
+
+          <div className="split">
+            <div>
+              <div className="eyebrow" style={{ fontSize: 10.5, marginBottom: 8 }}>Now, not registered</div>
+              <div style={{ fontSize: 13, marginBottom: 6 }}>Recorded income</div>
+              <div className="disp num" style={{ fontSize: 20, marginBottom: 10 }}>{money0(m.income)}</div>
+              <div style={{ fontSize: 12, color: "var(--tx-3)" }}>GST credits claimed: $0</div>
+            </div>
+            <div>
+              <div className="eyebrow" style={{ fontSize: 10.5, marginBottom: 8 }}>If registered</div>
+              <div style={{ fontSize: 13, marginBottom: 6 }}>Qualifying NDIS supports stay GST-free</div>
+              <div className="disp num" style={{ fontSize: 20, marginBottom: 10, color: "var(--good)" }}>{money0(m.hypotheticalGstCredits)}</div>
+              <div style={{ fontSize: 12, color: "var(--tx-3)" }}>estimated GST credits on this year's expenses</div>
+            </div>
+          </div>
+
+          <div style={{ fontSize: 12.5, color: "var(--tx-2)", lineHeight: 1.65, marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--line-2)" }}>
+            Based on the information currently recorded, GST registration may allow you to claim GST credits on
+            some eligible business purchases. Your qualifying GST-free NDIS services would not automatically have
+            10% GST added simply because you registered. Registration also means lodging a BAS, usually every
+            quarter, whether or not you're required to register.
+          </div>
+          <div style={{ fontSize: 11.5, color: "var(--tx-3)", lineHeight: 1.6, marginTop: 10 }}>
+            Registration may be worth considering based on your recorded activity. Review the estimate and
+            confirm your circumstances with the ATO or a registered tax professional.
+          </div>
+        </div>
+      )}
+
+      <div className="eyebrow" style={{ margin: "18px 0 14px" }}>Deductions</div>
+      <Claimable data={data} save={save} seed={claimSeed} />
+
+      <div className="callout" style={{ marginTop: 16 }}>Estimates use 2025–26 resident rates and ignore other income, HELP debt and PAYG instalments. Confirm with a registered tax agent.</div>
+    </>
+  );
+}
+
+/* ---------------- Invoices ---------------- */
+/* ---- BAS (Business Activity Statement) summary ---- */
+function BAS({ data, fy }) {
+  // Build the four quarters of the current financial year.
+  // fy is a calendar year number (e.g. 2025 means FY 2025-26, Jul 2025–Jun 2026).
+  const quarters = [
+    { label: "Q1", range: `Jul–Sep ${fy}`,       start: `${fy}-07-01`,   end: `${fy}-09-30`,   due: `${fy}-10-28` },
+    { label: "Q2", range: `Oct–Dec ${fy}`,       start: `${fy}-10-01`,   end: `${fy}-12-31`,   due: `${fy + 1}-02-28` },
+    { label: "Q3", range: `Jan–Mar ${fy + 1}`,   start: `${fy + 1}-01-01`, end: `${fy + 1}-03-31`, due: `${fy + 1}-04-28` },
+    { label: "Q4", range: `Apr–Jun ${fy + 1}`,   start: `${fy + 1}-04-01`, end: `${fy + 1}-06-30`, due: `${fy + 1}-07-28` },
+  ];
+
+  // Default to whichever quarter today falls in — but if that quarter is
+  // genuinely empty and another one isn't, land there instead. Every other
+  // Money screen shows the whole financial year at once, so a quarter
+  // narrowed down to nothing looks like a broken feature rather than an
+  // empty period, if the person's actual records happen to sit elsewhere.
+  const currentQ = (() => {
+    const t = today();
+    const idx = quarters.findIndex((q) => t >= q.start && t <= q.end);
+    return idx < 0 ? 0 : idx;
+  })();
+  const quarterHasData = (q) => {
+    const has = (d) => d && d >= q.start && d <= q.end;
+    return data.invoices.some((i) => i.status === "paid" && has(i.date)) || data.expenses.some((e) => has(e.date));
+  };
+  const initialQ = quarterHasData(quarters[currentQ]) ? currentQ : (() => {
+    const withData = quarters.findIndex(quarterHasData);
+    return withData < 0 ? currentQ : withData;
+  })();
+  const [qIdx, setQIdx] = useState(initialQ);
+  const q = quarters[qIdx];
+
+  const inPeriod = (d) => d && d >= q.start && d <= q.end;
+
+  // G1 — Total sales: use paid invoice date as cash-basis receipt date.
+  const paidInPeriod = data.invoices.filter((i) => i.status === "paid" && inPeriod(i.date));
+  const G1 = paidInPeriod.reduce((s, i) => s + invTotal(i), 0);
+  // G3 — All GST-free (NDIS supports, s38-38). G2 (exports) = $0 for this use case.
+  const G3 = G1;
+  // 1A — GST on sales: $0 because all sales are GST-free.
+  const oneA = 0;
+
+  // G11 — Non-capital purchases in period.
+  const expInPeriod = data.expenses.filter((e) => inPeriod(e.date));
+  const G11 = expInPeriod.reduce((s, e) => s + Number(e.amount || 0), 0);
+  // 1B — GST credits: GST paid on eligible expenses, adjusted for business-use %.
+  const oneB = expInPeriod.reduce((s, e) => s + gstCreditFor(e, true), 0);
+
+  // Net GST position for the quarter (positive = you receive a refund).
+  const net = oneB - oneA;
+
+  const Row = ({ label, code, amount, sub, highlight }) => (
+    <div style={{ display: "flex", alignItems: "baseline", gap: 10, padding: "11px 0",
+      borderBottom: "1px solid var(--line-2)" }}>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 13.5, fontWeight: highlight ? 700 : 500 }}>{label}</div>
+        {sub && <div style={{ fontSize: 11.5, color: "var(--tx-3)", marginTop: 2, lineHeight: 1.5 }}>{sub}</div>}
+      </div>
+      <div style={{ textAlign: "right", minWidth: 70 }}>
+        <div style={{ fontSize: 11, color: "var(--tx-3)", marginBottom: 1 }}>{code}</div>
+        <div className="num" style={{ fontSize: 15, fontWeight: highlight ? 700 : 600,
+          color: highlight ? (net >= 0 ? "var(--good)" : "var(--warn)") : "var(--tx)" }}>
+          {money(amount)}
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      <div className="hero">
+        <div className="eyebrow">Business Activity Statement · {fyLabel(fy)}</div>
+        <div style={{ fontSize: 13.5, color: "var(--tx-2)", marginTop: 8, lineHeight: 1.6 }}>
+          Quarterly GST summary. Use these figures when completing your BAS in MyGov or with your BAS agent. Figures are on a <b>cash basis</b> — income when invoices are marked paid, expenses when dated.
+        </div>
+      </div>
+
+      <div className="panel">
+        <div className="eyebrow" style={{ marginBottom: 10 }}>Select quarter</div>
+        <div className="tabnav" style={{ marginBottom: 0 }}>
+          {quarters.map((q2, i) => (
+            <button key={i} data-on={qIdx === i ? 1 : 0} onClick={() => setQIdx(i)}
+              style={{ fontSize: 12.5 }}>{q2.label}</button>
+          ))}
+        </div>
+        <div style={{ fontSize: 11.5, color: "var(--tx-3)", marginTop: 10 }}>
+          {q.range} · Due {new Date(q.due + "T00:00:00").toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" })}
+        </div>
+      </div>
+
+      <div className="panel">
+        <div className="eyebrow" style={{ marginBottom: 4 }}>GST on sales</div>
+        <Row label="Total sales" code="G1" amount={G1}
+          sub="All invoices marked paid in this quarter" />
+        <Row label="GST-free sales" code="G3" amount={G3}
+          sub="NDIS supports are GST-free under s38-38 of the GST Act" />
+        <Row label="GST collected on sales" code="1A" amount={oneA}
+          sub="$0 — no GST charged on GST-free NDIS income" />
+      </div>
+
+      <div className="panel">
+        <div className="eyebrow" style={{ marginBottom: 4 }}>GST credits on purchases</div>
+        <Row label="Non-capital purchases" code="G11" amount={G11}
+          sub="Total business expenses recorded in this quarter" />
+        <Row label="GST credits" code="1B" amount={oneB}
+          sub={expInPeriod.filter((e) => Number(e.gstAmount || 0) > 0).length
+            ? `From ${expInPeriod.filter((e) => Number(e.gstAmount || 0) > 0).length} expense${expInPeriod.filter((e) => Number(e.gstAmount || 0) > 0).length === 1 ? "" : "s"} with GST recorded, adjusted for business-use %`
+            : "No GST recorded on expenses this quarter"} />
+      </div>
+
+      <div className="panel">
+        <Row label={net >= 0 ? "GST refund due to you" : "GST payable to ATO"}
+          code={net >= 0 ? "Refund" : "Payable"} amount={Math.abs(net)} highlight />
+        <div style={{ fontSize: 12, color: "var(--tx-3)", lineHeight: 1.65, marginTop: 14 }}>
+          {paidInPeriod.length === 0 && expInPeriod.length === 0
+            ? (data.invoices.some((i) => i.status === "paid") || data.expenses.length
+                ? "Nothing recorded in this quarter. Try a different quarter above, your figures may sit in another one."
+                : "No invoices marked paid and no expenses recorded yet this financial year.")
+            : net >= 0
+              ? `You can claim back ${money(net)} in GST credits this quarter. Enter 1A and 1B in your BAS.`
+              : `You owe ${money(Math.abs(net))} in net GST this quarter.`}
+        </div>
+      </div>
+
+      <div className="callout" style={{ fontSize: 12.5, lineHeight: 1.65 }}>
+        These figures are a reference prepared from your SupportFlow records. Verify them before lodging — your BAS agent or registered tax agent is the right person to check and lodge. Lodge via MyGov Business Portal or through your BAS agent.
+      </div>
+    </>
+  );
+}
+
+function InvoiceList({ data, m, fy, save, newInvoice, open, go, billTick, setBillTick }) {
+  const rows = [...m.inv].reverse();
+  const setStatus = (id, status) => save({ ...data, invoices: data.invoices.map((i) => (i.id === id ? { ...i, status } : i)) });
+  const nameOf = (id) => (data.participants.find((x) => x.id === id) || {}).name || "No participant";
+  const unbilled = data.shifts.filter((x) => isBillable(x) && !shiftInvoice(x, data.invoices))
+    .sort((a, b) => (a.date < b.date ? -1 : 1));
+  // Billing everything happens from this one screen now, shifts and trips
+  // both. A shift's matching same-day travel already rides along
+  // automatically when you raise the invoice, this list is for the rest,
+  // travel with no matching shift, or from a different day.
+  const unbilledTrips = data.trips.filter((t) => t.billable && t.participantId && !tripInvoice(t, data.invoices))
+    .sort((a, b) => (a.date < b.date ? -1 : 1));
+
+  // Shifts and trips are ticked together here, one shared selection, so
+  // whichever mix you pick ends up on the same invoice. Scoped to one
+  // participant at a time, a running total across two people wouldn't
+  // mean anything.
+  const tick = billTick.shiftIds;
+  const tripTick = billTick.tripIds;
+  const tickedShifts = data.shifts.filter((s) => tick.includes(s.id));
+  const tickedTrips = data.trips.filter((t) => tripTick.includes(t.id));
+  const tickedParticipantId = tickedShifts[0]?.participantId || tickedTrips[0]?.participantId || null;
+  const toggleTick = (x) => {
+    if (tick.includes(x.id)) { setBillTick({ ...billTick, shiftIds: tick.filter((id) => id !== x.id) }); return; }
+    setBillTick(tickedParticipantId && tickedParticipantId !== x.participantId
+      ? { shiftIds: [x.id], tripIds: [] }
+      : { ...billTick, shiftIds: [...tick, x.id] });
+  };
+  const toggleTripTick = (t) => {
+    if (tripTick.includes(t.id)) { setBillTick({ ...billTick, tripIds: tripTick.filter((id) => id !== t.id) }); return; }
+    setBillTick(tickedParticipantId && tickedParticipantId !== t.participantId
+      ? { shiftIds: [], tripIds: [t.id] }
+      : { ...billTick, tripIds: [...tripTick, t.id] });
+  };
+  const tickedHours = tickedShifts.reduce((n, s) => n + shiftHours(s), 0);
+  const tickedAmount = tickedShifts.reduce((n, s) => {
+    const pt = data.participants.find((p) => p.id === s.participantId);
+    if (pt && pt.nonNdis) return n + shiftHours(s) * (Number(pt.defaultRate) || 0);
+    const c = classifyShift(s);
+    if (!c || !c.item) return n;
+    const rate = (pt && pt.defaultCode === c.item.code && pt.defaultRate) ? Number(pt.defaultRate) : c.item.rate;
+    return n + c.hours * rate;
+  }, 0) + tickedTrips.reduce((n, t) => n + Number(t.km || 0) * m.kmRate, 0);
+
+  return (
+    <>
+      <div className="bandhead" style={{ marginBottom: 14 }}>
+        <div className="eyebrow">Your invoices</div>
+      </div>
+
+      {(unbilled.length > 0 || unbilledTrips.length > 0) && (
+        <div className="band" style={{ paddingTop: 0 }}>
+          <div className="panel">
+            <div className="bandhead" style={{ marginBottom: 12 }}>
+              <div className="eyebrow">Ready to bill</div>
+              {(tick.length > 0 || tripTick.length > 0) && <div className="num" style={{ fontSize: 13.5, fontWeight: 600, color: "var(--tx)" }}>{money(tickedAmount)}</div>}
+            </div>
+            {unbilled.map((x) => (
+              <label className="check" key={"s-" + x.id} style={{ marginBottom: 12, alignItems: "center" }}>
+                <input type="checkbox" checked={tick.includes(x.id)} onChange={() => toggleTick(x)}
+                  style={{ width: 17, height: 17, flex: "0 0 17px", accentColor: "var(--brass)" }} />
+                <span style={{ flex: 1, color: "var(--tx)" }}>
+                  <span style={{ fontWeight: 500 }}>{nameOf(x.participantId)}</span>
+                  <span style={{ fontSize: 11.5, color: "var(--tx-3)", display: "block", marginTop: 1 }}>
+                    {fmtDate(x.date)} · {x.start}–{x.end}
+                  </span>
+                </span>
+                <span className="num" style={{ color: "var(--tx-3)" }}>{shiftHours(x).toFixed(2)}h</span>
+              </label>
+            ))}
+            {unbilledTrips.map((t) => (
+              <label className="check" key={"t-" + t.id} style={{ marginBottom: 12, alignItems: "center" }}>
+                <input type="checkbox" checked={tripTick.includes(t.id)} onChange={() => toggleTripTick(t)}
+                  style={{ width: 17, height: 17, flex: "0 0 17px", accentColor: "var(--brass)" }} />
+                <span style={{ flex: 1, color: "var(--tx)" }}>
+                  <span style={{ fontWeight: 500 }}>{nameOf(t.participantId)}</span>
+                  <span style={{ fontSize: 11.5, color: "var(--tx-3)", display: "block", marginTop: 1 }}>
+                    {fmtDate(t.date)} · travel
+                  </span>
+                </span>
+                <span className="num" style={{ color: "var(--tx-3)" }}>{Number(t.km).toFixed(1)} km</span>
+              </label>
+            ))}
+            {(tick.length > 0 || tripTick.length > 0) && (
+              <button className="btn" style={{ width: "100%", marginTop: 4, overflow: "hidden", textOverflow: "ellipsis" }}
+                onClick={() => { newInvoice({ participantId: tickedParticipantId, shiftIds: billTick.shiftIds, tripIds: billTick.tripIds }); setBillTick({ shiftIds: [], tripIds: [] }); }}>
+                Raise invoice for {nameOf(tickedParticipantId)}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {m.outstanding > 0 && (() => {
+        const unpaid = [...m.inv].filter((i) => i.status !== "paid" && i.due).sort((a, b) => (a.due < b.due ? -1 : 1));
+        return (
+          <div className="band" style={{ paddingTop: 0 }}>
+            <div className="panel">
+              <div className="bandhead" style={{ marginBottom: 10 }}>
+                <div className="eyebrow">Awaiting payment</div>
+                <div className="num" style={{ fontSize: 13.5, fontWeight: 600, color: "var(--tx)" }}>{money(m.outstanding)}</div>
+              </div>
+              {unpaid.map((i) => {
+                const overdue = i.due && i.due < today();
+                return (
+                  <div className="row" key={i.id}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {resolve(i, data).client || "Untitled"}
+                      </div>
+                      <div style={{ fontSize: 11, color: overdue ? "var(--req)" : "var(--tx-3)", marginTop: 2 }}>
+                        {overdue ? "Overdue since " : "Due "}{fmtDate(i.due)}
+                      </div>
+                    </div>
+                    <div className="num" style={{ fontSize: 13.5, fontWeight: 600 }}>{money(invTotal(i))}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
+      <div className="band">
+        {rows.length === 0
+          ? (
+            <div className="empty">
+              No invoices yet this year.<br />
+              {(unbilled.length > 0 || unbilledTrips.length > 0)
+                ? "Tick what's above once it's ready, and raise an invoice from there."
+                : "Log a shift or a trip on the Work tab, and once it's ready it'll show up here to bill."}
+            </div>
+          )
+          : rows.map((i) => {
+            const overdue = i.status === "sent" && i.due && i.due < today();
+            const displayStatus = overdue ? "overdue" : i.status;
+            return (
+              <div className="row" key={i.id}>
+                <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => open({ ...i })}>
+                  <div style={{ fontSize: 14, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{resolve(i, data).client || "Untitled"}</div>
+                  <div style={{ fontSize: 11, color: "var(--tx-3)", marginTop: 3, display: "flex", gap: 8, alignItems: "center" }}>
+                    <span className="mono">#{i.number}</span><span>{fmtDate(i.date)}</span><span className={"pill " + displayStatus}>{displayStatus}</span>
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div className="num" style={{ fontSize: 15, fontWeight: 600 }}>{money(invTotal(i))}</div>
+                  {i.status !== "paid" && <button className="btn ghost tiny" style={{ marginTop: 6 }} onClick={() => setStatus(i.id, "paid")}>Mark paid</button>}
+                </div>
+              </div>
+            );
+          })}
+      </div>
+    </>
+  );
+}
+
+
+function Editor({ inv, setInv, onSave, onCancel, onDelete, profile, data, go }) {
+  const set = (p) => setInv({ ...inv, ...p });
+  const total = invTotal(inv);
+  const r = resolve(inv, data);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  return (
+    <>
+      <div className="bandhead" style={{ marginBottom: 18 }}>
+        <div>
+          <div className="eyebrow">Invoice #{inv.number}</div>
+          <div className="disp" style={{ fontSize: 27, marginTop: 4 }}>{r.client || "New invoice"}</div>
+        </div>
+        <button className="btn ghost" onClick={onCancel}>Cancel</button>
+      </div>
+
+      <div className="panel">
+        <div className="eyebrow" style={{ marginBottom: 14 }}>Participant</div>
+        <label className="f"><span>Participant</span>
+          <select value={inv.participantId || ""} onChange={(e) => {
+            // Re-selecting the same participant, which some mobile picker
+            // UIs fire onChange for even without an actual change, must
+            // never wipe out shifts and trips someone already ticked. Only
+            // a genuine switch to a different person clears them, since
+            // billed work belonging to person A can't sensibly stay
+            // attached to an invoice now made out to person B. If nothing
+            // is left afterward, the empty state below already explains
+            // what to do next, a blank placeholder line would just be
+            // confusing with no way left in this screen to fill it in.
+            if (e.target.value === (inv.participantId || "")) return;
+            const np = data.participants.find((x) => x.id === e.target.value);
+            const kept = inv.lines.filter((l) => l.id !== "auto-travel" && l.id !== "auto-travel-time");
+            const cleaned = kept.filter((l) => !String(l.id).startsWith("auto-shift"));
+            set({ participantId: e.target.value, tripIds: [], shiftIds: [], due: dueFrom(inv.date, np, data), lines: cleaned });
+          }}>
+            <option value="">Choose from your directory…</option>
+            {data.participants.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </label>
+
+        {r.pt ? (
+          <div style={{ background: "var(--bg)", border: "1px solid var(--line)", borderRadius: 10, padding: "11px 14px", marginBottom: 14 }}>
+            <div style={{ fontSize: 12.5, lineHeight: 1.6, color: "var(--tx-2)" }}>
+              <span className="mono">{r.participantNo || "no NDIS number"}</span> · {planLabel(r.pt.planType)} ·
+              {" "}Bills <b style={{ color: "var(--tx)" }}>{r.billToName || "—"}</b>{!r.selfManaged && r.mgr ? " (plan manager)" : ""} ·
+              {" "}{r.terms ? `Due ${r.terms} days` : <span style={{ color: "var(--req)" }}>no payment terms set</span>}
+            </div>
+            {!r.billToEmail && <div style={{ fontSize: 12, color: "var(--warn)", marginTop: 4 }}>No billing email on file</div>}
+            <button className="btn ghost tiny" style={{ marginTop: 9 }} onClick={() => go("people", "participants")}>Edit details</button>
+          </div>
+        ) : (
+          <div className="callout" style={{ marginBottom: 14 }}>
+            Pick a participant and their NDIS number, plan manager and billing address fill in automatically.
+            <div style={{ marginTop: 10 }}><button className="btn tiny" onClick={() => go("people", "participants")}>Add someone</button></div>
+          </div>
+        )}
+        <div className="three" style={{ marginBottom: 0 }}>
+          <label className="f" style={{ marginBottom: 0 }}><span>Issued</span><AuDateInput value={inv.date} onChange={(v) => set({ date: v })} /></label>
+          <label className="f" style={{ marginBottom: 0 }}>
+            <span style={{ color: inv.due ? undefined : "var(--req)" }}>Due{inv.due ? "" : " (required)"}</span>
+            <AuDateInput value={inv.due} style={inv.due ? {} : { borderColor: "var(--req)" }} onChange={(v) => set({ due: v })} />
+          </label>
+          <label className="f" style={{ marginBottom: 0 }}><span>Status</span>
+            <select value={inv.status} onChange={(e) => set({ status: e.target.value })}>
+              <option value="draft">Draft</option><option value="sent">Sent</option><option value="paid">Paid</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      {/* What's on the invoice, read-only. Every line here came from ticking
+          shifts or trips on the Work tab, changing an amount means the
+          underlying shift or trip was wrong, so that's where it gets
+          fixed, not here, where a correction could drift from what was
+          actually logged and worked. */}
+      <div className="panel">
+        <div className="eyebrow" style={{ marginBottom: 4 }}>What's on this invoice</div>
+        {inv.lines.length === 0 ? (
+          <div style={{ fontSize: 12.5, color: "var(--tx-3)", padding: "10px 0" }}>
+            Nothing yet. Tick shifts on the Work tab to build this invoice.
+          </div>
+        ) : inv.lines.map((l) => (
+          <div className="row" key={l.id}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 500 }}>{l.desc}</div>
+              <div className="mono" style={{ fontSize: 11, color: "var(--tx-3)", marginTop: 2 }}>
+                {l.code} · {l.qty || 0} {l.unit} @ {money(l.rate)}
+              </div>
+            </div>
+            <div className="num" style={{ fontSize: 14, fontWeight: 600 }}>{money(Number(l.qty || 0) * Number(l.rate || 0))}</div>
+          </div>
+        ))}
+
+        <div className="lineitem" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: inv.lines.length ? 8 : 0 }}>
+          <div>
+            <div className="eyebrow">Total due</div>
+            <div style={{ fontSize: 11.5, color: "var(--tx-3)", marginTop: 4 }}>No GST, supplier not registered</div>
+          </div>
+          <div className="disp num" style={{ fontSize: 34 }}>{money(total)}</div>
+        </div>
+      </div>
+
+      {(() => {
+        const usedS = billedShiftIds(data.invoices, inv.id);
+        const usedT = billedTripIds(data.invoices, inv.id);
+        const picked = inv.shiftIds || [];
+        const pickedT = inv.tripIds || [];
+        const missS = data.shifts.filter((x) => x.participantId === inv.participantId
+          && isBillable(x) && !usedS.has(x.id) && !picked.includes(x.id));
+        const missT = data.trips.filter((t) => t.participantId === inv.participantId
+          && t.billable && !usedT.has(t.id) && !pickedT.includes(t.id));
+        if (missS.length + missT.length === 0) return null;
+        const bits = [];
+        if (missS.length) bits.push(`${missS.length} shift${missS.length === 1 ? "" : "s"}`);
+        if (missT.length) bits.push(`${missT.length} trip${missT.length === 1 ? "" : "s"}`);
+        return (
+          <div className="callout" style={{ borderColor: "var(--warn)" }}>
+            <b>{bits.join(" and ")} left off this invoice.</b> Logged for {r.client || "this participant"} and
+            not billed anywhere. {missS.length ? "Tick them on the Work tab if they belong here, " : ""}otherwise they'll stay waiting for the next one.
+          </div>
+        );
+      })()}
+
+      <div className="panel">
+        <label className="f" style={{ marginBottom: 0 }}>
+          <span>Notes for this invoice, optional</span>
+          <textarea rows={2} value={inv.notes || ""} onChange={(e) => set({ notes: e.target.value })}
+            placeholder="Supports delivered as planned, anything worth telling the payer" />
+        </label>
+      </div>
+
+      <SendPanel inv={inv} profile={profile} r={r} onSent={() => { const next = { ...inv, status: "sent" }; setInv(next); onSave(next); }} />
+
+      <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+        <button className="btn ghost" onClick={onCancel}>Cancel</button>
+        <button className="btn" onClick={() => onSave(inv)} disabled={!inv.participantId || !inv.due}>Save</button>
+      </div>
+
+      {!inv._new && (
+        confirmDelete ? (
+          <div className="callout" style={{ marginTop: 14 }}>
+            Deletes invoice #{inv.number} for good, there's no undo. If this number was the last one
+            you'd given out, the next invoice you raise reuses it, otherwise it's simply retired.
+            <div style={{ marginTop: 11, display: "flex", gap: 8 }}>
+              <button className="btn tiny" style={{ color: "var(--warn)" }} onClick={() => onDelete(inv)}>Yes, delete it</button>
+              <button className="btn ghost tiny" onClick={() => setConfirmDelete(false)}>Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <button className="btn ghost tiny" style={{ marginTop: 14, color: "var(--warn)" }} onClick={() => setConfirmDelete(true)}>
+            Delete this invoice, raised in error
+          </button>
+        )
+      )}
+    </>
+  );
+}
+
+
+function SendPanel({ inv, profile, r, onSent }) {
+  const [pdf, setPdf] = useState(null);
+  const [previewing, setPreviewing] = useState(false);
+  const ready = inv.participantId && invTotal(inv) > 0;
+
+  // Share the real PDF through the device's own share sheet, so Gmail,
+  // Outlook, Messages and the rest receive it as a genuine attachment.
+  const share = async () => {
+    setPdf("working");
+    try {
+      const file = await makeInvoicePDF(inv, profile, r, true);
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          title: `Invoice ${inv.number}`,
+          text: subject,
+          files: [file],
+        });
+        setPdf(null);
+        onSent && onSent();
+        return;
+      }
+      // No file sharing on this device: fall back to the download that does work.
+      await makeInvoicePDF(inv, profile, r);
+      setPdf("fellback");
+    } catch (e) {
+      // Cancelling the share sheet is a normal user action, not a failure.
+      if (e && e.name === "AbortError") { setPdf(null); return; }
+      console.error(e);
+      setPdf("fail");
+    }
+  };
+  // "New invoice from {you} for {participant}" — the participant's first
+  // name, so it reads naturally rather than a full legal name in a subject line.
+  const firstName = (r.client || "").trim().split(/\s+/)[0] || "";
+  const subject = firstName
+    ? `New invoice from ${profile.name || "your support worker"} for ${firstName}`
+    : `Invoice #${inv.number}, ${profile.name || "support services"}`;
+
+  // Builds the real PDF and opens it in a new tab so it can actually be
+  // looked at before it goes anywhere, rather than the old text-only
+  // preview, which showed the plain-text email body, not the document
+  // itself. The object URL is revoked after a short delay, long enough for
+  // the new tab to have loaded it.
+  const preview = async () => {
+    setPreviewing(true);
+    try {
+      const file = await makeInvoicePDF(inv, profile, r, true);
+      const url = URL.createObjectURL(file);
+      window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+    } catch (e) {
+      console.error(e);
+      setPdf("fail");
+    } finally {
+      setPreviewing(false);
+    }
+  };
+
+  return (
+    <div className="panel">
+      <div className="bandhead" style={{ marginBottom: 12 }}>
+        <div className="eyebrow">Send it</div>
+        {!ready && <div style={{ fontSize: 11.5, color: "var(--tx-3)" }}>Add a participant and an amount first</div>}
+      </div>
+
+      {ready ? (
+        <>
+          <button className="btn" style={{ width: "100%" }} onClick={share} disabled={pdf === "working"}>
+            {pdf === "working" ? "Building…" : "Share invoice"}
+          </button>
+          <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <button className="btn ghost tiny" onClick={preview} disabled={previewing}>{previewing ? "Opening…" : "Preview PDF"}</button>
+          </div>
+          {pdf === "fellback" && <div style={{ fontSize: 12.5, color: "var(--tx-2)", marginTop: 9, lineHeight: 1.6 }}>
+            Sharing isn't supported on this device. The invoice PDF has been downloaded instead, and you can attach it to your email from Downloads.
+          </div>}
+          {pdf === "fail" && <div style={{ fontSize: 12.5, color: "var(--warn)", marginTop: 9 }}>Couldn't build the PDF. Try again in a moment.</div>}
+          <div style={{ fontSize: 11.5, color: "var(--tx-3)", marginTop: 12, lineHeight: 1.6 }}>
+            Share invoice lets you send the PDF using Gmail, Outlook, Messages or any compatible app on your device.
+          </div>
+        </>
+      ) : (
+        <div style={{ fontSize: 13, color: "var(--tx-3)", lineHeight: 1.6 }}>
+          Choose a participant and add at least one line, then share the invoice PDF straight to whichever app you use.
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+
+
+
+/* ---------------- welcome ---------------- */
+// The first thing a new user sees. Not the manual — a wall of text before
+// anyone has seen the app loses more people than it helps — but an honest
+// orientation, with the manual one tap away and no wrong first move.
+function Welcome({ onSetup }) {
+  return (
+    <>
+      <div className="hero" style={{ marginBottom: 18 }}>
+        <div className="eyebrow">Welcome to SupportFlow</div>
+        <div className="disp" style={{ fontSize: 29, lineHeight: 1.12, marginTop: 10, marginBottom: 13 }}>
+          We'll guide you while you set it up.
+        </div>
+        <div style={{ fontSize: 14, color: "var(--tx-2)", lineHeight: 1.75, maxWidth: "46ch" }}>
+          Instead of showing you a tutorial and asking you to remember it, SupportFlow will explain each step while you actually do it.
+        </div>
+      </div>
+      <div className="panel">
+        {["Secure the app with your PIN","Protect backups and connect Google Drive","Add your business and invoice details","Set up managers and your first participant"].map((x,i)=>(
+          <div key={x} style={{display:"flex",gap:10,padding:"8px 0",alignItems:"flex-start"}}>
+            <span style={{color:"var(--brass)",fontWeight:800}}>{i+1}</span>
+            <div style={{fontSize:13.5,lineHeight:1.55}}>{x}</div>
+          </div>
+        ))}
+      </div>
+      <button className="btn" style={{width:"100%",marginTop:16}} onClick={onSetup}>Start guided setup</button>
+    </>
+  );
+}
+/* ---------------- onboarding ---------------- */
+const STEPS = [
+  { n: 1, title: "Your details", lead: "Required", hint: "Your name and ABN appear on every invoice you issue. Without them an invoice isn't valid, so this comes first." },
+  { n: 2, title: "Plan managers", lead: "Required if you invoice any", hint: "Add every plan management company you deal with, including their payment terms. That\u2019s what pre-fills the due date on invoices. Do this before participants, so each one can be linked in a tap." },
+  { n: 3, title: "Participants", lead: "Required", hint: "Add the people you support and flag how each plan is managed. Plan managed links to the manager who pays you; self or NDIA managed needs their own payment terms. Set the item you usually bill them for and new invoices open on it." },
+];
+
+function Onboarding({ data, save, close, help, openPrivacy, startStep }) {
+  // Security is asked about before any business or participant data, not
+  // buried further down Settings where a new user has no reason to look
+  // for it yet. Deliberately its own gate, not step "0" in the numbered
+  // 1/2/3 flow below, so it can't get tangled with that flow's own
+  // numbering, validation and back/forward logic.
+  const [lockDecided, setLockDecided] = useState(() => !!readLock());
+  // Mirrors LockPanel's own state, purely so this component re-renders when
+  // it changes. readLock() reads localStorage directly, which React has no
+  // way to observe on its own -- without this, the button below keeps
+  // showing "Skip for now" even after a PIN's been set, since nothing ever
+  // told this component the lock config had changed underneath it.
+  const [lockCfg, setLockCfg] = useState(() => readLock());
+  // Same reasoning as the lock gate, and shown right after it: the two
+  // things that protect what you're about to enter, before you've entered
+  // any of it. "Decided" here just means they've seen this screen and
+  // moved on -- there's nothing to actually back up yet on a fresh
+  // account, so this isn't gated on data.profile.backedUp.
+  const [backupDecided, setBackupDecided] = useState(false);
+  const [backupRefresh, setBackupRefresh] = useState(0);
+  const [step, setStep] = useState(startStep || 1);
+  // Plan managers is genuinely optional, so completion here can't just mean
+  // "at least one exists". It means a real decision was made: either a
+  // manager was added, or someone explicitly said they don't deal with any.
+  // Starts true if managers already exist (someone returning to a later
+  // step shouldn't be asked to re-decide something already settled).
+  const [mgrDecided, setMgrDecided] = useState(data.managers.length > 0);
+  const [p, setP] = useState(data.profile);
+  const [mf, setMf] = useState(null);
+  const [pf, setPf] = useState(null);
+
+  const pf0 = { name: "", ndisNumber: "", nonNdis: false, planType: "plan", managerId: "", terms: "", defaultCode: "", defaultDescription: "", defaultRate: "", agreement: false, agreementDate: "", agreementReview: "", agreementWhere: "", email: "", phone: "", address: "", planEnd: "", notes: "" };
+  const mf0 = { name: "", contact: "", email: "", phone: "", abn: "", address: "", terms: "14", notes: "" };
+
+  const profileOK = !!(p.name || "").trim() && isValidAbn(p.abn);
+  const partsOK = data.participants.length > 0;
+  const needsMgr = data.participants.some((x) => x.planType === "plan" && !x.managerId);
+
+  const saveProfile = () => save({ ...data, profile: { ...p, name: toProperName(p.name), abn: formatAbn(p.abn) } });
+  const addMgr = () => { save({ ...data, managers: [...data.managers, { ...mf, abn: formatAbn(mf.abn), id: uid() }] }); setMf(null); setMgrDecided(true); };
+  const addPart = () => { save({ ...data, participants: [...data.participants, { ...pf, name: toProperName(pf.name), ndisNumber: ndisDigits(pf.ndisNumber), id: uid() }] }); setPf(null); };
+  const finish = () => { save({ ...data, profile: p, onboarded: true }); close(); };
+
+  const Head = ({ i, ok }) => {
+    const st = STEPS[i - 1];
+    return (
+      <>
+        <span className="stepnum">{ok ? "✓" : st.n}</span>
+        <div className="steplead">{ok ? "Complete" : st.lead}</div>
+        <div className="disp" style={{ fontSize: 21, marginBottom: 7 }}>{st.title}</div>
+        <div className="stephint">{st.hint}</div>
+      </>
+    );
+  };
+
+  if (!lockDecided) {
+    return (
+      <>
+        <div className="bandhead" style={{ marginBottom: 16 }}>
+          <div>
+            <div className="eyebrow">Guided setup · 1 of 5</div>
+            <div className="disp" style={{ fontSize: 26, marginTop: 5 }}>First, secure SupportFlow</div>
+            <div style={{ fontSize: 12.5, color: "var(--tx-3)", marginTop: 5 }}>Create your PIN here. When it is set, we will take you to the next step.</div>
+          </div>
+        </div>
+        <div className="stepcard">
+          <span className="stepnum">1</span>
+          <div className="steplead">Security</div>
+          <div className="disp" style={{ fontSize: 21, marginBottom: 7 }}>Lock the app</div>
+          <div className="stephint" style={{ marginBottom: 16 }}>
+            Ask for a PIN or your fingerprint before the app opens. Worth having the moment you
+            start entering real participant details, not something to come back to later.
+          </div>
+          <LockPanel onChange={setLockCfg} />
+        </div>
+        <div style={{ display: "flex", gap: 8, justifyContent: "space-between", marginTop: 4 }}>
+          <button className="btn ghost" onClick={close}>Cancel</button>
+          <button className="btn" disabled={!lockCfg} onClick={() => setLockDecided(true)}>
+            {lockCfg ? "PIN set — continue" : "Set your PIN above to continue"}
+          </button>
+        </div>
+      </>
+    );
+  }
+
+  if (!backupDecided) {
+    return (
+      <>
+        <div className="bandhead" style={{ marginBottom: 16 }}>
+          <div>
+            <div className="eyebrow">Guided setup · 2 of 5</div>
+            <div className="disp" style={{ fontSize: 26, marginTop: 5 }}>Now protect your backup</div>
+            <div style={{ fontSize: 12.5, color: "var(--tx-3)", marginTop: 5 }}>Create your backup password and connect your Google Drive below. Continue unlocks only when both are ready.</div>
+          </div>
+        </div>
+        <div className="stepcard">
+          <span className="stepnum">2</span>
+          <div className="steplead">Safety net</div>
+          <div className="disp" style={{ fontSize: 21, marginBottom: 7 }}>Secure your backups</div>
+          <div className="stephint" style={{ marginBottom: 16 }}>
+            Create one backup password now. It protects every new SupportFlow backup until you change it.
+            SupportFlow cannot recover this password, so keep it somewhere safe away from this device.
+          </div>
+          <GoogleDriveSetup onConnected={() => setBackupRefresh((n) => n + 1)} />
+          <BackupPasswordSetup data={data} save={save} onReady={() => setBackupRefresh((n) => n + 1)} />
+        </div>
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 }}>
+          <button className="btn" disabled={!hasBackupMasterKey() || !googleDriveConnected()} onClick={async () => { try { await performGoogleAutoBackup(data); setBackupDecided(true); } catch (e) { alert("The first encrypted Google Drive backup could not be completed. Check your connection and try again."); } }}>
+            Continue
+          </button>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div className="bandhead" style={{ marginBottom: 16 }}>
+        <div>
+          <div className="eyebrow">Guided setup · {step + 2} of 5</div>
+          <div className="disp" style={{ fontSize: 26, marginTop: 5 }}>
+            {step === 1 ? "Add your business details" : step === 2 ? "Add plan managers" : "Add your first participant"}
+          </div>
+          <div style={{ fontSize: 12.5, color: "var(--tx-3)", marginTop: 5 }}>
+            {step === 1 ? "These details identify you on invoices. Fill in the highlighted required fields, then continue." :
+             step === 2 ? "Add the plan managers you deal with, or confirm that you do not use any." :
+             "Add the first person you support. This shows you exactly where participant information belongs."}
+          </div>
+        </div>
+        
+      </div>
+
+      <div className="dots">{[1, 2, 3].map((i) => <i key={i} data-on={i <= step ? 1 : 0} />)}</div>
+
+      {/* ---- 1 ---- */}
+      {step === 1 && (
+        <div className={"stepcard" + (profileOK ? " done" : "")}>
+          <Head i={1} ok={profileOK} />
+          <BusinessDetailsFields p={p} setP={setP} variant="onboarding" data={data} save={save} />
+          <div style={{ marginBottom: 0 }}>
+            <PaymentDetailsFields p={p} setP={setP} />
+          </div>
+        </div>
+      )}
+
+      {/* ---- 2 ---- */}
+      {step === 2 && (
+        <div className={"stepcard" + (data.managers.length ? " done" : "")}>
+          <Head i={2} ok={data.managers.length > 0} />
+          {data.managers.map((mg) => (
+            <div className="row" key={mg.id}>
+              <span className="dot" style={{ background: "var(--brass)" }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 600 }}>{mg.name}</div>
+                <div style={{ fontSize: 11, color: "var(--tx-3)", marginTop: 2 }}>{mg.email || "no accounts email"}</div>
+              </div>
+            </div>
+          ))}
+          {mf ? (
+            <div className="panel" style={{ marginTop: 14 }}>
+              <div className="two">
+                <label className="f"><span>Company</span><input {...F(mf, setMf)("name")} /></label>
+                <label className="f">
+                  <span style={{ color: mf.contact?.trim() ? undefined : "var(--req)" }}>Contact person, required</span>
+                  <input style={mf.contact?.trim() ? {} : { borderColor: "var(--req)" }} {...F(mf, setMf)("contact")} />
+                </label>
+              </div>
+              <div className="two">
+                <label className="f">
+                  <span style={{ color: mf.email?.trim() ? undefined : "var(--req)" }}>Accounts email, required</span>
+                  <input type="email" style={mf.email?.trim() ? {} : { borderColor: "var(--req)" }}
+                    value={mf.email || ""} onChange={(e) => setMf({ ...mf, email: e.target.value })}
+                    onBlur={() => setMf({ ...mf, email: normaliseEmail(mf.email) })} />
+                </label>
+                <label className="f">
+                  <span style={{ color: mf.phone?.trim() ? undefined : "var(--req)" }}>Phone, required</span>
+                  <input style={mf.phone?.trim() ? {} : { borderColor: "var(--req)" }}
+                    value={mf.phone || ""} onChange={(e) => setMf({ ...mf, phone: e.target.value })}
+                    onBlur={() => setMf({ ...mf, phone: normalisePhone(mf.phone) })} />
+                </label>
+              </div>
+              <div className="two" style={{ marginBottom: 0 }}>
+                <label className="f" style={{ marginBottom: 0 }}>
+                  <span style={{ color: isValidAbn(mf.abn) ? undefined : "var(--req)" }}>ABN, required</span>
+                  <input value={mf.abn || ""} onChange={(e) => setMf({ ...mf, abn: e.target.value })}
+                    onBlur={() => setMf({ ...mf, abn: formatAbn(mf.abn) })}
+                    style={isValidAbn(mf.abn) ? {} : { borderColor: "var(--req)" }} placeholder="11 digits" />
+                  {mf.abn && !isValidAbn(mf.abn) && (
+                    <em style={{ fontSize: 11.5, color: "var(--warn)", fontStyle: "normal", marginTop: 5, display: "block" }}>
+                      Doesn't check out as a valid ABN.
+                    </em>
+                  )}
+                </label>
+                <label className="f" style={{ marginBottom: 0 }}>
+                  <span style={{ color: mf.terms ? undefined : "var(--req)" }}>Payment terms in days, required</span>
+                  <input type="number" style={mf.terms ? {} : { borderColor: "var(--req)" }} {...F(mf, setMf)("terms")} placeholder="e.g. 14" />
+                  {mf.terms ? <em style={{ fontSize: 11.5, color: "var(--good)", fontStyle: "normal", marginTop: 5, display: "block" }}>{termsHint(mf.terms)}</em> : null}
+                </label>
+              </div>
+              <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+                <button className="btn" onClick={addMgr}
+                  disabled={!mf.name.trim() || !mf.contact?.trim() || !mf.email?.trim() || !mf.phone?.trim() || !isValidAbn(mf.abn) || !mf.terms}>Add manager</button>
+                <button className="btn ghost" onClick={() => setMf(null)}>Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 14 }}>
+              <button className="btn ghost" onClick={() => setMf(mf0)}>
+                {data.managers.length === 0 ? "Add a plan manager" : "Add another plan manager"}
+              </button>
+              {data.managers.length === 0
+                ? <button className="btn ghost" onClick={() => { setMgrDecided(true); setStep(3); }}>I don't deal with any</button>
+                : <button className="btn" onClick={() => setStep(3)}>Continue to participants</button>}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ---- 3 ---- */}
+      {step === 3 && (
+        <div className={"stepcard" + (partsOK && !needsMgr ? " done" : "")}>
+          <Head i={3} ok={partsOK && !needsMgr} />
+          {data.participants.map((x) => {
+            const mg = data.managers.find((g) => g.id === x.managerId);
+            const gap = x.planType === "plan" && !x.managerId;
+            return (
+              <div className="row" key={x.id}>
+                <span className="dot" style={{ background: gap ? "var(--req)" : "var(--good)" }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 600 }}>{x.name}</div>
+                  <div style={{ fontSize: 11, color: gap ? "var(--req)" : "var(--tx-3)", marginTop: 2 }}>
+                    {gap ? "Plan managed, no manager linked" : x.planType === "plan" ? mg?.name : planLabel(x.planType)}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          {pf ? (
+            <div className="panel" style={{ marginTop: 14 }}>
+              <div className="two">
+                <label className="f req"><span>Full name</span>
+                  <input value={pf.name || ""} onChange={(e) => setPf({ ...pf, name: e.target.value })}
+                    onBlur={() => setPf({ ...pf, name: toProperName(pf.name) })} />
+                </label>
+                <label className={"f" + (pf.nonNdis ? "" : " req")}>
+                  <span style={{ color: (pf.nonNdis || isValidNdisNumber(pf.ndisNumber)) ? undefined : "var(--req)" }}>
+                    NDIS number{pf.nonNdis ? ", optional" : ", required"}
+                  </span>
+                  <input value={pf.ndisNumber || ""} onChange={(e) => setPf({ ...pf, ndisNumber: e.target.value })}
+                    onBlur={() => setPf({ ...pf, ndisNumber: ndisDigits(pf.ndisNumber) })}
+                    disabled={pf.nonNdis}
+                    style={(pf.nonNdis || isValidNdisNumber(pf.ndisNumber)) ? {} : { borderColor: "var(--req)" }}
+                    placeholder="43xxxxxxx" />
+                  {!pf.nonNdis && !isValidNdisNumber(pf.ndisNumber) && (
+                    <em style={{ fontSize: 11.5, color: "var(--warn)", fontStyle: "normal", marginTop: 5, display: "block" }}>
+                      {pf.ndisNumber ? NDIS_NUMBER_ERROR : "A participant needs their NDIS number recorded."}
+                    </em>
+                  )}
+                  <label style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 8, fontSize: 12.5, color: "var(--tx-2)", cursor: "pointer" }}>
+                    <input type="checkbox" checked={!!pf.nonNdis}
+                      onChange={(e) => setPf({ ...pf, nonNdis: e.target.checked, ndisNumber: e.target.checked ? "" : pf.ndisNumber })}
+                      style={{ width: "auto" }} />
+                    Not an NDIS participant, private client
+                  </label>
+                </label>
+              </div>
+              <label className="f"><span>How is their plan managed?</span>
+                <select value={pf.planType} onChange={(e) => setPf({ ...pf, planType: e.target.value, managerId: e.target.value === "plan" ? pf.managerId : "" })}>
+                  {PLAN_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+              </label>
+              {pf.planType !== "plan" && (
+                <label className="f req">
+                  <span style={{ color: pf.terms ? undefined : "var(--req)" }}>Payment terms in days: required, they pay you directly</span>
+                  <input type="number" style={pf.terms ? {} : { borderColor: "var(--req)" }} value={pf.terms || ""} placeholder="e.g. 7"
+                    onChange={(e) => setPf({ ...pf, terms: e.target.value })} />
+                  {pf.terms ? <em style={{ fontSize: 11.5, color: "var(--good)", fontStyle: "normal", marginTop: 5, display: "block" }}>{termsHint(pf.terms)}</em> : null}
+                </label>
+              )}
+              {pf.planType === "plan" && (
+                data.managers.length ? (
+                  <label className="f"><span>Link their plan manager: this is who gets invoiced</span>
+                    <select value={pf.managerId} onChange={(e) => setPf({ ...pf, managerId: e.target.value })}>
+                      <option value="">Choose…</option>
+                      {data.managers.map((mg) => <option key={mg.id} value={mg.id}>{mg.name}</option>)}
+                    </select>
+                    {pf.managerId ? (
+                      <em style={{ fontSize: 11.5, color: "var(--good)", fontStyle: "normal", marginTop: 5, display: "block" }}>
+                        {termsHint((data.managers.find((mg) => mg.id === pf.managerId) || {}).terms)}
+                      </em>
+                    ) : null}
+                  </label>
+                ) : (
+                  <div className="callout" style={{ borderColor: "var(--req)" }}>
+                    No plan managers on file yet. Go back to step 2 and add theirs first, or set them as self managed.
+                  </div>
+                )
+              )}
+              {pf.nonNdis ? (
+                <>
+                  <label className="f req">
+                    <span style={{ color: (pf.defaultDescription || "").trim() ? undefined : "var(--req)" }}>What do you usually bill them for, required</span>
+                    <input value={pf.defaultDescription || ""} placeholder="e.g. Support work, hourly"
+                      style={(pf.defaultDescription || "").trim() ? {} : { borderColor: "var(--req)" }}
+                      onChange={(e) => setPf({ ...pf, defaultDescription: e.target.value })} />
+                    <em style={{ fontSize: 11.5, color: "var(--tx-3)", fontStyle: "normal", marginTop: 5, display: "block" }}>
+                      No NDIS item codes for a private client, this description prints on their invoice instead.
+                    </em>
+                  </label>
+                  <label className="f req">
+                    <span style={{ color: pf.defaultRate ? undefined : "var(--req)" }}>Rate, required</span>
+                    <input type="number" step="0.01" value={pf.defaultRate || ""}
+                      style={pf.defaultRate ? {} : { borderColor: "var(--req)" }}
+                      onChange={(e) => setPf({ ...pf, defaultRate: e.target.value })} />
+                  </label>
+                </>
+              ) : (
+                <>
+                  <label className="f req">
+                    <span style={{ color: pf.defaultCode ? undefined : "var(--req)" }}>Item you usually bill them for, required</span>
+                    <select value={pf.defaultCode || ""} style={pf.defaultCode ? {} : { borderColor: "var(--req)" }}
+                      onChange={(e) => {
+                        const it = SUPPORT_ITEMS.find((x) => x.code === e.target.value);
+                        setPf({ ...pf, defaultCode: e.target.value, defaultRate: it ? it.rate : "" });
+                      }}>
+                      <option value="">Choose their usual support…</option>
+{ITEM_GROUPS.map((g) => (
+                        <optgroup key={g} label={g}>
+                          {SUPPORT_ITEMS.filter((it) => it.group === g).map((it) => (
+                            <option key={it.code} value={it.code}>{it.name}, {money(it.rate)}</option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                    {pf.defaultCode ? (
+                      <em style={{ fontSize: 11.5, color: "var(--good)", fontStyle: "normal", marginTop: 5, display: "block" }}>
+                        New invoices for {pf.name || "them"} will open on this item. You can still change it per invoice.
+                      </em>
+                    ) : null}
+                  </label>
+                  {pf.defaultCode && (
+                    <label className="f"><span>Rate, edit if yours differs</span>
+                      <input type="number" step="0.01" value={pf.defaultRate || ""}
+                        onChange={(e) => setPf({ ...pf, defaultRate: e.target.value })} />
+                    </label>
+                  )}
+                </>
+              )}
+              <label className="check" style={{ marginBottom: 14 }}>
+                <input type="checkbox" checked={!!pf.agreement} onChange={(e) => setPf({ ...pf, agreement: e.target.checked })} />
+                <span>Written service agreement in place</span>
+              </label>
+              <div className="two" style={{ marginBottom: 0 }}>
+                <label className="f req" style={{ marginBottom: 0 }}>
+                  <span style={{ color: (pf.email || "").trim() ? undefined : "var(--req)" }}>Their email, required</span>
+                  <input type="email" style={(pf.email || "").trim() ? {} : { borderColor: "var(--req)" }} {...F(pf, setPf)("email")} />
+                </label>
+                <label className="f req" style={{ marginBottom: 0 }}>
+                  <span style={{ color: (pf.phone || "").trim() ? undefined : "var(--req)" }}>Their phone, required</span>
+                  <input style={(pf.phone || "").trim() ? {} : { borderColor: "var(--req)" }} {...F(pf, setPf)("phone")} />
+                </label>
+              </div>
+              <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+                <button className="btn" onClick={addPart}
+                  disabled={!pf.name.trim() || (pf.nonNdis ? (!(pf.defaultDescription || "").trim() || !pf.defaultRate) : !pf.defaultCode) ||
+                    (pf.planType === "plan" ? !pf.managerId : !pf.terms) ||
+                    (!pf.nonNdis && !isValidNdisNumber(pf.ndisNumber)) || !(pf.email || "").trim() || !(pf.phone || "").trim()}>Add participant</button>
+                <button className="btn ghost" onClick={() => setPf(null)}>Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <button className="btn" style={{ marginTop: 14 }} onClick={() => setPf(pf0)}>Add a participant</button>
+          )}
+        </div>
+      )}
+
+      {step === 3 && (
+        <div style={{ fontSize: 11.5, color: "var(--tx-3)", lineHeight: 1.6, marginTop: 4, marginBottom: 12 }}>
+          By continuing, you acknowledge that you have read our{" "}
+          <span style={{ color: "var(--brass-lift)", textDecoration: "underline", cursor: "pointer" }}
+            onClick={openPrivacy}>Privacy Policy</span>.
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 8, justifyContent: "space-between", marginTop: 4 }}>
+        <button className="btn ghost" onClick={() => (step > 1 ? setStep(step - 1) : close())}>{step > 1 ? "Back" : "Cancel"}</button>
+        {step < 3
+          ? <button className="btn" onClick={() => { if (step === 1) saveProfile(); setStep(step + 1); }}
+              disabled={(step === 1 && !profileOK) || (step === 2 && !mgrDecided)}>Continue</button>
+          : <button className="btn" onClick={finish} disabled={!partsOK || needsMgr}>Finish setup</button>}
+      </div>
+
+      {step === 1 && !profileOK && <div style={{ fontSize: 12, color: "var(--req)", marginTop: 10, textAlign: "right" }}>Your name and a valid ABN are needed to continue.</div>}
+      {step === 2 && !mgrDecided && <div style={{ fontSize: 12, color: "var(--req)", marginTop: 10, textAlign: "right" }}>Add a plan manager, or say you don't deal with any, to continue.</div>}
+      {step === 3 && needsMgr && <div style={{ fontSize: 12, color: "var(--req)", marginTop: 10, textAlign: "right" }}>Every plan-managed participant needs a manager linked.</div>}
+    </>
+  );
+}
+
+/* ---------------- claimable check (live ATO lookup) ---------------- */
+const CLAIM_SUGGESTIONS = [
+  "NDIS worker screening check", "First aid and CPR course", "Car travel between participants",
+  "Home to first participant travel", "Uniform and branded shirts", "Gloves, masks and sanitiser",
+  "Mobile phone bill", "Working with children check", "Professional indemnity insurance",
+  "Laundering work clothing", "Parking and tolls on shift", "Study for a Cert IV in disability",
+];
+
+const VERDICTS = {
+  yes: { label: "Claimable", color: "var(--good)" },
+  partial: { label: "Partly claimable", color: "var(--brass)" },
+  no: { label: "Not claimable", color: "var(--warn)" },
+  unclear: { label: "Depends", color: "var(--tx-3)" },
+};
+
+async function checkClaimable(item) {
+  const { text, sources } = await askModel(
+    `You are answering a work-expense question for an Australian NDIS disability support ` +
+    `worker who is a sole trader with an ABN and is not registered for GST.\n\n` +
+    `Search the ATO website for the current rules on whether this expense is deductible: "${item}".\n\n` +
+    `Your search is restricted to ato.gov.au. Use the occupation guide for community support and ` +
+    `care workers where it applies. Pay attention to the difference between travel between ` +
+    `workplaces and ordinary home-to-work travel, to conventional clothing versus compulsory or ` +
+    `protective uniforms, and to apportioning private use.\n\n` +
+    `Answer ONLY from what the ATO pages actually say. If the ATO pages do not cover it, say so ` +
+    `rather than reasoning it out yourself.\n\n` +
+    `Reply with ONLY a JSON object, no preamble and no markdown fences:\n` +
+    `{"verdict":"yes|partial|no|unclear","short":"one plain sentence answer",` +
+    `"rule":"2-3 sentences on why, in plain English, no jargon",` +
+    `"apportion":"how to split work vs private use, or empty string if not relevant",` +
+    `"records":"what evidence to keep"}`,
+    { search: true, kind: "check" }
+  );
+  const raw = text.replace(/```json|```/g, "").trim();
+  const start = raw.indexOf("{"), end = raw.lastIndexOf("}");
+  if (start === -1 || end === -1) throw new Error("Could not read the answer");
+  const out = JSON.parse(raw.slice(start, end + 1));
+  // The model no longer supplies its own links. These are the ATO pages the
+  // search actually retrieved, so a citation can't be invented.
+  out.sources = sources;
+  if (sources.length === 0) out.verdict = "unclear";
+  return out;
+}
+
+
+
+function Claimable({ data, save, seed }) {
+  const [q, setQ] = useState(seed || "");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [ans, setAns] = useState(null);
+  const cache = data.claimCache || {};
+  useEffect(() => { if (seed) setQ(seed); }, [seed]);
+
+  const run = async (term) => {
+    const item = (term ?? q).trim();
+    if (!item) return;
+    setQ(item); setErr(""); setAns(null);
+    const hit = cache[item.toLowerCase()];
+    if (hit) { setAns(hit); return; }          // instant on anything asked before
+    setBusy(true);
+    try {
+      const out = await checkClaimable(item);
+      out.item = item; out.checked = today();
+      setAns(out);
+      save({ ...data, claimCache: { ...cache, [item.toLowerCase()]: out } });
+    } catch (e) {
+      setErr(
+        e.message === "not-configured" ? "The checker isn't switched on for this site yet. Everything else works as normal."
+        : e.message === "daily-cap" ? `That's ${AI_CAPS.check} checks today, the daily limit. Anything you've already asked still opens instantly, and it resets tomorrow.`
+        : e.message === "busy" ? "Too many checks at once. Give it a minute and try again."
+        : (e.message || "Something went wrong. Try again in a moment."));
+    } finally { setBusy(false); }
+  };
+
+  const recent = Object.values(cache).sort((a, b) => (a.checked < b.checked ? 1 : -1)).slice(0, 8);
+  const v = ans ? VERDICTS[ans.verdict] || VERDICTS.unclear : null;
+
+  return (
+    <>
+      <div className="panel">
+        <div className="eyebrow" style={{ marginBottom: 8 }}>Can I claim this?</div>
+        {!AI.enabled() ? (
+          <>
+            <div style={{ fontSize: 13, color: "var(--tx-2)", lineHeight: 1.7, marginBottom: 14 }}>
+              The automatic checker isn't connected in this build. The common ones for support work are
+              covered in the guide, and the ATO publishes an occupation guide for community support and
+              care workers with the current rules.
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <a className="btn ghost tiny" href="https://www.ato.gov.au/individuals-and-families/income-deductions-offsets-and-records/deductions-you-can-claim/occupation-and-industry-specific-guides" target="_blank" rel="noreferrer">ATO occupation guides ↗</a>
+            </div>
+          </>
+        ) : (
+          <>
+        <div style={{ fontSize: 13, color: "var(--tx-2)", lineHeight: 1.6, marginBottom: 14 }}>
+          Reads the ATO site, and only the ATO site, then shows you the pages the answer came from.
+        </div>
+        <div style={{ fontSize: 11.5, color: "var(--warn)", lineHeight: 1.6, marginBottom: 12,
+                      background: "var(--req-soft)", border: "1px solid var(--req)", borderRadius: 9, padding: "9px 11px" }}>
+          Do not enter participant names, NDIS numbers, health information or other personal
+          information. Ask about the expense in general terms.
+        </div>
+        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+          <input style={{ flex: 1 }} value={q} placeholder="Steel cap boots, phone bill, travel between clients…"
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") run(); }} />
+          <button className="btn" onClick={() => run()} disabled={busy || !q.trim()}>{busy ? "Checking…" : "Check"}</button>
+        </div>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {CLAIM_SUGGESTIONS.slice(0, 6).map((c) => (
+            <button key={c} className="btn ghost tiny" onClick={() => run(c)} disabled={busy}>{c}</button>
+          ))}
+        </div>
+        {aiLeft("check") <= 5 && (
+          <div style={{ fontSize: 11.5, color: aiLeft("check") === 0 ? "var(--warn)" : "var(--tx-3)", marginTop: 12, lineHeight: 1.6 }}>
+            {aiLeft("check") === 0
+              ? "You've used today's checks. Anything asked before still opens instantly, and it resets tomorrow."
+              : `${aiLeft("check")} check${aiLeft("check") === 1 ? "" : "s"} left today.`}
+          </div>
+        )}
+        {aiLeft() <= 5 && (
+          <div style={{ fontSize: 11.5, color: aiLeft() === 0 ? "var(--warn)" : "var(--tx-3)", marginTop: 12, lineHeight: 1.6 }}>
+            {aiLeft() === 0
+              ? `You've used today's ${AI_CAPS.check} checks. Ones you've asked before still open instantly.`
+              : `${aiLeft()} new check${aiLeft() === 1 ? "" : "s"} left today. Repeats don't count.`}
+          </div>
+        )}
+        </>
+        )}
+      </div>
+
+      {busy && <div className="panel"><div className="eyebrow">Searching the ATO…</div>
+        <div style={{ fontSize: 13, color: "var(--tx-3)", marginTop: 8 }}>Usually a few seconds.</div></div>}
+
+      {err && <div className="callout" style={{ borderColor: "var(--warn)" }}>{err}</div>}
+
+      {ans && !busy && (
+        <div className="panel" style={{ borderColor: v.color }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10 }}>
+            <span className="dot" style={{ background: v.color }} />
+            <span style={{ fontSize: 12.5, fontWeight: 600, color: v.color, letterSpacing: ".04em", textTransform: "uppercase" }}>{v.label}</span>
+          </div>
+          <div className="disp" style={{ fontSize: 19, lineHeight: 1.35, marginBottom: 12 }}>{ans.short}</div>
+          <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.7 }}>{ans.rule}</div>
+
+          {ans.apportion && (
+            <div style={{ marginTop: 14 }}>
+              <div className="eyebrow" style={{ marginBottom: 5 }}>Splitting work and private use</div>
+              <div style={{ fontSize: 13, color: "var(--tx-2)", lineHeight: 1.65 }}>{ans.apportion}</div>
+            </div>
+          )}
+          {ans.records && (
+            <div style={{ marginTop: 14 }}>
+              <div className="eyebrow" style={{ marginBottom: 5 }}>Keep this</div>
+              <div style={{ fontSize: 13, color: "var(--tx-2)", lineHeight: 1.65 }}>{ans.records}</div>
+            </div>
+          )}
+
+          <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--line)" }}>
+            <div className="eyebrow" style={{ marginBottom: 8 }}>
+              {ans.sources.length ? `Read from the ATO, ${ans.sources.length} page${ans.sources.length === 1 ? "" : "s"}` : "Where this came from"}
+            </div>
+            {ans.sources.length === 0 ? (
+              <div style={{ fontSize: 12.5, color: "var(--warn)", lineHeight: 1.7 }}>
+                Nothing on the ATO site answered this one. That doesn't mean you can't claim it. It means the answer isn't on a page this could find, so it's worth asking a
+                registered tax agent rather than guessing.
+              </div>
+            ) : ans.sources.map((sc, i) => (
+              <a key={i} href={sc.url} target="_blank" rel="noreferrer"
+                style={{ display: "block", fontSize: 12.5, color: "var(--brass)", marginBottom: 6, wordBreak: "break-word" }}>
+                {sc.title} ↗
+              </a>
+            ))}
+          </div>
+
+          <div style={{ marginTop: 14, fontSize: 11.5, color: "var(--tx-3)", lineHeight: 1.6 }}>
+            General information, not tax advice. Rules turn on your own circumstances, check the source pages,
+            or a registered tax agent, before you rely on it.
+          </div>
+        </div>
+      )}
+
+      {recent.length > 0 && (
+        <div className="band">
+          <div className="eyebrow" style={{ marginBottom: 10 }}>Checked before, these open instantly</div>
+          {recent.map((rr) => {
+            const rv = VERDICTS[rr.verdict] || VERDICTS.unclear;
+            return (
+              <div className="row tap" key={rr.item} onClick={() => { setQ(rr.item); setAns(rr); setErr(""); }}>
+                <span className="dot" style={{ background: rv.color }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 500 }}>{rr.item}</div>
+                  <div style={{ fontSize: 11, color: "var(--tx-3)", marginTop: 2 }}>{rv.label}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
+}
+
+/* ---------------- Directory ---------------- */
+
+/* ---------------- Agreements ---------------- */
+// Service agreements had been living at the bottom of the participant form,
+// where nobody found them. They carry GST-free status, so they get their own place.
+function Agreements({ data, save, open }) {
+  const [busy, setBusy] = useState("");
+  const [err, setErr] = useState("");
+  const [hint, setHint] = useState("");
+
+  const make = async (pt) => {
+    setErr(""); setHint(""); setBusy(pt.id);
+    try {
+      await makeAgreementPDF(pt, data.profile,
+        resolve({ participantId: pt.id }, data));
+      setHint("Downloaded. Keep it somewhere safe — it contains participant details.");
+    } catch (e) { setErr("Couldn't build the PDF. Check your connection and try again."); }
+    finally { setBusy(""); }
+  };
+
+  const mark = (pt, on) => save({
+    ...data,
+    participants: data.participants.map((x) => (x.id === pt.id
+      ? { ...x, agreement: on, agreementDate: on && !x.agreementDate ? today() : x.agreementDate }
+      : x)),
+  });
+
+  const missing = data.participants.filter((x) => !x.agreement);
+  const due = data.participants.filter((x) => x.agreement && x.agreementReview && x.agreementReview <= addDays(today(), 30));
+
+  return (
+    <>
+      <div className="panel">
+        <div className="eyebrow" style={{ marginBottom: 10 }}>Why these matter</div>
+        <div style={{ fontSize: 13, color: "var(--tx-2)", lineHeight: 1.7 }}>
+          A written agreement is one of four conditions that keep your supports GST-free. Without one,
+          a support may be taxable, meaning you could owe 10% you never charged. The app can write
+          one from the details you've already entered.
+        </div>
+      </div>
+
+      {missing.length > 0 && (
+        <div className="callout" style={{ borderColor: "var(--warn)" }}>
+          <b>{missing.length} participant{missing.length === 1 ? "" : "s"} without an agreement</b>, {missing.map((x) => x.name).join(", ")}.
+        </div>
+      )}
+      {due.length > 0 && (
+        <div className="callout" style={{ borderColor: "var(--brass)" }}>
+          <b>Review due soon</b>, {due.map((x) => x.name).join(", ")}.
+        </div>
+      )}
+      {err && <div className="callout" style={{ borderColor: "var(--warn)" }}>{err}</div>}
+      {hint && <div className="callout" style={{ borderColor: "var(--good)", fontSize: 13 }}>{hint}</div>}
+
+      {data.participants.length === 0 ? (
+        <div className="empty">Add a participant first. An agreement is between you and someone.</div>
+      ) : data.participants.map((pt) => {
+        const reviewSoon = pt.agreement && pt.agreementReview && pt.agreementReview <= addDays(today(), 30);
+        return (
+          <div className="panel" key={pt.id} style={{ borderColor: pt.agreement ? (reviewSoon ? "var(--brass)" : "var(--line)") : "var(--warn)" }}>
+            <div className="bandhead" style={{ marginBottom: 8 }}>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 600 }}>{pt.name}</div>
+                <div style={{ fontSize: 11.5, marginTop: 3, color: pt.agreement ? "var(--tx-3)" : "var(--warn)" }}>
+                  {!pt.agreement ? "No agreement recorded"
+                    : reviewSoon ? `Signed ${fmtDate(pt.agreementDate)} · review due ${fmtDate(pt.agreementReview)}`
+                    : pt.agreementDate ? `Signed ${fmtDate(pt.agreementDate)}` : "Signed"}
+                </div>
+              </div>
+              <span className="dot" style={{ background: pt.agreement ? (reviewSoon ? "var(--brass)" : "var(--good)") : "var(--warn)" }} />
+            </div>
+
+            {pt.agreement && pt.agreementWhere && (
+              <div style={{ fontSize: 12, color: "var(--tx-3)", marginBottom: 12 }}>Kept: {pt.agreementWhere}</div>
+            )}
+
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button className="btn tiny" onClick={() => make(pt)} disabled={busy === pt.id}>
+                {busy === pt.id ? "Downloading…" : "Download"}
+              </button>
+              {!pt.agreement
+                ? <button className="btn ghost tiny" onClick={() => mark(pt, true)}>Mark as signed</button>
+                : <button className="btn ghost tiny" onClick={() => open(pt)}>Dates and details</button>}
+            </div>
+          </div>
+        );
+      })}
+
+      <div style={{ fontSize: 11.5, color: "var(--tx-3)", lineHeight: 1.65, marginTop: 16 }}>
+        Generated agreements are a starting point built from your records, not legal advice.
+        Read one through before it gets signed.
+      </div>
+    </>
+  );
+}
+
+// A quick, read-only look at one participant, aggregated from records that
+// already exist elsewhere rather than tracked separately. Collapsed by
+// default, so opening someone to fix a typo in their phone number doesn't
+// suddenly load a report they didn't ask for.
+function ParticipantHistory({ pt, data }) {
+  const [open, setOpen] = useState(false);
+  if (!open) {
+    return (
+      <button className="btn ghost tiny" style={{ marginBottom: 16 }} onClick={() => setOpen(true)}>View history</button>
+    );
+  }
+
+  const fy = fyOf(today());
+  const shifts = data.shifts.filter((x) => x.participantId === pt.id && inFY(x.date, fy) && statusOf(x) === "done");
+  const hours = shifts.reduce((n, x) => n + shiftHours(x), 0);
+  const lastShift = [...data.shifts].filter((x) => x.participantId === pt.id && statusOf(x) === "done")
+    .sort((a, b) => (a.date < b.date ? 1 : -1))[0];
+
+  const invoices = data.invoices.filter((i) => i.participantId === pt.id && inFY(i.date, fy));
+  const invoiced = invoices.reduce((s, i) => s + invTotal(i), 0);
+  const paid = invoices.filter((i) => i.status === "paid").reduce((s, i) => s + invTotal(i), 0);
+  const outstanding = invoiced - paid;
+
+  const hasAgreement = !!pt.agreement;
+  const reviewDue = pt.agreementReview && pt.agreementReview < today();
+
+  return (
+    <div className="panel" style={{ marginBottom: 16 }}>
+      <div className="bandhead" style={{ marginBottom: 12 }}>
+        <div className="eyebrow">History · {fyLabel(fy)}</div>
+        <button className="btn ghost tiny" onClick={() => setOpen(false)}>Hide</button>
+      </div>
+
+      <div className="split" style={{ marginBottom: 12 }}>
+        <div>
+          <div className="eyebrow">Worked</div>
+          <div className="disp num" style={{ fontSize: 20, marginTop: 6 }}>{hours.toFixed(1)}h</div>
+          <div style={{ fontSize: 11, color: "var(--tx-3)", marginTop: 3 }}>{shifts.length} shift{shifts.length === 1 ? "" : "s"}</div>
+        </div>
+        <div>
+          <div className="eyebrow">Outstanding</div>
+          <div className="disp num" style={{ fontSize: 20, marginTop: 6, color: outstanding > 0 ? "var(--warn)" : "var(--tx)" }}>{money0(outstanding)}</div>
+          <div style={{ fontSize: 11, color: "var(--tx-3)", marginTop: 3 }}>of {money0(invoiced)} invoiced</div>
+        </div>
+      </div>
+
+      <div style={{ fontSize: 12.5, color: "var(--tx-2)", lineHeight: 1.8 }}>
+        <div>Last shift: {lastShift ? fmtDate(lastShift.date) : "none logged"}</div>
+        <div>
+          Agreement: {hasAgreement
+            ? (reviewDue
+              ? <span style={{ color: "var(--warn)" }}>on file, review overdue</span>
+              : <>on file{pt.agreementReview ? `, review due ${fmtDate(pt.agreementReview)}` : ""}</>)
+            : <span style={{ color: "var(--req)" }}>none on file</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Directory({ data, save, view, setView, openId, clearOpen, canCreate, onBlocked }) {
+  const [edit, setEdit] = useState(null);
+  useEffect(() => {
+    if (!openId) return;
+    const pt = data.participants.find((x) => x.id === openId);
+    if (pt) setEdit({ _k: "participants", rec: { ...pt } });
+    if (clearOpen) clearOpen();
+  }, [openId]);
+  const [agBusy, setAgBusy] = useState(false);
+  const [agErr, setAgErr] = useState("");
+  const [agHint, setAgHint] = useState("");
+
+  const blankP = { id: "", name: "", ndisNumber: "", nonNdis: false, planType: "plan", managerId: "", terms: "", defaultCode: "", defaultDescription: "", defaultRate: "", agreement: false, agreementDate: "", agreementReview: "", agreementWhere: "", email: "", phone: "", address: "", planEnd: "", notes: "" };
+  const blankM = { id: "", name: "", contact: "", email: "", phone: "", address: "", abn: "", terms: "14", notes: "" };
+
+  const put = (key, rec) => {
+    const list = data[key];
+    const next = rec.id ? list.map((x) => (x.id === rec.id ? rec : x)) : [...list, { ...rec, id: uid() }];
+    save({ ...data, [key]: next });
+    setEdit(null);
+  };
+  const drop = (key, id) => { save({ ...data, [key]: data[key].filter((x) => x.id !== id) }); setEdit(null); };
+  const list = view === "participants" ? data.participants : data.managers;
+
+  if (edit) {
+    const isP = edit._k === "participants";
+    const r = edit.rec;
+    const set = (patch) => setEdit({ ...edit, rec: { ...r, ...patch } });
+    const makeAgreement = async () => {
+      setAgErr(""); setAgHint(""); setAgBusy(true);
+      try {
+        await makeAgreementPDF(r, data.profile, resolve({ participantId: r.id }, { ...data, participants: [r, ...data.participants.filter((x) => x.id !== r.id)] }));
+        setAgHint("Downloaded. Keep it somewhere safe — it contains participant details.");
+      }
+      catch (e) { setAgErr("Couldn't build the PDF. Check your connection and try again."); }
+      finally { setAgBusy(false); }
+    };
+    const f = (k) => ({ value: r[k] || "", onChange: (e) => set({ [k]: e.target.value }) });
+
+    return (
+      <>
+        <div className="bandhead" style={{ marginBottom: 16 }}>
+          <div className="disp" style={{ fontSize: 22 }}>{r.id ? r.name || "Edit" : isP ? "New participant" : "New plan manager"}</div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="btn ghost" onClick={() => setEdit(null)}>Cancel</button>
+            <button className="btn"
+              onClick={() => {
+                if (!r.id && !canCreate) { onBlocked(); return; }
+                put(edit._k, isP
+                  ? { ...r, name: toProperName(r.name), ndisNumber: ndisDigits(r.ndisNumber) }
+                  : { ...r, abn: formatAbn(r.abn) });
+              }}
+              disabled={!r.name || (isP && (r.nonNdis ? (!(r.defaultDescription || "").trim() || !r.defaultRate) : !r.defaultCode)) || (isP && r.planType !== "plan" && !r.terms) ||
+                (isP && !r.nonNdis && !isValidNdisNumber(r.ndisNumber)) ||
+                (!isP && (!r.terms || !r.contact?.trim() || !r.email?.trim() || !r.phone?.trim() || !isValidAbn(r.abn)))}>Save</button>
+          </div>
+        </div>
+
+        {isP && r.id && <ParticipantHistory pt={r} data={data} />}
+
+        <div className="panel">
+          {isP ? (
+            <>
+              <div className="two">
+                <label className="f"><span>Full name</span>
+                  <input value={r.name || ""} onChange={(e) => set({ name: e.target.value })}
+                    onBlur={() => set({ name: toProperName(r.name) })} />
+                </label>
+                <label className={"f" + (r.nonNdis ? "" : " req")}>
+                  <span style={{ color: (r.nonNdis || isValidNdisNumber(r.ndisNumber)) ? undefined : "var(--req)" }}>
+                    NDIS number{r.nonNdis ? ", optional" : ", required"}
+                  </span>
+                  <input value={r.ndisNumber || ""} onChange={(e) => set({ ndisNumber: e.target.value })}
+                    onBlur={() => set({ ndisNumber: ndisDigits(r.ndisNumber) })}
+                    disabled={r.nonNdis}
+                    style={(r.nonNdis || isValidNdisNumber(r.ndisNumber)) ? {} : { borderColor: "var(--req)" }}
+                    placeholder="43xxxxxxx" />
+                  {!r.nonNdis && !isValidNdisNumber(r.ndisNumber) && (
+                    <em style={{ fontSize: 11.5, color: "var(--warn)", fontStyle: "normal", marginTop: 5, display: "block" }}>
+                      {r.ndisNumber ? NDIS_NUMBER_ERROR : "A participant needs their NDIS number recorded."}
+                    </em>
+                  )}
+                  <label style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 8, fontSize: 12.5, color: "var(--tx-2)", cursor: "pointer" }}>
+                    <input type="checkbox" checked={!!r.nonNdis}
+                      onChange={(e) => set({ nonNdis: e.target.checked, ndisNumber: e.target.checked ? "" : r.ndisNumber })}
+                      style={{ width: "auto" }} />
+                    Not an NDIS participant, private client
+                  </label>
+                </label>
+              </div>
+              <div className="two">
+                <label className="f"><span>Plan type</span>
+                  <select value={r.planType} onChange={(e) => set({ planType: e.target.value })}>
+                    {PLAN_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                  </select>
+                </label>
+                <label className="f"><span>Plan ends</span><AuDateInput value={r.planEnd} onChange={(v) => set({ planEnd: v })} /></label>
+              </div>
+              <label className="f"><span>Where they are, sets your travel time cap</span>
+                <select value={r.zone || "mmm13"} onChange={(e) => set({ zone: e.target.value })}>
+                  {TRAVEL_CAPS.map((z) => <option key={z.zone} value={z.zone}>{z.label}</option>)}
+                </select>
+                <em style={{ fontSize: 11.5, color: "var(--tx-3)", fontStyle: "normal", marginTop: 5, display: "block" }}>
+                  {travelCap(r.zone || "mmm13")
+                    ? `You can claim up to ${travelCap(r.zone || "mmm13")} minutes of travel time each way to this participant.`
+                    : "No travel time cap applies in remote and very remote areas."}
+                </em>
+              </label>
+              {r.planType !== "plan" && (
+                <label className="f">
+                  <span style={{ color: r.terms ? undefined : "var(--req)" }}>Payment terms in days, required{r.terms ? "" : ", sets the due date"}</span>
+                  <input type="number" style={r.terms ? {} : { borderColor: "var(--req)" }} {...f("terms")} placeholder="e.g. 7" />
+                  {r.terms ? <em style={{ fontSize: 11.5, color: "var(--good)", fontStyle: "normal", marginTop: 5, display: "block" }}>{termsHint(r.terms)}</em> : null}
+                </label>
+              )}
+              {r.planType === "plan" && (
+                <label className="f"><span>Plan manager, invoices go here</span>
+                  <select value={r.managerId || ""} onChange={(e) => set({ managerId: e.target.value })}>
+                    <option value="">Not set</option>
+                    {data.managers.map((mg) => <option key={mg.id} value={mg.id}>{mg.name}</option>)}
+                  </select>
+                </label>
+              )}
+              {r.nonNdis ? (
+                <>
+                  <label className="f req">
+                    <span style={{ color: (r.defaultDescription || "").trim() ? undefined : "var(--req)" }}>What do you usually bill them for, required</span>
+                    <input value={r.defaultDescription || ""} placeholder="e.g. Support work, hourly"
+                      style={(r.defaultDescription || "").trim() ? {} : { borderColor: "var(--req)" }}
+                      onChange={(e) => set({ defaultDescription: e.target.value })} />
+                    <em style={{ fontSize: 11.5, color: "var(--tx-3)", fontStyle: "normal", marginTop: 5, display: "block" }}>
+                      No NDIS item codes for a private client, this description prints on their invoice instead.
+                    </em>
+                  </label>
+                  <label className="f req">
+                    <span style={{ color: r.defaultRate ? undefined : "var(--req)" }}>Rate, required</span>
+                    <input type="number" step="0.01" value={r.defaultRate || ""}
+                      style={r.defaultRate ? {} : { borderColor: "var(--req)" }}
+                      onChange={(e) => set({ defaultRate: e.target.value })} />
+                  </label>
+                </>
+              ) : (
+                <>
+                  <label className="f">
+                    <span style={{ color: r.defaultCode ? undefined : "var(--req)" }}>Item you usually bill them for</span>
+                    <select value={r.defaultCode || ""} style={r.defaultCode ? {} : { borderColor: "var(--req)" }}
+                      onChange={(e) => {
+                        const it = SUPPORT_ITEMS.find((x) => x.code === e.target.value);
+                        set({ defaultCode: e.target.value, defaultRate: it ? it.rate : "" });
+                      }}>
+                      <option value="">Choose…</option>
+{ITEM_GROUPS.map((g) => (
+                        <optgroup key={g} label={g}>
+                          {SUPPORT_ITEMS.filter((it) => it.group === g).map((it) => (
+                            <option key={it.code} value={it.code}>{it.name}, {money(it.rate)}</option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                  </label>
+                  {r.defaultCode && (
+                    <label className="f"><span>Rate</span>
+                      <input type="number" step="0.01" value={r.defaultRate || ""} onChange={(e) => set({ defaultRate: e.target.value })} />
+                    </label>
+                  )}
+                </>
+              )}
+              <div className="two">
+                <label className="f"><span>Their email</span>
+                  <input type="email" value={r.email || ""} onChange={(e) => set({ email: e.target.value })}
+                    onBlur={() => set({ email: normaliseEmail(r.email) })} />
+                </label>
+                <label className="f"><span>Their phone</span>
+                  <input value={r.phone || ""} onChange={(e) => set({ phone: e.target.value })}
+                    onBlur={() => set({ phone: normalisePhone(r.phone) })} />
+                </label>
+              </div>
+              <label className="f"><span>Address</span>
+                <input value={r.address || ""} onChange={(e) => set({ address: e.target.value })}
+                  onBlur={() => set({ address: toAddressCase(r.address) })} />
+              </label>
+              <div className="two">
+                <label className="f"><span>Emergency contact name</span>
+                  <input value={r.emergencyName || ""} onChange={(e) => set({ emergencyName: e.target.value })}
+                    onBlur={() => set({ emergencyName: toProperName(r.emergencyName) })}
+                    placeholder="Full name" />
+                </label>
+                <label className="f"><span>Relationship</span>
+                  <input value={r.emergencyRel || ""} onChange={(e) => set({ emergencyRel: e.target.value })}
+                    placeholder="Mother, carer, guardian…" />
+                </label>
+              </div>
+              <label className="f"><span>Emergency contact phone</span>
+                <input value={r.emergencyPhone || ""} onChange={(e) => set({ emergencyPhone: e.target.value })}
+                  onBlur={() => set({ emergencyPhone: normalisePhone(r.emergencyPhone) })}
+                  placeholder="Mobile or home" />
+              </label>
+              <div style={{ background: "var(--bg)", border: "1px solid " + (r.agreement ? "var(--line)" : "var(--warn)"), borderRadius: 10, padding: "15px 16px", marginBottom: 16 }}>
+                <div className="eyebrow" style={{ marginBottom: 8 }}>Service agreement</div>
+                <div style={{ fontSize: 12.5, color: "var(--tx-2)", lineHeight: 1.65, marginBottom: 12 }}>
+                  {r.agreement
+                    ? "One of the four conditions that keeps your supports GST-free."
+                    : "Without one your supports may not qualify as GST-free, which can leave you owing 10% you never charged."}
+                </div>
+                <label className="check" style={{ marginBottom: 12 }}>
+                  <input type="checkbox" checked={!!r.agreement} onChange={(e) => set({ agreement: e.target.checked })} />
+                  <span>Signed agreement in place</span>
+                </label>
+                {r.agreement && (
+                  <>
+                    <div className="two">
+                      <label className="f"><span>Date signed</span><AuDateInput value={r.agreementDate} onChange={(v) => set({ agreementDate: v })} /></label>
+                      <label className="f"><span>Review by</span><AuDateInput value={r.agreementReview} onChange={(v) => set({ agreementReview: v })} /></label>
+                    </div>
+                    <label className="f" style={{ marginBottom: 12 }}><span>Where the signed copy is kept</span>
+                      <input {...f("agreementWhere")} placeholder="Google Drive, filing cabinet, email from 3 March…" />
+                    </label>
+                  </>
+                )}
+                <button className="btn ghost tiny" onClick={makeAgreement} disabled={agBusy || !r.name}>
+                  {agBusy ? "Downloading…" : r.agreement ? "Download service agreement" : "Download service agreement"}
+                </button>
+                {agErr && <div style={{ fontSize: 12, color: "var(--warn)", marginTop: 9 }}>{agErr}</div>}
+                {agHint && <div style={{ fontSize: 12, color: "var(--good)", marginTop: 9, lineHeight: 1.55 }}>{agHint}</div>}
+                <div style={{ fontSize: 11.5, color: "var(--tx-3)", lineHeight: 1.6, marginTop: 10 }}>
+                  Builds a PDF from the details on this record, a starting point, not legal advice. Read it before you use it.
+                </div>
+              </div>
+              <label className="f" style={{ marginBottom: 0 }}><span>Support notes</span>
+                <textarea style={{ minHeight: 70 }} value={r.notes || ""} onChange={(e) => set({ notes: e.target.value })}
+                  onBlur={() => set({ notes: toSentenceCase(r.notes) })}
+                  placeholder="Preferences, access, routines, anything worth remembering" /></label>
+            </>
+          ) : (
+            <>
+              <div className="two">
+                <label className="f"><span>Company</span><input {...f("name")} /></label>
+                <label className="f">
+                  <span style={{ color: r.contact?.trim() ? undefined : "var(--req)" }}>Contact person, required</span>
+                  <input style={r.contact?.trim() ? {} : { borderColor: "var(--req)" }} {...f("contact")} />
+                </label>
+              </div>
+              <div className="two">
+                <label className="f">
+                  <span style={{ color: r.email?.trim() ? undefined : "var(--req)" }}>Accounts email, required</span>
+                  <input type="email" style={r.email?.trim() ? {} : { borderColor: "var(--req)" }}
+                    value={r.email || ""} onChange={(e) => set({ email: e.target.value })}
+                    onBlur={() => set({ email: normaliseEmail(r.email) })} placeholder="accounts@…" />
+                </label>
+                <label className="f">
+                  <span style={{ color: r.phone?.trim() ? undefined : "var(--req)" }}>Phone, required</span>
+                  <input style={r.phone?.trim() ? {} : { borderColor: "var(--req)" }}
+                    value={r.phone || ""} onChange={(e) => set({ phone: e.target.value })}
+                    onBlur={() => set({ phone: normalisePhone(r.phone) })} />
+                </label>
+              </div>
+              <div className="two">
+                <label className="f">
+                  <span style={{ color: isValidAbn(r.abn) ? undefined : "var(--req)" }}>ABN, required</span>
+                  <input value={r.abn || ""} onChange={(e) => set({ abn: e.target.value })}
+                    onBlur={() => set({ abn: formatAbn(r.abn) })}
+                    style={isValidAbn(r.abn) ? {} : { borderColor: "var(--req)" }} placeholder="11 digits" />
+                  {r.abn && !isValidAbn(r.abn) && (
+                    <em style={{ fontSize: 11.5, color: "var(--warn)", fontStyle: "normal", marginTop: 5, display: "block" }}>
+                      Doesn't check out as a valid ABN, worth a second look.
+                    </em>
+                  )}
+                </label>
+                <label className="f">
+                  <span style={{ color: r.terms ? undefined : "var(--req)" }}>Payment terms in days, required</span>
+                  <input type="number" style={r.terms ? {} : { borderColor: "var(--req)" }} {...f("terms")} placeholder="e.g. 14" />
+                  {r.terms ? <em style={{ fontSize: 11.5, color: "var(--good)", fontStyle: "normal", marginTop: 5, display: "block" }}>{termsHint(r.terms)}</em> : null}
+                </label>
+              </div>
+              <label className="f"><span>Postal address</span><input {...f("address")} /></label>
+              <label className="f" style={{ marginBottom: 0 }}><span>Notes</span>
+                <textarea style={{ minHeight: 70 }} value={r.notes || ""} onChange={(e) => set({ notes: e.target.value })}
+                  onBlur={() => set({ notes: toSentenceCase(r.notes) })}
+                  placeholder="How they like invoices submitted, portal details, quirks" /></label>
+              <div style={{ fontSize: 11.5, color: "var(--tx-3)", lineHeight: 1.6, marginTop: 10 }}>
+                The ABN is checked against the ATO's own checksum, so a mistyped digit gets caught
+                immediately. That confirms it's a validly structured ABN, not that it's currently
+                registered, a live lookup against the ABN or ACN register needs its own access and
+                isn't built into the app yet.
+              </div>
+            </>
+          )}
+        </div>
+
+        {r.id && (
+          <div style={{ marginTop: 14 }}>
+            <button className="btn ghost tiny" style={{ color: "var(--warn)" }} onClick={() => confirmAndRun("this directory entry", () => drop(edit._k, r.id))}>Remove from directory</button>
+          </div>
+        )}
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div className="bandhead" style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 12.5, color: "var(--tx-3)" }}>
+          {list.length} {view === "participants" ? (list.length === 1 ? "participant" : "participants") : (list.length === 1 ? "manager" : "managers")}
+        </div>
+        <button className="btn tiny" onClick={() => setEdit({ _k: view, rec: view === "participants" ? blankP : blankM })}>
+          Add {view === "participants" ? "participant" : "manager"}
+        </button>
+      </div>
+
+      {list.length === 0 ? (
+        <div className="empty">
+          {view === "participants"
+            ? <>No participants yet.<br />Add one and their NDIS number, plan manager and billing details fill every future invoice.</>
+            : <>No plan managers yet.<br />Add the companies you invoice, then link participants to them.</>}
+        </div>
+      ) : view === "participants" ? list.map((p) => {
+        const mg = data.managers.find((x) => x.id === p.managerId);
+        return (
+          <div className="row tap" key={p.id} onClick={() => setEdit({ _k: "participants", rec: { ...p } })}>
+            <span className="dot" style={{ background: "var(--good)" }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>{p.name}</div>
+              <div style={{ fontSize: 11, color: "var(--tx-3)", marginTop: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {p.nonNdis ? <span style={{ color: "var(--tx-3)" }}>Non-NDIS</span> : p.ndisNumber ? <span className="mono">{p.ndisNumber}</span> : "no NDIS number"} · {p.planType === "plan" ? (mg ? mg.name : "no manager linked") : planLabel(p.planType)}
+                {!p.agreement
+                  ? <span style={{ color: "var(--warn)" }}> · no service agreement</span>
+                  : p.agreementReview && p.agreementReview <= addDays(today(), 30)
+                    ? <span style={{ color: "var(--warn)" }}> · agreement due for review</span>
+                    : null}
+              </div>
+            </div>
+          </div>
+        );
+      }) : list.map((mg) => {
+        const count = data.participants.filter((p) => p.managerId === mg.id).length;
+        return (
+          <div className="row tap" key={mg.id} onClick={() => setEdit({ _k: "managers", rec: { ...mg } })}>
+            <span className="dot" style={{ background: "var(--brass)" }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>{mg.name}</div>
+              <div style={{ fontSize: 11, color: "var(--tx-3)", marginTop: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {mg.email || "no accounts email"}{mg.terms ? ` · ${mg.terms} day terms` : ""}
+              </div>
+            </div>
+            <div style={{ fontSize: 11.5, color: "var(--tx-3)" }}>{count} participant{count === 1 ? "" : "s"}</div>
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+/* ---------------- Expenses ---------------- */
+function Expenses({ data, save, m, fy, askClaim, canCreate, onBlocked }) {
+  const gstRegistered = !!data.profile.gstRegistered;
+  // GST shown on a receipt and a GST credit the user can actually claim are
+  // two different questions, not the same figure under two names. A private
+  // fuel top-up still shows GST on the receipt but isn't creditable; a
+  // partly-business phone bill is only creditable for its business-use
+  // share. So gstAmount is what the receipt says, businessUsePct is how much
+  // of the purchase was genuinely for the business (100 by default, since
+  // most logged expenses are wholly business, but editable), and the actual
+  // credit is derived from both, never stored as its own number that could
+  // drift out of sync with the two real inputs.
+  const [f, setF] = useState({ date: today(), cat: EXPENSE_CATS[0], desc: "", amount: "", gstAmount: "", businessUsePct: 100 });
+  const rows = data.expenses.filter((e) => inFY(e.date, fy));
+  const add = () => {
+    if (!f.amount) return;
+    if (!canCreate) { onBlocked(); return; }
+    save({ ...data, expenses: [...data.expenses, { ...f, id: uid() }] });
+    setF({ date: today(), cat: EXPENSE_CATS[0], desc: "", amount: "", gstAmount: "", businessUsePct: 100 });
+  };
+  const byCat = useMemo(() => {
+    // Grouped by the canonical name so an old "Vehicle running costs" entry
+    // and a new "Fuel" entry land in one bucket for this breakdown rather
+    // than reading as two unrelated categories, the stored record itself is
+    // never rewritten, this only affects how the total is displayed.
+    const o = {}; rows.forEach((e) => { const c = normaliseExpenseCat(e.cat); o[c] = (o[c] || 0) + Number(e.amount || 0); });
+    return Object.entries(o).sort((a, b) => b[1] - a[1]);
+  }, [rows]);
+
+  return (
+    <>
+      <div className="panel">
+        <div className="eyebrow" style={{ marginBottom: 14 }}>Add an expense</div>
+        <div className="two">
+          <label className="f"><span>Date</span><AuDateInput value={f.date} onChange={(v) => setF({ ...f, date: v })} /></label>
+          <label className="f"><span>Category</span>
+            <select value={f.cat} onChange={(e) => setF({ ...f, cat: e.target.value })}>
+              <optgroup label="Vehicle">{EXPENSE_CAT_GROUPS.vehicle.map((c) => <option key={c}>{c}</option>)}</optgroup>
+              <optgroup label="Work expenses">{EXPENSE_CAT_GROUPS.work.map((c) => <option key={c}>{c}</option>)}</optgroup>
+            </select>
+          </label>
+        </div>
+        <div className="two">
+          <label className="f"><span>What was it</span><input value={f.desc} onChange={(e) => setF({ ...f, desc: e.target.value })} placeholder="Manual handling refresher" /></label>
+          <label className="f"><span>Amount</span>
+            <div className="affix"><i>$</i>
+              <input type="number" step="0.01" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} placeholder="0.00" />
+            </div>
+          </label>
+        </div>
+
+        {gstRegistered && (
+          <div className="two" style={{ marginBottom: 8 }}>
+            <label className="f" style={{ marginBottom: 0 }}><span>GST shown on receipt</span>
+              <div className="affix">
+                <i>$</i>
+                <input type="number" step="0.01" value={f.gstAmount} onChange={(e) => setF({ ...f, gstAmount: e.target.value })} placeholder="Leave blank if none shown" />
+              </div>
+            </label>
+            <label className="f" style={{ marginBottom: 0 }}><span>Business-use %</span>
+              <div className="affix suffix">
+                <i>%</i>
+                <input type="number" min="0" max="100" value={f.businessUsePct} onChange={(e) => setF({ ...f, businessUsePct: e.target.value })} />
+              </div>
+            </label>
+          </div>
+        )}
+        {gstRegistered && f.gstAmount && (
+          <div style={{ fontSize: 11.5, color: "var(--tx-3)", marginBottom: 16 }}>
+            Potential GST credit: <b style={{ color: "var(--tx-2)" }}>{money0(gstCreditFor(f, true))}</b>, an estimate,
+            not every business purchase is creditable.
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <button className="btn" onClick={add} disabled={!f.amount}>Add expense</button>
+          {f.desc.trim() && (
+            <button className="btn ghost" onClick={() => askClaim(f.desc.trim())}>Can I claim this?</button>
+          )}
+        </div>
+      </div>
+
+      {byCat.length > 0 && (
+        <div className="panel">
+          <div className="bandhead" style={{ marginBottom: 12 }}><div className="eyebrow">Where it went</div><div className="num" style={{ fontSize: 12.5, fontWeight: 600 }}>{money0(m.expenses)}</div></div>
+          {byCat.map(([c, v]) => (
+            <div key={c} style={{ marginBottom: 13 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 6 }}>
+                <span style={{ color: "var(--tx-2)" }}>{c}</span><span className="num" style={{ fontWeight: 600 }}>{money0(v)}</span>
+              </div>
+              <div className="bar"><i style={{ width: (v / m.expenses) * 100 + "%" }} /></div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="panel">
+        {rows.length === 0 ? <div className="empty">Nothing logged yet.</div> : [...rows].reverse().map((e) => (
+          <div className="row" key={e.id}>
+            <span className="dot" style={{ background: "var(--warn)" }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 500 }}>{e.desc || e.cat}</div>
+              <div style={{ fontSize: 11, color: "var(--tx-3)", marginTop: 2 }}>
+                {fmtDate(e.date)} · {normaliseExpenseCat(e.cat)}
+                {gstRegistered && Number(e.gstAmount || 0) > 0 && ` · ${money0(gstCreditFor(e, true))} credit`}
+              </div>
+            </div>
+            <div className="num" style={{ fontSize: 13.5, fontWeight: 600 }}>{money(e.amount)}</div>
+            <button className="btn x" aria-label="Delete" title="Delete" onClick={() => confirmAndRun("this expense", () => save({ ...data, expenses: data.expenses.filter((x) => x.id !== e.id) }))}><TrashIcon /></button>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+
+/* ---------------- Incidents ---------------- */
+const INCIDENT_TYPES = [
+  ["death", "Death of a person with disability"],
+  ["serious_injury", "Serious injury of a person with disability"],
+  ["abuse_neglect", "Abuse or neglect"],
+  ["assault", "Unlawful sexual or physical contact / assault"],
+  ["sexual_misconduct", "Sexual misconduct, including grooming"],
+  ["unauthorised_restrictive", "Unauthorised restrictive practice"],
+  ["other", "Other safety / quality incident"],
+];
+const incidentTypeLabel = (v) => INCIDENT_TYPES.find(([k]) => k === v)?.[1] || "Other incident";
+const reportableIncidentRule = (r) => {
+  if (!r) return null;
+  if (["death", "serious_injury", "abuse_neglect", "assault", "sexual_misconduct"].includes(r.type))
+    return { label: "Within 24 hours of becoming aware", mode: "24h" };
+  if (r.type === "unauthorised_restrictive")
+    return r.restrictiveHarm === "yes"
+      ? { label: "Potentially within 24 hours because harm was recorded — check the Commission guidance now", mode: "24h" }
+      : { label: "Within 5 business days of becoming aware", mode: "5bd" };
+  return null;
+};
+function addBusinessDaysLocal(date, count) {
+  const d = new Date(date);
+  let left = count;
+  while (left > 0) {
+    d.setDate(d.getDate() + 1);
+    if (d.getDay() !== 0 && d.getDay() !== 6) left -= 1;
+  }
+  return d;
+}
+function incidentDueDate(r) {
+  const rule = reportableIncidentRule(r);
+  if (!rule || !r.awareAt) return null;
+  const start = new Date(r.awareAt);
+  if (Number.isNaN(start.getTime())) return null;
+  return rule.mode === "24h" ? new Date(start.getTime() + 24 * 60 * 60 * 1000) : addBusinessDaysLocal(start, 5);
+}
+const fmtIncidentDateTime = (d) => {
+  if (!d) return "—";
+  const x = new Date(d);
+  if (Number.isNaN(x.getTime())) return "—";
+  return x.toLocaleString("en-AU", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
+};
+
+async function makeIncidentRegisterPDF(data) {
+  const JsPDF = await loadJsPDF();
+  const doc = new JsPDF({ unit: "mm", format: "a4" });
+  const incidents = [...(data.incidents || [])].sort((a, b) => `${b.date || ""}${b.time || ""}`.localeCompare(`${a.date || ""}${a.time || ""}`));
+  const L = 18, R = 192, W = R - L;
+  let y = 20;
+  const page = () => { doc.addPage(); y = 20; };
+  const need = (h) => { if (y + h > 278) page(); };
+  const line = (label, value) => {
+    if (!value) return;
+    const text = `${label}: ${value}`;
+    const rows = doc.splitTextToSize(text, W);
+    need(rows.length * 5 + 2);
+    doc.setFont("helvetica", "normal").setFontSize(9).setTextColor(55, 62, 72);
+    doc.text(rows, L, y); y += rows.length * 5 + 2;
+  };
+  doc.setFont("helvetica", "bold").setFontSize(19).setTextColor(20, 32, 56);
+  doc.text("INCIDENT REGISTER", L, y);
+  doc.setFont("helvetica", "normal").setFontSize(9).setTextColor(100, 110, 125);
+  doc.text(data.profile?.name || "SupportFlow user", R, y, { align: "right" }); y += 9;
+  doc.text(`Generated ${new Date().toLocaleString("en-AU")}`, L, y); y += 8;
+  if (!incidents.length) {
+    doc.setTextColor(80, 88, 100).text("No incidents recorded.", L, y);
+  }
+  incidents.forEach((r, idx) => {
+    need(34);
+    const pt = data.participants.find((p) => p.id === r.participantId);
+    doc.setDrawColor(212, 160, 61); doc.setLineWidth(.5); doc.line(L, y, R, y); y += 6;
+    doc.setFont("helvetica", "bold").setFontSize(11).setTextColor(20, 32, 56);
+    doc.text(`${idx + 1}. ${incidentTypeLabel(r.type)}`, L, y);
+    doc.setFont("helvetica", "normal").setFontSize(9).setTextColor(100, 110, 125);
+    doc.text((r.status || "open").toUpperCase(), R, y, { align: "right" }); y += 6;
+    line("Affected person", pt?.name || r.affectedName || "Not linked");
+    line("Incident", [r.date, r.time].filter(Boolean).join(" "));
+    line("Became aware", fmtIncidentDateTime(r.awareAt));
+    line("Location", r.location);
+    line("Actual / alleged", r.nature === "alleged" ? "Alleged" : "Actual / observed");
+    line("What happened", r.description);
+    line("Impact / harm", r.impactHarm);
+    line("Immediate action", r.immediateActions);
+    line("Participant support", r.participantSupport);
+    line("Follow-up", r.followUp);
+    line("Corrective / preventative action", r.correctiveActions);
+    line("Commission report", r.commissionReported ? `Recorded as reported${r.commissionReference ? ` — ref ${r.commissionReference}` : ""}` : "Not recorded as reported");
+    y += 3;
+  });
+  doc.save(`supportflow-incident-register-${today()}.pdf`);
+}
+
+function Incidents({ data, save }) {
+  const fresh = () => ({
+    id: "", participantId: "", affectedName: "", date: today(), time: "", awareAt: "", location: "",
+    nature: "actual", type: "other", restrictiveHarm: "no", description: "", peopleInvolved: "", witnesses: "",
+    impactHarm: "", immediateActions: "", medical: "no", emergency: "no", police: "no", notified: "",
+    participantSupport: "", followUp: "", correctiveActions: "", commissionReported: false, commissionReference: "",
+    status: "open", createdAt: "", updatedAt: ""
+  });
+  const [edit, setEdit] = useState(null);
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const [pdfMsg, setPdfMsg] = useState("");
+  const incidents = [...(data.incidents || [])].sort((a, b) => `${b.date || ""}${b.time || ""}`.localeCompare(`${a.date || ""}${a.time || ""}`));
+  const registered = !!data.profile.registeredProvider;
+
+  const put = (r) => {
+    const now = new Date().toISOString();
+    const rec = { ...r, id: r.id || uid(), createdAt: r.createdAt || now, updatedAt: now };
+    const next = r.id ? incidents.map((x) => x.id === r.id ? rec : x) : [...incidents, rec];
+    save({ ...data, incidents: next });
+    if (!r.id) emitTesterActivity("incident_created");
+    setEdit(null);
+  };
+  const drop = (id) => {
+    if (!confirm("Delete this incident record? This cannot be undone.")) return;
+    save({ ...data, incidents: incidents.filter((x) => x.id !== id) });
+    setEdit(null);
+  };
+  const exportPdf = async () => {
+    setPdfBusy(true); setPdfMsg("");
+    try { await makeIncidentRegisterPDF(data); setPdfMsg("Incident register downloaded."); }
+    catch (_) { setPdfMsg("Couldn't build the PDF. Check your connection and try again."); }
+    finally { setPdfBusy(false); }
+  };
+
+  if (edit) {
+    const r = edit;
+    const set = (patch) => setEdit({ ...r, ...patch });
+    const rule = registered ? reportableIncidentRule(r) : null;
+    const due = rule ? incidentDueDate(r) : null;
+    const affectedOK = !!r.participantId || !!(r.affectedName || "").trim();
+    return (
+      <>
+        <div className="bandhead" style={{ marginBottom: 16 }}>
+          <div>
+            <div className="disp" style={{ fontSize: 22 }}>{r.id ? "Edit incident" : "New incident"}</div>
+            <div style={{ fontSize: 12, color: "var(--tx-3)", marginTop: 3 }}>Record facts, immediate safety action and follow-up.</div>
+          </div>
+          <button className="btn ghost" onClick={() => setEdit(null)}>Cancel</button>
+        </div>
+
+        <div className="callout" style={{ marginBottom: 16, borderColor: "var(--warn)" }}>
+          <b>If anyone is in immediate danger, call 000.</b> SupportFlow records and prompts; it does not submit an incident report for you.
+        </div>
+
+        {registered && rule && (
+          <div className="callout" style={{ marginBottom: 16, borderColor: "var(--req)" }}>
+            <b>This may be a reportable incident for a registered NDIS provider.</b><br />
+            Current Commission timeframe: {rule.label}.{due ? <> Estimated deadline: <b>{fmtIncidentDateTime(due)}</b>.</> : <> Enter when you became aware of it to show an estimated deadline.</>}
+            {rule.mode === "5bd" && <><br /><span style={{ fontSize: 11.5 }}>The estimate skips weekends only; check public holidays and the Commission guidance.</span></>}
+          </div>
+        )}
+
+        <div className="panel">
+          <div className="two">
+            <label className="f req"><span>Affected participant</span>
+              <select value={r.participantId || ""} onChange={(e) => set({ participantId: e.target.value, affectedName: e.target.value ? "" : r.affectedName })}>
+                <option value="">Other / not in participant list</option>
+                {data.participants.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </label>
+            {!r.participantId && <label className="f req"><span>Affected person's name</span><input value={r.affectedName || ""} onChange={(e) => set({ affectedName: e.target.value })} /></label>}
+          </div>
+          <div className="three">
+            <label className="f req"><span>Incident date</span><AuDateInput value={r.date || ""} onChange={(v) => set({ date: v })} /></label>
+            <label className="f"><span>Incident time</span><input type="time" value={r.time || ""} onChange={(e) => set({ time: e.target.value })} /></label>
+            <label className="f req"><span>When you became aware</span><input type="datetime-local" value={r.awareAt || ""} onChange={(e) => set({ awareAt: e.target.value })} /></label>
+          </div>
+          <label className="f"><span>Location</span><input value={r.location || ""} onChange={(e) => set({ location: e.target.value })} /></label>
+          <div className="two">
+            <label className="f"><span>Was this actual or alleged?</span><select value={r.nature || "actual"} onChange={(e) => set({ nature: e.target.value })}><option value="actual">Actual / observed</option><option value="alleged">Alleged</option></select></label>
+            <label className="f req"><span>Incident type</span><select value={r.type || "other"} onChange={(e) => set({ type: e.target.value })}>{INCIDENT_TYPES.map(([k,l]) => <option key={k} value={k}>{l}</option>)}</select></label>
+          </div>
+          {r.type === "unauthorised_restrictive" && <label className="f"><span>Did the restrictive practice result in harm?</span><select value={r.restrictiveHarm || "no"} onChange={(e) => set({ restrictiveHarm: e.target.value })}><option value="no">No harm recorded</option><option value="yes">Yes / possible harm</option></select></label>}
+          <label className="f req"><span>What happened — factual description</span><textarea rows="5" value={r.description || ""} onChange={(e) => set({ description: e.target.value })} /></label>
+          <div className="two">
+            <label className="f"><span>People involved</span><textarea rows="3" value={r.peopleInvolved || ""} onChange={(e) => set({ peopleInvolved: e.target.value })} /></label>
+            <label className="f"><span>Witnesses</span><textarea rows="3" value={r.witnesses || ""} onChange={(e) => set({ witnesses: e.target.value })} /></label>
+          </div>
+          <label className="f"><span>Impact, injury or harm</span><textarea rows="3" value={r.impactHarm || ""} onChange={(e) => set({ impactHarm: e.target.value })} /></label>
+          <label className="f req"><span>Immediate actions taken</span><textarea rows="3" value={r.immediateActions || ""} onChange={(e) => set({ immediateActions: e.target.value })} /></label>
+          <div className="three">
+            <label className="f"><span>Medical assistance?</span><select value={r.medical || "no"} onChange={(e) => set({ medical: e.target.value })}><option value="no">No</option><option value="yes">Yes</option></select></label>
+            <label className="f"><span>000 / emergency?</span><select value={r.emergency || "no"} onChange={(e) => set({ emergency: e.target.value })}><option value="no">No</option><option value="yes">Yes</option></select></label>
+            <label className="f"><span>Police contacted?</span><select value={r.police || "no"} onChange={(e) => set({ police: e.target.value })}><option value="no">No</option><option value="yes">Yes</option></select></label>
+          </div>
+          <label className="f"><span>Other people / organisations notified</span><textarea rows="2" value={r.notified || ""} onChange={(e) => set({ notified: e.target.value })} /></label>
+          <label className="f"><span>Support provided to the participant</span><textarea rows="3" value={r.participantSupport || ""} onChange={(e) => set({ participantSupport: e.target.value })} /></label>
+          <label className="f"><span>Follow-up required</span><textarea rows="3" value={r.followUp || ""} onChange={(e) => set({ followUp: e.target.value })} /></label>
+          <label className="f"><span>Corrective / preventative action</span><textarea rows="3" value={r.correctiveActions || ""} onChange={(e) => set({ correctiveActions: e.target.value })} /></label>
+
+          {registered && (
+            <div style={{ borderTop: "1px solid var(--line-2)", paddingTop: 16, marginTop: 6 }}>
+              <div className="eyebrow" style={{ marginBottom: 10 }}>NDIS Commission reporting record</div>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, marginBottom: 12 }}><input type="checkbox" checked={!!r.commissionReported} onChange={(e) => set({ commissionReported: e.target.checked })} /> I have submitted the required Commission notification/report</label>
+              <label className="f"><span>Commission reference, if provided</span><input value={r.commissionReference || ""} onChange={(e) => set({ commissionReference: e.target.value })} /></label>
+              <a className="btn ghost" href="https://www.ndiscommission.gov.au/rules-and-standards/reportable-incidents-and-incident-management/reportable-incidents" target="_blank" rel="noreferrer">Open NDIS Commission reporting guidance ↗</a>
+            </div>
+          )}
+
+          <label className="f" style={{ marginTop: 16 }}><span>Status</span><select value={r.status || "open"} onChange={(e) => set({ status: e.target.value })}><option value="open">Open</option><option value="followup">Follow-up</option><option value="closed">Closed</option></select></label>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 16 }}>
+            <button className="btn" disabled={!affectedOK || !r.date || !r.awareAt || !(r.description || "").trim() || !(r.immediateActions || "").trim()} onClick={() => put(r)}>Save incident</button>
+            {r.id && <button className="btn ghost" style={{ color: "var(--req)" }} onClick={() => drop(r.id)}>Delete</button>}
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  const openCount = incidents.filter((x) => x.status !== "closed").length;
+  return (
+    <>
+      <div className="panel">
+        <div className="bandhead" style={{ marginBottom: 10 }}>
+          <div>
+            <div className="eyebrow">Incident register</div>
+            <div style={{ fontSize: 13, color: "var(--tx-2)", marginTop: 5 }}>Record incidents, immediate actions, follow-up and closure in one place.</div>
+          </div>
+          <span className="pill">{openCount} open</span>
+        </div>
+        <div style={{ fontSize: 12, color: "var(--tx-3)", lineHeight: 1.65, marginBottom: 14 }}>
+          {registered
+            ? "Registered-provider reporting prompts are on. SupportFlow can flag common reportable-incident categories and timeframes, but you remain responsible for deciding and submitting through the NDIS Commission Portal."
+            : "Registered-provider reporting prompts are off. You can still keep a complete incident record here. Turn the setting on under Settings → Business & invoice details if you are a registered NDIS provider."}
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button className="btn" onClick={() => setEdit(fresh())}>New incident</button>
+          <button className="btn ghost" disabled={pdfBusy || !incidents.length} onClick={exportPdf}>{pdfBusy ? "Building PDF…" : "Export register PDF"}</button>
+          <a className="btn ghost" href="https://www.ndiscommission.gov.au/rules-and-standards/reportable-incidents-and-incident-management/reportable-incidents" target="_blank" rel="noreferrer">Commission guidance ↗</a>
+        </div>
+        {pdfMsg && <div style={{ fontSize: 11.5, color: "var(--tx-3)", marginTop: 10 }}>{pdfMsg}</div>}
+      </div>
+
+      {!incidents.length ? <div className="empty">No incidents recorded.</div> : incidents.map((r) => {
+        const pt = data.participants.find((p) => p.id === r.participantId);
+        const rule = registered ? reportableIncidentRule(r) : null;
+        const due = rule ? incidentDueDate(r) : null;
+        const overdue = !!(due && !r.commissionReported && due.getTime() < Date.now());
+        return (
+          <div className="panel" key={r.id} style={{ borderColor: overdue ? "var(--req)" : rule && !r.commissionReported ? "var(--warn)" : undefined }}>
+            <div className="bandhead" style={{ marginBottom: 9 }}>
+              <div>
+                <div style={{ fontWeight: 650 }}>{incidentTypeLabel(r.type)}</div>
+                <div style={{ fontSize: 11.5, color: "var(--tx-3)", marginTop: 3 }}>{pt?.name || r.affectedName || "Not linked"} · {r.date ? fmtDate(r.date) : "No date"}{r.time ? ` · ${r.time}` : ""}</div>
+              </div>
+              <span className="pill" style={{ color: r.status === "closed" ? "var(--good)" : undefined }}>{r.status === "followup" ? "Follow-up" : r.status === "closed" ? "Closed" : "Open"}</span>
+            </div>
+            {rule && !r.commissionReported && <div className="callout" style={{ margin: "8px 0 12px", borderColor: overdue ? "var(--req)" : "var(--warn)" }}><b>{overdue ? "Reporting timeframe may have passed." : "May be reportable."}</b> {rule.label}{due ? ` · estimated ${fmtIncidentDateTime(due)}` : ""}</div>}
+            <div style={{ fontSize: 12.5, color: "var(--tx-2)", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{r.description || "No description"}</div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}><button className="btn ghost tiny" onClick={() => setEdit({ ...r })}>Open</button>{r.commissionReported && <span className="pill" style={{ color: "var(--good)" }}>Commission report recorded</span>}</div>
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+/* ---------------- Shifts ---------------- */
+// A record of work done, not a rostering system. Each shift carries its own
+// times, so the billing rules can pick the correct item, and it flows onto an
+// invoice the same way a trip does — logged once, billed once.
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const DOW = ["M","T","W","T","F","S","S"];
+
+function Shifts({ data, save, fy, newInvoice, canCreate, onBlocked, onShiftSaved, openNewRequest, onOpenNewConsumed }) {
+  const [month, setMonth] = useState(() => today().slice(0, 7));   // YYYY-MM
+  const [pick, setPick] = useState(null);                          // selected date
+  const [showCal, setShowCal] = useState(false);                   // calendar collapsed by default, the shift list underneath is the primary view
+  const [f, setF] = useState(null);                                // shift being edited
+
+  const blank = (date) => ({ id: "", date: date, participantId: "", start: "09:00", end: "15:00",
+                             publicHoliday: false, family: "selfcare", notes: "",
+                             status: "",
+                             cancelledOn: "" });
+
+  useEffect(() => {
+    if (!openNewRequest) return;
+    if (data.participants.length) setF(blank(today()));
+    if (onOpenNewConsumed) onOpenNewConsumed();
+  }, [openNewRequest]);
+
+  const nameOf = (id) => (data.participants.find((x) => x.id === id) || {}).name || "No participant";
+  const rows = data.shifts.filter((x) => inFY(x.date, fy));
+
+  // Prevent accidental double-booking. Back-to-back shifts are allowed, and
+  // overnight shifts are handled across midnight. Cancelled shifts do not
+  // occupy time.
+  const shiftBounds = (sh) => {
+    if (!sh?.date || !sh?.start || !sh?.end) return null;
+    const toMins = (v) => {
+      const [h, m] = String(v).split(":").map(Number);
+      return Number.isFinite(h) && Number.isFinite(m) ? h * 60 + m : NaN;
+    };
+    const sm = toMins(sh.start), em = toMins(sh.end);
+    if (!Number.isFinite(sm) || !Number.isFinite(em)) return null;
+    const base = new Date(`${sh.date}T00:00:00`).getTime();
+    if (!Number.isFinite(base)) return null;
+    const startAt = base + sm * 60000;
+    let endAt = base + em * 60000;
+    if (endAt <= startAt) endAt += 24 * 60 * 60 * 1000;
+    return [startAt, endAt];
+  };
+  const shiftConflict = (candidate) => {
+    if (!candidate || statusOf(candidate) === "cancelled") return null;
+    const cb = shiftBounds(candidate);
+    if (!cb) return null;
+    return data.shifts.find((x) => {
+      if (x.id === candidate.id || statusOf(x) === "cancelled") return false;
+      const xb = shiftBounds(x);
+      return xb && cb[0] < xb[1] && cb[1] > xb[0];
+    }) || null;
+  };
+  const shiftConflictText = (x) => {
+    if (!x) return "";
+    const xb = shiftBounds(x);
+    const overnight = xb && String(x.end) <= String(x.start) ? " next day" : "";
+    return `This shift overlaps an existing shift for ${nameOf(x.participantId)} on ${fmtDate(x.date)} (${x.start}–${x.end}${overnight}). Change the time or edit the existing shift.`;
+  };
+
+  // month grid, Monday first
+  const [y, mo] = month.split("-").map(Number);
+  const first = new Date(y, mo - 1, 1);
+  const lead = (first.getDay() + 6) % 7;
+  const days = new Date(y, mo, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < lead; i++) cells.push(null);
+  for (let d = 1; d <= days; d++) cells.push(`${month}-${String(d).padStart(2, "0")}`);
+
+  const onDay = (iso) => data.shifts.filter((x) => x.date === iso);
+  const shiftMonth = (delta) => {
+    // Built with local year/month/day, so it must be read back the same way.
+    // Reading it via toISOString() converts to UTC first, and in a timezone
+    // ahead of UTC that can roll the date across a day boundary and land on
+    // the wrong month entirely, the exact bug that made the arrows seem to
+    // stop working after navigating back.
+    const d = new Date(y, mo - 1 + delta, 1);
+    setMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); setPick(null);
+  };
+
+  const put = () => {
+    if (!f.id && !canCreate) { onBlocked(); return; }
+    if (shiftConflict(f)) return;
+    const isNew = !f.id;
+    const rec = f.id ? f : { ...f, id: uid() };
+    const next = f.id ? data.shifts.map((x) => (x.id === f.id ? rec : x)) : [...data.shifts, rec];
+    save({ ...data, shifts: next });
+    // Only offer next steps for a genuinely new shift, not an edit, editing
+    // an old one isn't "a visit that just happened", it's a correction.
+    if (isNew && onShiftSaved) onShiftSaved({ participantId: rec.participantId, date: rec.date, shiftId: rec.id });
+    setF(null);
+  };
+  const drop = (id) => { save({ ...data, shifts: data.shifts.filter((x) => x.id !== id) }); setF(null); };
+
+  const monthTotal = data.shifts.filter((x) => x.date.slice(0, 7) === month && statusOf(x) !== "cancelled")
+    .reduce((n, x) => n + shiftHours(x), 0);
+
+  /* ---- editor ---- */
+  if (f) {
+    const editPt = data.participants.find((x) => x.id === f.participantId) || null;
+    const isNonNdis = !!(editPt && editPt.nonNdis);
+    const cls = classifyShift(f);
+    const billed = f.id ? shiftInvoice(f, data.invoices) : null;
+    const timingConflict = shiftConflict(f);
+    return (
+      <>
+        <div className="bandhead" style={{ marginBottom: 16 }}>
+          <div className="disp" style={{ fontSize: 22 }}>{f.id ? "Edit shift" : "Add a shift"}</div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="btn ghost" onClick={() => setF(null)}>Cancel</button>
+            <button className="btn" onClick={put} disabled={!f.participantId || !f.start || !f.end || !!billed || !!timingConflict}>Save</button>
+          </div>
+        </div>
+
+        {timingConflict && (
+          <div className="callout" style={{ borderColor: "var(--warn)" }}>
+            <b>Shift not saved.</b> {shiftConflictText(timingConflict)}
+          </div>
+        )}
+
+        {billed && (
+          <div className="callout" style={{ borderColor: "var(--good)" }}>
+            Already on invoice #{billed.number}, so it can't be changed. Remove it from that invoice first.
+          </div>
+        )}
+
+        <div className="panel">
+          <label className="f"><span>Participant</span>
+            <select value={f.participantId} onChange={(e) => {
+              const pid = e.target.value;
+              // Starts the shift on whatever type of support this participant
+              // usually gets, rather than always landing on self-care and
+              // making every shift a manual re-pick. Only for a brand new
+              // shift, changing the participant on an existing one shouldn't
+              // silently rewrite a family someone already chose deliberately.
+              const pt = data.participants.find((x) => x.id === pid);
+              const fam = !f.id ? familyOfCode(pt?.defaultCode) : null;
+              setF({ ...f, participantId: pid, family: fam || f.family });
+            }}>
+              <option value="">Choose…</option>
+              {data.participants.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+            </select>
+          </label>
+          <div className="three">
+            <label className="f"><span>Date</span><AuDateInput value={f.date} onChange={(v) => setF({ ...f, date: v })} /></label>
+            <label className="f"><span>Start</span><AuTimeInput value={f.start} onChange={(v) => setF({ ...f, start: v })} /></label>
+            <label className="f"><span>Finish</span><AuTimeInput value={f.end} onChange={(v) => setF({ ...f, end: v })} /></label>
+          </div>
+          <label className="f"><span>Type of support</span>
+            <select value={f.family} onChange={(e) => setF({ ...f, family: e.target.value })} disabled={isNonNdis}
+              style={isNonNdis ? { opacity: 0.55 } : {}}>
+              <option value="">Not applicable, private client</option>
+              {Object.entries(FAMILIES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+            </select>
+            {isNonNdis && (
+              <em style={{ fontSize: 11.5, color: "var(--tx-3)", fontStyle: "normal", marginTop: 5, display: "block" }}>
+                {editPt.name} is a private client, no NDIS category applies. Billed at their own rate below.
+              </em>
+            )}
+          </label>
+          <label className="f">
+            <span>Status</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0" }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: statusColour(statusOf(f)),
+                              flex: "0 0 auto" }} />
+              <span style={{ fontSize: 14, fontWeight: 600 }}>
+                {(SHIFT_STATUS.find((x) => x[0] === statusOf(f)) || [])[1]}
+              </span>
+              <span style={{ fontSize: 11.5, color: "var(--tx-3)" }}>
+                — set by the date, {f.date > today() ? "in the future" : "already passed"}
+              </span>
+            </div>
+            <label className="check" style={{ marginBottom: 0 }}>
+              <input type="checkbox" checked={f.status === "cancelled"}
+                onChange={(e) => setF({ ...f, status: e.target.checked ? "cancelled" : "" })} />
+              <span>This shift was cancelled</span>
+            </label>
+            <em style={{ fontSize: 11.5, color: "var(--tx-3)", fontStyle: "normal", marginTop: 8, display: "block" }}>
+              {statusOf(f) === "scheduled"
+                ? "Shows on the calendar. It won't be ready to bill until the date passes."
+                : statusOf(f) === "cancelled"
+                  ? "Kept on the calendar as a record. If it's short notice and claimable, it can still be billed like any other shift."
+                  : "Ready to bill once its finish time has passed."}
+            </em>
+          </label>
+
+          {statusOf(f) === "cancelled" && (
+            <label className="f"><span>They cancelled on</span>
+              <AuDateInput value={f.cancelledOn || ""} onChange={(v) => setF({ ...f, cancelledOn: v })} />
+              {f.cancelledOn && f.date && (() => {
+                const c = cancellationCheck(f.date, f.cancelledOn);
+                return <em style={{ fontSize: 11.5, fontStyle: "normal", marginTop: 5, display: "block",
+                  color: c.claimable ? "var(--good)" : "var(--warn)" }}>{c.why}</em>;
+              })()}
+            </label>
+          )}
+
+          <label className="check" style={{ marginBottom: 14 }}>
+            <input type="checkbox" checked={!!f.publicHoliday} onChange={(e) => setF({ ...f, publicHoliday: e.target.checked })} />
+            <span>Public holiday where the support was delivered</span>
+          </label>
+          <label className="f" style={{ marginBottom: 0 }}><span>Notes (optional)</span>
+            <input value={f.notes || ""} onChange={(e) => setF({ ...f, notes: e.target.value })} placeholder="Anything worth remembering about the shift" />
+          </label>
+        </div>
+
+        {isNonNdis ? (
+          <div className="panel" style={{ borderColor: "var(--brass)" }}>
+            <div className="eyebrow" style={{ marginBottom: 9 }}>Billed at</div>
+            <div style={{ fontSize: 14.5, fontWeight: 600, marginBottom: 4 }}>
+              {editPt.defaultDescription || "Support work"}
+            </div>
+            <div className="mono" style={{ color: "var(--tx-3)", marginBottom: 10 }}>
+              {money(Number(editPt.defaultRate) || 0)}/hr{f.start && f.end
+                ? ` · ${shiftHours(f)} hr${shiftHours(f) === 1 ? "" : "s"} = ${money((Number(editPt.defaultRate) || 0) * shiftHours(f))}`
+                : ""}
+            </div>
+            <div style={{ fontSize: 12.5, color: "var(--tx-2)", lineHeight: 1.65 }}>
+              {editPt.name} is a private client, no NDIS item code applies. This is the description and
+              rate set on their record, edit the participant record if it's changed.
+            </div>
+          </div>
+        ) : cls && cls.item && (
+          <div className="panel" style={{ borderColor: "var(--brass)" }}>
+            <div className="eyebrow" style={{ marginBottom: 9 }}>The rules give you</div>
+            <div style={{ fontSize: 14.5, fontWeight: 600, marginBottom: 4 }}>{cls.item.name}</div>
+            <div className="mono" style={{ color: "var(--tx-3)", marginBottom: 10 }}>
+              {cls.item.code} · {money(cls.item.rate)}/{cls.item.unit}
+            </div>
+            <div style={{ fontSize: 12.5, color: "var(--tx-2)", lineHeight: 1.65 }}>{cls.why}</div>
+            {cls.note && <div style={{ fontSize: 12, color: "var(--warn)", lineHeight: 1.65, marginTop: 8 }}>{cls.note}</div>}
+          </div>
+        )}
+
+        {f.id && !billed && (
+          <button className="btn ghost tiny" style={{ marginTop: 14, color: "var(--warn)" }} onClick={() => confirmAndRun("this shift", () => drop(f.id))}>Delete this shift</button>
+        )}
+
+        <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
+          <button className="btn ghost" onClick={() => setF(null)}>Cancel</button>
+          <button className="btn" onClick={put} disabled={!f.participantId || !f.start || !f.end || !!billed || !!timingConflict}>Save</button>
+        </div>
+      </>
+    );
+  }
+
+  /* ---- calendar ---- */
+  return (
+    <>
+      <div className="hero" style={{ marginBottom: 18 }}>
+        <div className="bandhead" style={{ marginBottom: 0, alignItems: "center" }}>
+          <div>
+            <div className="disp" style={{ fontSize: 19 }}>{MONTHS[mo - 1]} {y}</div>
+            <div style={{ fontSize: 11.5, color: "var(--tx-3)", marginTop: 2 }}>
+              {monthTotal ? `${monthTotal.toFixed(1)} hours logged` : "nothing logged"}
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="btn tiny"
+              onClick={() => setF(blank(pick || today()))} disabled={data.participants.length === 0}>Add a shift</button>
+            <button className="btn ghost tiny" onClick={() => setShowCal(!showCal)}>
+              {showCal ? "Hide calendar" : "Show calendar"}
+            </button>
+          </div>
+        </div>
+
+        {showCal && (
+          <>
+            <div className="bandhead" style={{ marginTop: 14, marginBottom: 0, alignItems: "center" }}>
+              <button className="btn ghost tiny" onClick={() => shiftMonth(-1)} aria-label="Previous month">‹</button>
+              <div className="eyebrow">{MONTHS[mo - 1]} {y}</div>
+              <button className="btn ghost tiny" onClick={() => shiftMonth(1)} aria-label="Next month">›</button>
+            </div>
+
+            <div className="cal">
+              {DOW.map((d, i) => <div className="dowlab" key={i}>{d}</div>)}
+              {cells.map((iso, i) => {
+                if (!iso) return <div key={"e" + i} />;
+                const list = onDay(iso);
+                const hrs = list.reduce((n, x) => n + shiftHours(x), 0);
+                const st = list.some((x) => needsConfirm(x)) ? "var(--warn)"
+                  : list.some((x) => statusOf(x) === "scheduled") ? "var(--tx-3)"
+                  : list.every((x) => statusOf(x) === "cancelled") ? "var(--warn)"
+                  : "var(--good)";
+                return (
+                  <button key={iso} className="day" data-on={pick === iso ? 1 : 0} data-today={iso === today() ? 1 : 0}
+                    onClick={() => { setPick(pick === iso ? null : iso); setShowCal(false); }}>
+                    <span>{Number(iso.slice(8))}</span>
+                    {list.length > 0 && (
+                      <em style={{ background: st }} title={hrs + " hours"} />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Today, at a glance. Hidden entirely when nothing's on, rather
+          than showing an empty card most days. Sits above the year
+          summary, since "what's next right now" matters more in the
+          moment than a running total. Reversible on its own, this block
+          doesn't touch anything else on the screen. */}
+      {!pick && (() => {
+        const todayShifts = data.shifts.filter((x) => x.date === today() && statusOf(x) !== "cancelled")
+          .sort((a, b) => mins(a.start) - mins(b.start));
+        if (todayShifts.length === 0) return null;
+        const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+        const nextIdx = todayShifts.findIndex((x) => mins(x.start) > nowMin);
+        const untilText = (start) => {
+          const diff = mins(start) - nowMin;
+          if (diff <= 0) return null;
+          const h = Math.floor(diff / 60), m = diff % 60;
+          return h > 0 ? `next up, in ${h}h${m ? ` ${m}m` : ""}` : `next up, in ${m}m`;
+        };
+        return (
+          <div className="panel" style={{ marginBottom: 18 }}>
+            <div className="eyebrow" style={{ marginBottom: 12 }}>Today, {new Date().toLocaleDateString("en-AU", { weekday: "long" })}</div>
+            {todayShifts.map((x, i) => {
+              const isNext = i === nextIdx;
+              const until = isNext ? untilText(x.start) : null;
+              return (
+                <div key={x.id} style={{ display: "flex", gap: 12, cursor: "pointer",
+                  paddingBottom: i < todayShifts.length - 1 ? 14 : 0,
+                  marginBottom: i < todayShifts.length - 1 ? 14 : 0,
+                  borderBottom: i < todayShifts.length - 1 ? "1px solid var(--line-2)" : "none" }}
+                  onClick={() => setF({ ...x })}>
+                  <div style={{ width: 3, borderRadius: 2, background: isNext ? "var(--brass)" : "var(--line)", flex: "0 0 3px" }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+                      <div style={{ fontSize: isNext ? 15 : 14, fontWeight: isNext ? 600 : 500, color: isNext ? "var(--tx)" : "var(--tx-2)",
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nameOf(x.participantId)}</div>
+                      <div className="num" style={{ fontSize: isNext ? 13 : 12.5, fontWeight: isNext ? 600 : 400,
+                        color: isNext ? "var(--brass)" : "var(--tx-3)", flex: "0 0 auto" }}>{x.start}</div>
+                    </div>
+                    <div style={{ fontSize: 11.5, color: "var(--tx-3)", marginTop: 2 }}>
+                      {x.start}–{x.end}{until ? ` · ${until}` : ""}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
+
+      {pick && (
+        <div className="callout" style={{ marginBottom: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontSize: 12.5 }}>Showing {fmtDate(pick)} only</span>
+          <button className="btn ghost tiny" onClick={() => setPick(null)}>Show all</button>
+        </div>
+      )}
+
+      <div className="panel">
+        <div className="eyebrow" style={{ marginBottom: 12 }}>{pick ? fmtDate(pick) : "This financial year"}</div>
+
+        {data.participants.length === 0 ? (
+          <div className="empty">Add a participant first. A shift has to belong to someone.</div>
+        ) : pick ? (() => {
+          const list = onDay(pick).slice(0, 99);
+          if (list.length === 0) return <div className="empty">Nothing logged that day.</div>;
+          return list.map((x) => {
+            const st = statusOf(x);
+            const confirm = needsConfirm(x);
+            return (
+              <div className="row" key={x.id}>
+                <span className="dot" style={{ background: confirm ? "var(--warn)" : statusColour(st) }} />
+                <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => setF({ ...x })}>
+                  <div style={{ fontSize: 13.5, fontWeight: 500 }}>{nameOf(x.participantId)}</div>
+                  <div style={{ fontSize: 11, color: "var(--tx-3)", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {fmtDate(x.date)} · {x.start}–{x.end}
+                    {st === "cancelled" ? <span style={{ color: "var(--warn)" }}> · cancelled</span>
+                      : confirm ? <span style={{ color: "var(--warn)" }}> · did this go ahead?</span>
+                      : st === "scheduled" ? <span style={{ color: "var(--tx-3)" }}> · scheduled</span>
+                      : <span style={{ color: "var(--good)" }}> · completed</span>}
+                  </div>
+                </div>
+                {confirm ? (
+                  <button className="btn ghost tiny" onClick={(e) => {
+                    e.stopPropagation();
+                    save({ ...data, shifts: data.shifts.map((y) => (y.id === x.id ? { ...y, status: "done" } : y)) });
+                  }}>Yes</button>
+                ) : (
+                  <div className="num" style={{ fontSize: 13.5, fontWeight: 600, color: st === "cancelled" ? "var(--tx-3)" : undefined }}>
+                    {shiftHours(x).toFixed(2)}h
+                  </div>
+                )}
+              </div>
+            );
+          });
+        })() : (() => {
+          // Flat, most-recent-first list of every shift this financial
+          // year, each row showing exactly what's happening with it, same
+          // row shape as the single-day view above and as Travel's list.
+          if (rows.length === 0) return <div className="empty">No shifts logged yet.</div>;
+          const list = [...rows].sort((a, b) => (a.date === b.date ? mins(b.start) - mins(a.start) : b.date < a.date ? -1 : 1));
+          return list.map((x) => {
+            const st = statusOf(x);
+            const confirm = needsConfirm(x);
+            const billed = shiftInvoice(x, data.invoices);
+            const overdue = billed && billed.status === "sent" && billed.due && billed.due < today();
+            return (
+              <div className="row" key={x.id}>
+                <span className="dot" style={{ background: confirm ? "var(--warn)"
+                  : billed ? (billed.status === "paid" ? "var(--good)" : overdue ? "var(--warn)" : "var(--brass)")
+                  : isBillable(x) ? "var(--brass)" : statusColour(st) }} />
+                <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => setF({ ...x })}>
+                  <div style={{ fontSize: 13.5, fontWeight: 500 }}>{nameOf(x.participantId)}</div>
+                  <div style={{ fontSize: 11, color: "var(--tx-3)", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {fmtDate(x.date)} · {x.start}–{x.end}
+                    {st === "cancelled" ? <span style={{ color: "var(--warn)" }}> · cancelled</span>
+                      : confirm ? <span style={{ color: "var(--warn)" }}> · did this go ahead?</span>
+                      : billed ? (billed.status === "paid"
+                          ? <span style={{ color: "var(--good)" }}> · paid, invoice #{billed.number}</span>
+                          : overdue
+                            ? <span style={{ color: "var(--warn)" }}> · overdue, invoice #{billed.number}</span>
+                            : <span style={{ color: "var(--brass)" }}> · invoiced #{billed.number}</span>)
+                      : isBillable(x) ? <span style={{ color: "var(--brass)" }}> · ready to invoice</span>
+                      : st === "scheduled" ? <span style={{ color: "var(--tx-3)" }}> · scheduled</span>
+                      : <span style={{ color: "var(--good)" }}> · completed</span>}
+                  </div>
+                </div>
+                {confirm ? (
+                  <button className="btn ghost tiny" onClick={(e) => {
+                    e.stopPropagation();
+                    save({ ...data, shifts: data.shifts.map((y) => (y.id === x.id ? { ...y, status: "done" } : y)) });
+                  }}>Yes</button>
+                ) : (
+                  <div className="num" style={{ fontSize: 13.5, fontWeight: 600, color: st === "cancelled" ? "var(--tx-3)" : undefined }}>
+                    {shiftHours(x).toFixed(2)}h
+                  </div>
+                )}
+              </div>
+            );
+          });
+        })()}
+      </div>
+    </>
+  );
+}
+
+
+
+function Trips({ data, save, m, fy, canCreate, onBlocked, prefill, onSaved }) {
+  const blank = () => ({ id: "", date: today(), participantId: "", kmMode: "manual", km: "", odoStart: "", odoEnd: "", travelMins: "", billable: true, taxDeductible: true });
+  // A lazy initializer, so this only runs once, at mount, picking up
+  // whichever prefill was current the moment this screen was opened.
+  // Trips remounts fresh every time Work switches to this tab, so a new
+  // prefill from "log travel for this shift" is always seen correctly.
+  const [f, setF] = useState(() => prefill ? { ...blank(), ...prefill, billable: true } : blank());
+  const rows = data.trips.filter((t) => inFY(t.date, fy));
+  const nameOf = (t) => data.participants.find((x) => x.id === t.participantId)?.name || t.client || "Trip";
+  const billable = rows.filter((t) => t.billable).reduce((s, t) => s + Number(t.km || 0), 0);
+  const billed = f.id ? tripInvoice(f, data.invoices) : null;
+  // Two genuine ways in, since not everyone tracks a dash reading, some
+  // people just know the distance from memory or a map. Odometer stays
+  // available for anyone who wants the more precise, ATO-friendly record.
+  const odoKm = (() => {
+    const s = Number(f.odoStart), e = Number(f.odoEnd);
+    if (f.odoStart !== "" && f.odoEnd !== "" && Number.isFinite(s) && Number.isFinite(e) && e > s) {
+      return (e - s).toFixed(1);
+    }
+    return "";
+  })();
+  const finalKm = f.kmMode === "odometer" ? odoKm : (f.km !== "" && Number(f.km) > 0 ? Number(f.km).toFixed(1) : "");
+
+  // Prevent accidental double-counting of kilometres. Exact same-day,
+  // same-participant distance entries are blocked. Odometer ranges cannot
+  // overlap any existing odometer range. A genuinely different second trip
+  // on the same day is allowed, but SupportFlow brings it to the worker's
+  // attention before they save it.
+  const tripProblem = (candidate, kmValue) => {
+    if (!candidate || !kmValue) return null;
+    const others = data.trips.filter((x) => x.id !== candidate.id);
+    const cs = Number(candidate.odoStart), ce = Number(candidate.odoEnd);
+    if (candidate.kmMode === "odometer" && candidate.odoStart !== "" && candidate.odoEnd !== "" &&
+        Number.isFinite(cs) && Number.isFinite(ce) && ce > cs) {
+      const overlap = others.find((x) => {
+        const xs = Number(x.odoStart), xe = Number(x.odoEnd);
+        return x.odoStart !== "" && x.odoEnd !== "" &&
+          Number.isFinite(xs) && Number.isFinite(xe) && xe > xs &&
+          cs < xe && ce > xs;
+      });
+      if (overlap) return { kind: "odometer", other: overlap };
+    }
+    const duplicate = others.find((x) =>
+      x.date === candidate.date &&
+      String(x.participantId || "") === String(candidate.participantId || "") &&
+      Number(x.km || 0).toFixed(1) === Number(kmValue).toFixed(1)
+    );
+    return duplicate ? { kind: "duplicate", other: duplicate } : null;
+  };
+  const tripProblemText = (problem) => {
+    if (!problem) return "";
+    if (problem.kind === "odometer") {
+      const x = problem.other;
+      return `These odometer readings overlap travel already recorded${x.date ? ` on ${fmtDate(x.date)}` : ""} (${x.odoStart}–${x.odoEnd}). Change the readings or edit the existing trip.`;
+    }
+    return "The same kilometres are already recorded for this participant on this date. Edit the existing trip instead of entering it twice.";
+  };
+  const currentTripProblem = tripProblem(f, finalKm);
+  const sameDayExisting = !f.id && f.participantId && data.trips.find((x) =>
+    x.date === f.date && x.participantId === f.participantId && !currentTripProblem
+  );
+  // Being billable to a participant and being tax-deductible are two
+  // different questions, a trip can be one, both, or neither, so this is
+  // its own field rather than reusing "billable". Existing trips saved
+  // before this field existed have taxDeductible === undefined, treated as
+  // deductible by default since that matches how the app already behaved,
+  // rather than silently zeroing out real deductions people already had.
+  const put = () => {
+    if (!finalKm || billed) return;
+    if (currentTripProblem) return;
+    if (!f.id && !canCreate) { onBlocked(); return; }
+    const isNew = !f.id;
+    const wasPrefilled = isNew && prefill && prefill.participantId === f.participantId && prefill.date === f.date;
+    const rec = { ...f, km: finalKm, id: f.id || uid() };
+    const next = f.id ? data.trips.map((x) => (x.id === f.id ? rec : x)) : [...data.trips, rec];
+    save({ ...data, trips: next });
+    // Only reports back if this really was the prefilled trip someone was
+    // sent here to log, an unrelated trip added while on this screen
+    // shouldn't reopen a follow-up panel for a shift it has nothing to do
+    // with.
+    if (wasPrefilled && onSaved) onSaved({ participantId: rec.participantId, date: rec.date });
+    setF(blank());
+  };
+  const startEdit = (t) => {
+    // A trip already carrying real odometer readings reopens in that mode,
+    // so its own numbers show rather than silently landing on the plain
+    // total and looking like the readings were never there.
+    const hasOdo = t.odoStart && t.odoEnd;
+    setF({ ...blank(), ...t, kmMode: hasOdo ? "odometer" : "manual" });
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  const cancelEdit = () => setF(blank());
+  const drop = (id) => save({ ...data, trips: data.trips.filter((x) => x.id !== id) });
+
+  return (
+    <>
+      <div className="split" style={{ marginBottom: 14 }}>
+        <div>
+          <div className="eyebrow">Total</div>
+          <div className="disp num midnum" style={{ marginTop: 8 }}>{m.km.toLocaleString("en-AU")} km</div>
+          <div style={{ fontSize: 11.5, color: "var(--tx-3)", marginTop: 6 }}>
+            {rows.length} trip{rows.length === 1 ? "" : "s"}, {m.deductibleKm.toLocaleString("en-AU")} km counted toward tax
+          </div>
+        </div>
+        <div>
+          <div className="eyebrow">Billable</div>
+          <div className="disp num midnum" style={{ marginTop: 8, color: "var(--good)" }}>{money0(billable * m.kmRate)}</div>
+          <div style={{ fontSize: 11.5, color: "var(--tx-3)", marginTop: 6 }}>{billable.toLocaleString("en-AU")} km at {money(m.kmRate)}</div>
+        </div>
+      </div>
+
+      {m.carOn && m.km > 0 && (
+        <div className="callout" style={{ borderColor: "var(--brass)" }}>
+          These same kilometres are also worth <b>{money0(m.car)}</b> as a tax deduction at {(m.carRate * 100).toFixed(0)}c/km
+, counted automatically, whether or not you billed them to anyone.
+          {m.overCap && <> You're past the {CAR.cap.toLocaleString()} km ceiling, so further trips add nothing under this method.</>}
+        </div>
+      )}
+
+      <div className="panel">
+        <div className="eyebrow" style={{ marginBottom: 14 }}>{f.id ? "Edit trip" : "Log a trip"}</div>
+
+        {currentTripProblem && (
+          <div className="callout" style={{ borderColor: "var(--warn)", marginBottom: 16 }}>
+            <b>Travel not saved.</b> {tripProblemText(currentTripProblem)}
+          </div>
+        )}
+
+        {!currentTripProblem && sameDayExisting && (
+          <div className="callout" style={{ borderColor: "var(--brass)", marginBottom: 16 }}>
+            <b>Check this trip.</b> Travel is already recorded for this participant on {fmtDate(f.date)}. A different second trip is allowed, but make sure these are not kilometres already entered.
+          </div>
+        )}
+
+        {billed && (
+          <div className="callout" style={{ borderColor: "var(--good)", marginBottom: 16 }}>
+            Already on invoice #{billed.number}, so it can't be changed. Remove it from that invoice first.
+          </div>
+        )}
+
+        <div className="two">
+          <label className="f"><span>Date</span><AuDateInput value={f.date} onChange={(v) => setF({ ...f, date: v })} /></label>
+          <label className="f"><span>Participant</span>
+            <select value={f.participantId} onChange={(e) => setF({ ...f, participantId: e.target.value })}>
+              <option value="">Not for a participant</option>
+              {data.participants.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </label>
+        </div>
+
+        <div className="tabnav" style={{ marginBottom: 14 }}>
+          <button data-on={f.kmMode !== "odometer" ? 1 : 0} onClick={() => setF({ ...f, kmMode: "manual" })}>Kilometres</button>
+          <button data-on={f.kmMode === "odometer" ? 1 : 0} onClick={() => setF({ ...f, kmMode: "odometer" })}>Odometer readings</button>
+        </div>
+
+        {f.kmMode === "odometer" ? (
+          <>
+            <div className="two" style={{ marginBottom: 0 }}>
+              <label className="f"><span>Odometer start</span>
+                <div className="affix suffix"><i>km</i>
+                  <input type="number" step="0.1" value={f.odoStart} onChange={(e) => setF({ ...f, odoStart: e.target.value })} placeholder="0" />
+                </div>
+              </label>
+              <label className="f"><span>Odometer finish</span>
+                <div className="affix suffix"><i>km</i>
+                  <input type="number" step="0.1" value={f.odoEnd} onChange={(e) => setF({ ...f, odoEnd: e.target.value })} placeholder="0" />
+                </div>
+              </label>
+            </div>
+            <div style={{ fontSize: 12.5, marginTop: 8, marginBottom: 16,
+              color: odoKm ? "var(--tx-2)" : "var(--tx-3)" }}>
+              {odoKm
+                ? <>Distance: <b style={{ color: "var(--tx)" }}>{odoKm} km</b></>
+                : f.odoStart !== "" && f.odoEnd !== ""
+                  ? "Finish should be a bigger number than start."
+                  : "Distance works itself out once both readings are in."}
+            </div>
+          </>
+        ) : (
+          <label className="f"><span>Kilometres</span>
+            <div className="affix suffix"><i>km</i>
+              <input type="number" step="0.1" value={f.km} onChange={(e) => setF({ ...f, km: e.target.value })} placeholder="0" />
+            </div>
+          </label>
+        )}
+
+        <label className="check">
+          <input type="checkbox" checked={f.billable} onChange={(e) => setF({ ...f, billable: e.target.checked })} />
+          <span>Billable, offer it when I next invoice them</span>
+        </label>
+        {f.billable && (
+          <label className="f"><span>Travel time, minutes, optional</span>
+            <input type="number" value={f.travelMins || ""} onChange={(e) => setF({ ...f, travelMins: e.target.value })} placeholder="e.g. 25" />
+            <em style={{ fontSize: 11.5, fontStyle: "normal", color: "var(--tx-3)", marginTop: 5, display: "block" }}>
+              Separate from kilometres, claimed at the support rate, capped by the participant's area.
+            </em>
+          </label>
+        )}
+        <label className="check" style={{ marginBottom: 16 }}>
+          <input type="checkbox" checked={f.taxDeductible !== false} onChange={(e) => setF({ ...f, taxDeductible: e.target.checked })} />
+          <span>Genuine business travel, count it toward my vehicle deduction</span>
+        </label>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="btn" onClick={put} disabled={!finalKm || !!billed || !!currentTripProblem}>{f.id ? "Save changes" : "Log trip"}</button>
+          {f.id && <button className="btn ghost" onClick={cancelEdit}>Cancel</button>}
+        </div>
+        {f.id && !billed && (
+          <button className="btn ghost tiny" style={{ marginTop: 14, color: "var(--warn)" }} onClick={() => confirmAndRun("this trip", () => { drop(f.id); setF(blank()); })}>Delete this trip</button>
+        )}
+      </div>
+
+      <div className="panel">
+        {rows.length === 0 ? <div className="empty">No trips logged yet.</div> : [...rows].reverse().map((t) => {
+          const on = tripInvoice(t, data.invoices);
+          return (
+            <div className="row" key={t.id}>
+              <span className="dot" style={{ background: on ? (on.status === "paid" ? "var(--good)" : "var(--brass)") : t.billable ? "var(--brass)" : "var(--tx-3)" }} />
+              <div style={{ flex: 1, minWidth: 0, cursor: on ? "default" : "pointer" }} onClick={() => !on && startEdit(t)}>
+                <div style={{ fontSize: 13.5, fontWeight: 500 }}>{nameOf(t)}</div>
+                <div style={{ fontSize: 11, color: "var(--tx-3)", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {fmtDate(t.date)}
+                  {!t.billable && " · private"}
+                  {on && (on.status === "paid"
+                    ? <span style={{ color: "var(--good)" }}> · paid, invoice #{on.number}</span>
+                    : <span style={{ color: "var(--brass)" }}> · invoiced #{on.number}</span>)}
+                  {!on && t.billable && t.participantId && <span style={{ color: "var(--brass)" }}> · ready to invoice</span>}
+                </div>
+              </div>
+              <div className="num" style={{ fontSize: 13.5, fontWeight: 600 }}>{Number(t.km).toFixed(1)} km</div>
+              {on
+                ? <span style={{ fontSize: 10.5, color: "var(--tx-3)", padding: "0 8px" }} title="Remove it from the invoice first">locked</span>
+                : <button className="btn x" aria-label="Delete" title="Delete" onClick={() => confirmAndRun("this trip", () => drop(t.id))}><TrashIcon /></button>}
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+function Notes({ data, save, prefill, onPrefillConsumed }) {
+  // One box to speak the shift in your own words, then Tidy this up sorts
+  // it into the five sections NDIS's own record-keeping guidance points to
+  // (what was done, how the participant took part, how it ties to their
+  // goals, what was observed, what's next) -- filling in whichever of the
+  // five your words actually covered, and clearly flagging any that came
+  // back empty. Nothing is enforced: save works with gaps showing, or
+  // without ever tidying at all. Assembled into one block of text on save
+  // (same `body` shape as before), so nothing downstream -- email, share,
+  // print, older notes already saved -- needs to change at all.
+  const blank = () => ({
+    date: today(), participantId: "", shared: false,
+    rough: "", tidied: false,
+    supportProvided: "", participantInvolvement: "", progress: "", observations: "", followUp: "",
+  });
+  const FIELDS = [
+    ["supportProvided", "Support provided"],
+    ["participantInvolvement", "Participant involvement"],
+    ["progress", "Progress toward goals"],
+    ["observations", "Observations"],
+    ["followUp", "Follow-up"],
+  ];
+  const HEADINGS = FIELDS.map(([, label]) => label);
+
+  const assembleBody = (x) => FIELDS
+    .map(([key, label]) => x[key] && x[key].trim() ? `${label}: ${x[key].trim()}` : null)
+    .filter(Boolean).join("\n\n");
+
+  const hasContent = (x) => x.tidied ? FIELDS.some(([key]) => x[key] && x[key].trim()) : !!x.rough.trim();
+
+  // A lazy initializer, so this only runs once, at mount, picking up
+  // whichever prefill was current the moment this screen was opened.
+  // Notes remounts fresh every time Work switches to this tab, so a new
+  // prefill from "add a note" after logging travel is always seen correctly.
+  const [f, setF] = useState(() => prefill ? { ...blank(), ...prefill } : blank());
+  // Consumed once, immediately, so a later unrelated visit to this tab
+  // doesn't silently reapply a participant from an old shift.
+  useEffect(() => { if (prefill && onPrefillConsumed) onPrefillConsumed(); }, []);
+  const [busy, setBusy] = useState(false);
+  const [filter, setFilter] = useState("all");
+  const [sendFor, setSendFor] = useState(null);
+  const [tidyErr, setTidyErr] = useState("");
+  const [idOn, setIdOn] = useState(true);
+  const [editingId, setEditingId] = useState(null);
+  const canShare = typeof navigator !== "undefined" && !!navigator.share;
+
+  const startEdit = (n) => {
+    setEditingId(n.id);
+    // Opens exactly like a new note would -- the old text in the one box,
+    // untidied. Tidy it or save it as-is, same choice either way, no
+    // special-casing needed for a note written before this existed.
+    setF({ ...blank(), date: n.date, participantId: n.participantId || "", shared: n.shared || false,
+      rough: n.body || "" });
+    setTidyErr("");
+    setSendFor(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const cancelEdit = () => { setEditingId(null); setF(blank()); setTidyErr(""); };
+
+  const tidy = async () => {
+    const source = f.tidied ? assembleBody(f) : f.rough;
+    if (!source.trim()) return;
+    setBusy(true);
+    try {
+      const { text: out } = await askModel(
+        `You are helping an Australian NDIS support worker write a case note. Sort the rough notes below into a clear, factual, professional note. Objective and observational only, no diagnosis or clinical judgement. Plain language, past tense, third person for the participant. Return the result using exactly these five headings, each on its own line followed by a colon, skip a heading entirely if there's genuinely nothing in the rough notes to say for it, don't invent content for a heading that isn't there: ${HEADINGS.join(", ")}.\n\nRough notes:\n${source}`
+      );
+      if (out) {
+        const next = { ...f, tidied: true };
+        FIELDS.forEach(([key, label]) => {
+          const re = new RegExp(`${label}:\\s*([\\s\\S]*?)(?=\\n(?:${HEADINGS.join("|")}):|$)`, "i");
+          const m = out.match(re);
+          next[key] = (m && m[1].trim()) ? m[1].trim() : "";
+        });
+        setF(next);
+      }
+    } catch (e) {
+      if (e && e.message === "daily-cap") setTidyErr(`That's today's ${AI_CAPS.tidy} tidy-ups. Your note is saved as written.`);
+      else console.error(e);
+    }
+    setBusy(false);
+  };
+
+  const add = () => {
+    const body = f.tidied ? assembleBody(f) : f.rough.trim();
+    if (!body.trim()) return;
+    const record = { date: f.date, participantId: f.participantId, shared: f.shared, body };
+    if (editingId) {
+      save({ ...data, notes: data.notes.map((x) => x.id === editingId ? { ...x, ...record } : x) });
+      setEditingId(null);
+    } else {
+      save({ ...data, notes: [...data.notes, { ...record, id: uid() }] });
+    }
+    setF(blank());
+    setTidyErr("");
+  };
+
+  const rows = data.notes.filter((n) => filter === "all" || (filter === "shared" ? n.shared : !n.shared));
+
+  // Who a note can go to, worked out from the participant's record.
+  const recipients = (n) => {
+    const pt = data.participants.find((x) => x.id === n.participantId);
+    if (!pt) return [];
+    const mgr = data.managers.find((x) => x.id === pt.managerId);
+    return [
+      pt.email ? { who: pt.name, email: pt.email, role: "participant" } : null,
+      mgr && mgr.email ? { who: mgr.name, email: mgr.email, role: "plan manager" } : null,
+    ].filter(Boolean);
+  };
+
+  // withId=false drops the NDIS number and surname-level detail — sensible when
+  // the note is going out through a messaging app rather than to a plan manager.
+  const noteText = (n, withId) => {
+    const pt = data.participants.find((x) => x.id === n.participantId);
+    const who = pt ? (withId ? `${pt.name}${pt.ndisNumber ? ` (NDIS ${pt.ndisNumber})` : ""}` : pt.name.split(" ")[0]) : "";
+    return [
+      `Support note: ${fmtDate(n.date)}`,
+      who ? `Participant: ${who}` : "",
+      `Support worker: ${data.profile.name || ""}`,
+      "",
+      n.body,
+      "",
+      "Sent from SupportFlow™",
+    ].filter(Boolean).join("\n");
+  };
+
+  const record = (n, to, role) => save({
+    ...data,
+    notes: data.notes.map((x) => (x.id === n.id
+      ? { ...x, sentTo: [...(x.sentTo || []), { to, role, on: today() }] } : x)),
+  });
+
+  const subjectFor = (n) => {
+    const pt = data.participants.find((x) => x.id === n.participantId);
+    return `Support note, ${pt ? pt.name + ", " : ""}${fmtDate(n.date)}`;
+  };
+
+  const emailNote = (n, to) => {
+    window.location.href = composeURL("mail", to.email, subjectFor(n), noteText(n, idOn));
+    record(n, to.who, to.role);
+    setSendFor(null);
+  };
+
+  // The device sheet covers WhatsApp, Telegram, Messages, email — whatever they
+  // have. We can't know which they picked, so the record says so honestly.
+  const shareNote = async (n) => {
+    try {
+      await navigator.share({ title: subjectFor(n), text: noteText(n, idOn) });
+      record(n, "shared from this device", "recipient not recorded");
+      setSendFor(null);
+    } catch (e) {
+      if (e && e.name === "AbortError") return;
+      setSendFor(null);
+    }
+  };
+
+  const copyNote = async (n) => {
+    try { await navigator.clipboard.writeText(noteText(n, idOn)); record(n, "copied to clipboard", "recipient not recorded"); }
+    catch (e) { /* clipboard unavailable */ }
+    setSendFor(null);
+  };
+
+  return (
+    <>
+      <div className="panel">
+        <div className="two">
+          <label className="f"><span>Date</span><AuDateInput value={f.date} onChange={(v) => setF({ ...f, date: v })} /></label>
+          <label className="f"><span>Participant</span>
+            <select value={f.participantId || ""} onChange={(e) => setF({ ...f, participantId: e.target.value })}>
+              <option value="">Not about a participant</option>
+              {data.participants.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </label>
+        </div>
+        {!f.tidied ? (
+          <label className="f"><span>What happened</span>
+            <textarea style={{ minHeight: 130 }} value={f.rough} onChange={(e) => setF({ ...f, rough: e.target.value })}
+              placeholder="Talk about the shift in your own words, however it comes out. Tidy this up sorts it into the right sections for you." />
+          </label>
+        ) : (
+          <>
+            <div style={{ fontSize: 11.5, color: "var(--tx-3)", lineHeight: 1.6, marginBottom: 12 }}>
+              Sorted into the five NDIS-aligned sections. A section marked <b style={{ color: "var(--warn)" }}>missing</b> just
+              means nothing in what you said covered it, fill it in yourself or leave it and save as-is, your call.
+            </div>
+            {FIELDS.map(([key, label]) => {
+              const empty = !f[key] || !f[key].trim();
+              return (
+                <label className="f" key={key}>
+                  <span style={{ color: empty ? "var(--warn)" : undefined }}>{label}{empty ? " — missing" : ""}</span>
+                  <textarea style={{ minHeight: 64, borderColor: empty ? "var(--warn)" : undefined }}
+                    value={f[key]} onChange={(e) => setF({ ...f, [key]: e.target.value })} />
+                </label>
+              );
+            })}
+          </>
+        )}
+        <label className="check" style={{ marginBottom: 8 }}>
+          <input type="checkbox" checked={f.shared} onChange={(e) => setF({ ...f, shared: e.target.checked })} />
+          <span>Written to be shared, suitable for the participant, family or plan manager to read</span>
+        </label>
+        <div style={{ fontSize: 11.5, color: "var(--tx-3)", lineHeight: 1.65, marginBottom: 16 }}>
+          This is about how you've written it, not where it goes. Nothing is sent by ticking it. Notes stay on this device until you send one yourself.
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          {AI.enabled() && (
+            <button className="btn ghost" onClick={tidy} disabled={busy || !hasContent(f)}>{busy ? "Writing…" : "Tidy this up"}</button>
+          )}
+          <button className="btn" onClick={add} disabled={!hasContent(f)}>{editingId ? "Save changes" : "Save note"}</button>
+          {editingId && <button className="btn ghost" onClick={cancelEdit}>Cancel</button>}
+        </div>
+        {tidyErr && <div style={{ fontSize: 12, color: "var(--warn)", marginTop: 10 }}>{tidyErr}</div>}
+      </div>
+
+      <div className="tabnav" style={{ marginTop: 20 }}>
+        {[["all", "All"], ["shared", "Shareable"], ["private", "Private"]].map(([k, l]) => (
+          <button key={k} data-on={filter === k ? 1 : 0} onClick={() => setFilter(k)}>{l}</button>
+        ))}
+      </div>
+
+      {rows.length === 0 ? <div className="empty">No notes yet.</div> : [...rows].reverse().map((n) => (
+        <div className="panel" key={n.id} style={{ marginTop: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 11 }}>
+            <div className="eyebrow">{fmtDate(n.date)} · {data.participants.find((x) => x.id === n.participantId)?.name || n.client || "No participant"}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span className={"pill " + (n.shared ? "sent" : "draft")}>{n.shared ? "Shareable" : "Private"}</span>
+              <button className="btn ghost tiny" onClick={() => startEdit(n)}>Edit</button>
+              <button className="btn x" aria-label="Delete" title="Delete" onClick={() => confirmAndRun("this note", () => save({ ...data, notes: data.notes.filter((x) => x.id !== n.id) }))}><TrashIcon /></button>
+            </div>
+          </div>
+          <div style={{ fontSize: 13.5, lineHeight: 1.7, whiteSpace: "pre-wrap", color: "var(--tx-2)" }}>{n.body}</div>
+
+          {(n.sentTo || []).length > 0 && (
+            <div style={{ fontSize: 11.5, color: "var(--good)", marginTop: 12, lineHeight: 1.6 }}>
+              Sent to {n.sentTo.map((x) => `${x.who} (${x.role}) on ${fmtDate(x.on)}`).join("; ")}
+            </div>
+          )}
+
+          {n.shared && (() => {
+            const to = recipients(n);
+            if (sendFor !== n.id) {
+              return (
+                <div style={{ marginTop: 12 }}>
+                  <button className="btn ghost tiny" onClick={() => setSendFor(n.id)}>
+                    {(n.sentTo || []).length ? "Send again" : "Send this note"}
+                  </button>
+                  {to.length === 0 && (
+                    <div style={{ fontSize: 11.5, color: "var(--tx-3)", marginTop: 8, lineHeight: 1.6 }}>
+                      No email on file for {data.participants.find((x) => x.id === n.participantId)?.name || "this participant"}
+                      {" "}or their plan manager, add one in Participants to email it, or share it another way.
+                    </div>
+                  )}
+                </div>
+              );
+            }
+            return (
+              <div style={{ marginTop: 12, background: "var(--bg)", border: "1px solid var(--line)", borderRadius: 10, padding: "13px 14px" }}>
+                <div className="eyebrow" style={{ marginBottom: 9 }}>Send this note</div>
+
+                {to.length > 0 && (
+                  <>
+                    <div style={{ fontSize: 11.5, color: "var(--tx-3)", marginBottom: 8 }}>By email, to someone on file</div>
+                    <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 14 }}>
+                      {to.map((x) => (
+                        <button key={x.email} className="btn tiny" onClick={() => emailNote(n, x)}>
+                          {x.who} · {x.role}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                <div style={{ fontSize: 11.5, color: "var(--tx-3)", marginBottom: 8 }}>
+                  {canShare ? "Or another way" : "Or"}
+                </div>
+                <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
+                  {canShare && (
+                    <button className="btn ghost tiny" onClick={() => shareNote(n)}>
+                      Share: WhatsApp, Telegram, Messages…
+                    </button>
+                  )}
+                  <button className="btn ghost tiny" onClick={() => copyNote(n)}>Copy the text</button>
+                  <button className="btn ghost tiny" onClick={() => setSendFor(null)}>Cancel</button>
+                </div>
+
+                <label className="check" style={{ marginTop: 14, marginBottom: 6 }}>
+                  <input type="checkbox" checked={idOn} onChange={(e) => setIdOn(e.target.checked)} />
+                  <span>Include their full name and NDIS number</span>
+                </label>
+                <div style={{ fontSize: 11.5, color: "var(--tx-3)", lineHeight: 1.65 }}>
+                  {idOn
+                    ? "A plan manager needs these to match the note to the right person."
+                    : "First name only, no NDIS number, sensible if this is going through a messaging app."}
+                </div>
+
+                <div style={{ fontSize: 11.5, color: "var(--warn)", lineHeight: 1.65, marginTop: 12 }}>
+                  This is personal information about someone else. Send it only to people entitled to
+                  see it, and check the participant is comfortable with how you're sending it. Some
+                  plan managers require email or their own portal.
+                </div>
+
+                <div style={{ fontSize: 11.5, color: "var(--tx-3)", lineHeight: 1.65, marginTop: 10 }}>
+                  Nothing sends until you press send in whichever app opens.
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      ))}
+    </>
+  );
+}
+
+
+
+
+
+/* ---------------- NDIS billing rules ---------------- */
+// Encoded from the NDIS Pricing Arrangements and Price Limits 2025-26 v1.1,
+// "Time of Day and Day of Week", "Provider Travel" and "Short Notice
+// Cancellations". The 2026-27 release published price tables only, so these
+// rules still stand. Times are about when the SUPPORT was delivered, not the
+// worker's shift under an award.
+const RULES_SOURCE = {
+  doc: "NDIS Pricing Arrangements and Price Limits 2025-26 (v1.1)",
+  url: "https://www.ndis.gov.au/providers/pricing-arrangements",
+};
+
+// Support families, so a shift time can be turned into the right item code.
+const FAMILIES = {
+  selfcare: { label: "Self-care", day: "01_011_0107_1_1", eve: "01_015_0107_1_1", night: "01_002_0107_1_1", sat: "01_013_0107_1_1", sun: "01_014_0107_1_1", ph: "01_012_0107_1_1", sleep: "01_010_0107_1_1" },
+  community: { label: "Community access", day: "04_104_0125_6_1", eve: "04_103_0125_6_1", night: null, sat: "04_105_0125_6_1", sun: "04_106_0125_6_1", ph: "04_102_0125_6_1", sleep: null },
+  group: { label: "Group activities", day: "04_102_0136_6_1", eve: "04_103_0136_6_1", night: null, sat: "04_104_0136_6_1", sun: "04_105_0136_6_1", ph: "04_106_0136_6_1", sleep: null },
+  sil: { label: "Supported independent living", day: "01_801_0115_1_1", eve: "01_802_0115_1_1", night: "01_803_0115_1_1", sat: "01_804_0115_1_1", sun: "01_805_0115_1_1", ph: "01_806_0115_1_1", sleep: "01_832_0115_1_1" },
+  sta: { label: "Short term accommodation", day: "01_200_0115_1_1", eve: "01_201_0115_1_1", night: "01_205_0115_1_1", sat: "01_202_0115_1_1", sun: "01_203_0115_1_1", ph: "01_204_0115_1_1", sleep: "01_206_0115_1_1" },
+};
+
+// Reverse lookup, a participant's usual item code back to the family it
+// belongs to, so a new shift can start on the type of support they usually
+// get rather than always defaulting to self-care regardless of who's picked.
+const familyOfCode = (code) => {
+  if (!code) return null;
+  const hit = Object.entries(FAMILIES).find(([, v]) => Object.values(v).includes(code));
+  return hit ? hit[0] : null;
+};
+
+
+// Returns the support item that applies, and why — so the worker can check it.
+function classifyShift({ date, start, end, publicHoliday, family }) {
+  const fam = FAMILIES[family] || FAMILIES.selfcare;
+  if (!date || !start || !end) return null;
+  const d = new Date(date + "T00:00:00");
+  const dow = d.getDay();                      // 0 Sun, 6 Sat
+  const a = mins(start);
+  let b = mins(end);
+  const crossesMidnight = b <= a;
+  if (crossesMidnight) b += 1440;
+  const hours = (b - a) / 60;
+
+  // A sleepover outranks everything: crosses midnight, 8+ continuous hours,
+  // and the worker may sleep when not actively supporting.
+  const sleepover = crossesMidnight && hours >= 8;
+
+  const pick = (k, why, note) => ({
+    code: fam[k], band: k, hours: Math.round(hours * 100) / 100, why, note,
+    item: SUPPORT_ITEMS.find((x) => x.code === fam[k]) || null,
+  });
+
+  if (sleepover && fam.sleep) {
+    return pick("sleep", "Crosses midnight, runs 8 hours or more, and you can sleep when not needed.",
+      "Covers up to 2 hours of active support. A third or later active hour is claimed at Saturday rates on a weekday, or the rate for the day otherwise.");
+  }
+  if (publicHoliday) return pick("ph", "Delivered on a public holiday, which outranks the day of the week.");
+  if (dow === 6) return pick("sat", "Delivered on a Saturday.");
+  if (dow === 0) return pick("sun", "Delivered on a Sunday.");
+
+  // Weekday bands
+  if (crossesMidnight || a < 360) {
+    return fam.night
+      ? pick("night", a < 360 ? "Starts before 6:00 am on a weekday." : "Starts at or before midnight and finishes after it.")
+      : pick("eve", "Runs outside daytime hours and this support has no night rate.", "Check the item. This family has no weekday night rate.");
+  }
+  if (a >= 1200) return pick("eve", "Starts at or after 8:00 pm on a weekday.");
+  if (b <= 1200) return pick("day", "Runs between 6:00 am and 8:00 pm on a weekday.");
+  // Crosses the 8pm boundary with the same worker → the HIGHER limit applies to
+  // the whole support, and the PAPL says to discuss this with the participant.
+  return pick("eve", "Crosses 8:00 pm, so the higher evening rate applies to the whole support.",
+    "The rules require you to discuss this billing arrangement with the participant.");
+}
+
+// Travel time caps depend on how remote the PARTICIPANT is, not the worker.
+const TRAVEL_CAPS = [
+  { zone: "mmm13", label: "Metro or regional centre (MMM 1-3)", cap: 30 },
+  { zone: "mmm45", label: "Regional area (MMM 4-5)", cap: 60 },
+  { zone: "mmm67", label: "Remote or very remote (MMM 6-7)", cap: null },
+];
+const travelCap = (zone) => (TRAVEL_CAPS.find((z) => z.zone === zone) || TRAVEL_CAPS[0]).cap;
+
+// Short notice cancellation: 7 days for disability support worker supports.
+const CANCEL_NOTICE_DAYS = 7;
+function cancellationCheck(scheduled, cancelledOn) {
+  if (!scheduled || !cancelledOn) return null;
+  const days = Math.floor((new Date(scheduled + "T00:00:00") - new Date(cancelledOn + "T00:00:00")) / 86400000);
+  return {
+    days,
+    claimable: days < CANCEL_NOTICE_DAYS,
+    why: days < CANCEL_NOTICE_DAYS
+      ? `${days} day${days === 1 ? "" : "s"} notice, less than ${CANCEL_NOTICE_DAYS}, so this is a short notice cancellation and you may claim up to 100% of the agreed fee.`
+      : `${days} days notice, ${CANCEL_NOTICE_DAYS} or more, so this is not a short notice cancellation and cannot be claimed.`,
+  };
+}
+
+/* ---------------- service agreement ---------------- */
+// The app already holds everything a basic agreement needs, so it writes the
+// document rather than asking the user to find one. The barrier to having an
+// agreement is usually "I don't know how to write one", not unwillingness.
+function agreementClauses(pt, profile, r) {
+  const who = profile.name || "the support worker";
+  return [
+    ["The supports", `${who} will provide the supports listed below to ${pt.name}. These supports are funded under ${pt.name}'s NDIS plan and both parties agree they are reasonable and necessary supports under that plan.`],
+    ["Rates and invoicing", `Supports are charged at the rates set out below, which do not exceed the price limits in the NDIS Pricing Schedule. Invoices are issued to ${r.billToName || "the payer named above"} and payable within ${r.terms || "the agreed number of"} days.`],
+    ["Travel", `Where travel is agreed as part of a support, ${who} may charge for kilometres travelled at the NDIS non-labour travel rate. Travel is itemised separately on each invoice.`],
+    ["Changes and cancellations", `Either party may change or cancel a booked support by giving reasonable notice. Short notice cancellations may be charged in line with the NDIS cancellation rules in force at the time.`],
+    ["Responsibilities", `${who} will hold a current NDIS Worker Screening Check and appropriate insurance, treat ${pt.name} with respect and dignity, protect their privacy, and communicate openly. ${pt.name} agrees to provide a safe working environment, give notice of cancellations, and advise ${who} if their NDIS plan changes, is suspended, or ends.`],
+    ["Ending this agreement", `Either party may end this agreement by giving 14 days written notice, or immediately where there is a serious concern about safety or conduct.`],
+    ["Goods and services tax", `The parties agree that the supports provided under this agreement are supports covered by the NDIS plan referred to above, and are GST-free under section 38-38 of the A New Tax System (Goods and Services Tax) Act 1999 and the associated NDIS supports determination.`],
+    ["Concerns and complaints", `Concerns can be raised directly with ${who} in the first instance. ${pt.name} may also contact the NDIS Quality and Safeguards Commission on 1800 035 544.`],
+  ];
+}
+
+async function makeAgreementPDF(pt, profile, r) {
+  const JsPDF = await loadJsPDF();
+  const doc = new JsPDF({ unit: "mm", format: "a4" });
+  const L = 20, R = 190, W = R - L;
+  const long = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" }) : "__________________";
+  let y = 24;
+
+  const page = (need) => { if (y + need > 272) { doc.addPage(); y = 24; } };
+
+  doc.setFont("times", "normal").setFontSize(24).setTextColor(20, 21, 15);
+  doc.text("Service agreement", L, y); y += 7;
+  doc.setFont("helvetica", "normal").setFontSize(9).setTextColor(120, 120, 112);
+  doc.text("NDIS supports provided by a sole trader", L, y); y += 10;
+  doc.setDrawColor(224, 220, 211).line(L, y, R, y); y += 9;
+
+  // parties
+  doc.setFontSize(8).setTextColor(150, 150, 142);
+  doc.text("SUPPORT WORKER", L, y); doc.text("PARTICIPANT", L + W / 2, y); y += 5;
+  doc.setFontSize(10).setTextColor(20, 21, 15);
+  doc.text(profile.name || "—", L, y); doc.text(pt.name || "—", L + W / 2, y); y += 5;
+  doc.setFontSize(8.5).setTextColor(110, 110, 104);
+  const a = [profile.abn ? `ABN ${profile.abn}` : "", profile.phone, profile.email].filter(Boolean);
+  const b = [pt.ndisNumber ? `NDIS ${pt.ndisNumber}` : "", planLabel(pt.planType), pt.phone, pt.address].filter(Boolean);
+  const rows = Math.max(a.length, b.length);
+  for (let i = 0; i < rows; i++) {
+    if (a[i]) doc.text(String(a[i]), L, y);
+    if (b[i]) doc.text(doc.splitTextToSize(String(b[i]), W / 2 - 6)[0], L + W / 2, y);
+    y += 4.6;
+  }
+  y += 4;
+
+  if (!r.selfManaged && r.mgr) {
+    doc.setFontSize(8).setTextColor(150, 150, 142);
+    doc.text("INVOICES ARE SENT TO", L, y); y += 5;
+    doc.setFontSize(9).setTextColor(60, 60, 56);
+    doc.text([r.mgr.name, r.mgr.email, r.terms ? `${r.terms} day payment terms` : ""].filter(Boolean).join("  ·  "), L, y);
+    y += 8;
+  }
+
+  if (pt.emergencyName || pt.emergencyPhone) {
+    doc.setFontSize(8).setTextColor(150, 150, 142);
+    doc.text("EMERGENCY CONTACT", L, y); y += 5;
+    doc.setFontSize(9).setTextColor(60, 60, 56);
+    const ec = [pt.emergencyName, pt.emergencyRel, pt.emergencyPhone].filter(Boolean).join("  ·  ");
+    doc.text(ec, L, y); y += 8;
+  }
+
+  doc.setDrawColor(224, 220, 211).line(L, y, R, y); y += 9;
+
+  // supports table
+  doc.setFontSize(8).setTextColor(150, 150, 142);
+  doc.text("AGREED SUPPORTS AND RATES", L, y); y += 6;
+  const item = SUPPORT_ITEMS.find((x) => x.code === pt.defaultCode);
+  doc.setFontSize(9).setTextColor(20, 21, 15);
+  if (item) {
+    doc.text(item.name, L, y);
+    doc.text(`${money(pt.defaultRate || item.rate)} per ${item.unit === "each" ? "night" : "hour"}`, R, y, { align: "right" });
+    y += 4.6;
+    doc.setFontSize(8).setTextColor(130, 130, 122);
+    doc.text(item.code, L, y); y += 6;
+  } else {
+    doc.setTextColor(130, 130, 122).text("To be agreed", L, y); y += 6;
+  }
+  doc.setFontSize(8.5).setTextColor(110, 110, 104);
+  doc.text(`Travel  ·  ${money(Number(profile.kmRate || TRAVEL_ITEM.rate))} per kilometre  ·  ${TRAVEL_ITEM.code}`, L, y); y += 5;
+  doc.text("Additional supports may be added in writing by agreement of both parties.", L, y); y += 9;
+
+  doc.setDrawColor(224, 220, 211).line(L, y, R, y); y += 9;
+
+  // clauses
+  agreementClauses(pt, profile, r).forEach(([h, body], i) => {
+    const wrapped = doc.splitTextToSize(body, W);
+    page(wrapped.length * 4.3 + 12);
+    doc.setFont("helvetica", "bold").setFontSize(9).setTextColor(20, 21, 15);
+    doc.text(`${i + 1}. ${h}`, L, y); y += 5;
+    doc.setFont("helvetica", "normal").setFontSize(9).setTextColor(70, 70, 66);
+    doc.text(wrapped, L, y); y += wrapped.length * 4.3 + 6;
+  });
+
+  // signatures
+  page(52);
+  y += 4;
+  doc.setDrawColor(224, 220, 211).line(L, y, R, y); y += 10;
+  doc.setFontSize(8).setTextColor(150, 150, 142);
+  doc.text("SIGNED", L, y); y += 10;
+  [["Support worker", profile.name], ["Participant or representative", pt.name]].forEach(([role, nm]) => {
+    doc.setDrawColor(180, 180, 172).line(L, y, L + 70, y);
+    doc.line(L + 90, y, L + 130, y);
+    y += 4.5;
+    doc.setFontSize(8).setTextColor(130, 130, 122);
+    doc.text(`${role}, ${nm || ""}`, L, y);
+    doc.text("Date", L + 90, y);
+    y += 13;
+  });
+
+  doc.setFontSize(7.5).setTextColor(160, 160, 152);
+  const note = doc.splitTextToSize(
+    "This document was generated from records held in SupportFlow™ as a starting point. It is not legal advice, have it checked before you rely on it, and adjust anything that does not match what you have actually agreed.", W);
+  doc.text(note, L, 282);
+
+  const safe = (pt.name || "participant").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+  doc.save(`service-agreement-${safe}.pdf`);
+}
+
+/* ---------------- help ---------------- */
+// Written for someone new to working for themselves in Australia. Short
+// sentences, no tax jargon without explaining it first.
+const FAQ = [
+  {
+    g: "Starting out",
+    q: [
+      ["What is an ABN, and why do I need one?",
+       "An ABN is an Australian Business Number. It is a free number from the government that says you are working for yourself rather than as an employee. You need one to send invoices. Without it, whoever pays you may have to hold back 47% of your money and send it to the tax office. You can apply free at abr.gov.au, never pay a website that offers to do it for you."],
+      ["Am I an employee or running my own business?",
+       "If an agency puts you on their payroll, takes tax out of your pay and pays your super, you are an employee and this app is not for that work. If you invoice for your hours, set your own arrangements and no tax is taken out, you are a sole trader, working for yourself. This app is for that."],
+      ["What is a sole trader?",
+       "It means you are the business. There is no separate company. You use your own tax file number, you report the business income on your own tax return, and you keep whatever is left after tax and expenses. It is the simplest way to work for yourself."],
+      ["Nobody takes tax out of my pay. What happens at tax time?",
+       "You get the full amount now and pay the tax later, in one go after 30 June. This surprises people badly in their first year. That is what the big number on the Summary screen is for, it is the money you should not spend, because it already belongs to the tax office."],
+    ],
+  },
+  {
+    g: "Getting paid",
+    q: [
+      ["Who actually pays me?",
+       "It depends how the participant's plan is managed. Plan managed means a company handles their money and you invoice that company. Self managed means the participant or their family pays you directly. NDIA managed means the NDIS pays registered providers through their portal. Set this on each person's record and the app sends every invoice to the right place."],
+      ["What is a plan manager?",
+       "A company the participant chooses to look after the money side of their NDIS plan. They receive your invoice, check it, and pay you. You are not working for them, the participant is who you support."],
+      ["What is a support item number?",
+       "A code the NDIS uses for each kind of support, like 01_011_0107_1_1 for weekday daytime self-care. Every line on your invoice needs the right one, because the wrong code can be rejected or paid at the wrong rate. The app has them built in from the official price list."],
+      ["Can I charge whatever I like?",
+       "The NDIS publishes a maximum price for each support. You can charge less, but not more. What you agree with the participant should be written down before you start."],
+      ["How long until I get paid?",
+       "Whatever payment terms you agreed, often 7 to 21 days. Put that number on the plan manager or participant record, and the app works out the due date for every invoice by itself."],
+    ],
+  },
+  {
+    g: "Tax",
+    q: [
+      ["How much should I put aside?",
+       "The app works it out as you go, using this year's tax rates and the Medicare levy, after subtracting your expenses and car costs. A rough rule while you are starting out is to keep about 25 to 30 cents of every dollar in a separate account. Open a second bank account and move the money as you are paid, it is much easier than finding it later."],
+      ["What is the tax-free threshold?",
+       "The first $18,200 you earn in a year is not taxed. Above that you pay tax on each extra dollar, at rates that step up as you earn more. This is why your set-aside figure looks small early in the year and grows."],
+      ["What can I claim?",
+       "Things you pay for because of the work: worker screening checks, first aid courses, gloves and masks, work-related travel, the work share of your phone. Not everyday clothing, not lunch, not the drive from home to a regular workplace. Use the Claim check tool, it checks the tax office website and shows you the pages it used."],
+      ["What about my car?",
+       "Every trip you log becomes a deduction at the official rate per kilometre, up to 5,000 kilometres a year. That rate already covers fuel, servicing, registration, insurance and the car losing value, so do not also claim those as separate expenses."],
+      ["Do I need receipts?",
+       "Yes. Keep them for five years. A photo is fine. If the tax office asks and you cannot show the receipt, you generally cannot keep the deduction."],
+      ["What is the Medicare levy?",
+       "An extra 2% of your taxable income that helps pay for the public health system. It is included in the figure the app shows you."],
+    ],
+  },
+  {
+    g: "GST",
+    q: [
+      ["What is GST?",
+       "A 10% tax added to most things sold in Australia. Most NDIS supports are GST-free, which means you do not add it. But that only holds if certain conditions are met."],
+      ["When do I have to register for GST?",
+       "When your total sales over any 12 months reach $75,000. Here is the part that catches people: your NDIS income counts toward that $75,000 even though it is GST-free. Being GST-free does not keep you under the line. Once you cross it you have 21 days to register."],
+      ["If I register, do I start charging GST?",
+       "Not on qualifying NDIS supports. They stay GST-free and your invoice shows GST as $0.00. What changes is that you must lodge a BAS, a short form to the tax office, usually every three months, and you can claim back the GST you paid on business things like fuel, your phone and equipment. That often means money coming back to you."],
+      ["What makes a support GST-free?",
+       "Four things must all be true at once: the participant has a current NDIS plan, the support is reasonable and necessary under that plan, you have a written service agreement with them, and the support is a type listed in the government's NDIS determination. Miss one and the support may be taxable, meaning you could owe 10% you never collected."],
+      ["What is a service agreement?",
+       "A written document between you and the participant saying what you will do, when, and at what rate, signed before you start. It protects you in a disagreement, and it is one of the four conditions for being GST-free. It is the one people most often skip."],
+    ],
+  },
+  {
+    g: "NDIS billing rules",
+    q: [
+      ["Which rate applies if my shift crosses 8pm?",
+       "The higher one, for the whole shift, provided the same worker does all of it. A shift from 6pm to 10pm is billed entirely at the weekday evening rate, not split. The rules say you must discuss this arrangement with the participant, so it should be in your service agreement."],
+      ["What counts as weekday daytime, evening and night?",
+       "Daytime starts at or after 6:00am and ends by 8:00pm. Evening starts at or after 8:00pm and finishes by midnight. Night is a shift that starts before 6:00am, or one that runs past midnight. What matters is when the support was delivered, not what shift your award calls it."],
+      ["When is it a sleepover instead?",
+       "When the support crosses midnight, runs for eight hours or more continuously, and you are allowed to sleep when you are not needed. It is a flat rate for the night and covers up to two hours of active support. A third or later active hour is claimed at Saturday rates on a weekday."],
+      ["What if it falls on a public holiday?",
+       "Public holiday beats everything except a sleepover, including Saturday and Sunday. It applies based on where the support was delivered, so check the holidays for that state."],
+      ["Can I charge for a cancelled shift?",
+       "For support worker supports the rule is 7 days. If the participant gives less than seven days notice, or does not show up, you can claim up to 100% of the agreed fee, but only if your service agreement covers cancellations and you could not fill the time with other paid work. There is no limit on how many you can claim, though the NDIA watches for unusual patterns, and you can always choose to waive it."],
+      ["Can I charge for my travel time?",
+       "Yes, and it is separate from kilometres. On Work \u2192 Travel, tick a trip as billable and a travel time field appears, minutes, optional. It is claimed against the same support item at the same hourly rate, capped at 30 minutes each way in metro and regional centres, or 60 minutes in regional areas. There is no cap in remote areas. The cap depends on where the participant is, not where you live, and each trip's own minutes are capped before they are added together. If you see several people on one trip, split the time between them."],
+      ["And the kilometres themselves?",
+       "Those are the separate non-labour travel item, up to 99 cents a kilometre for an ordinary vehicle. It has to be agreed in advance with the participant, and shown as its own line on the invoice. You cannot claim travel at all if the support already has travel built into its price."],
+    ],
+  },
+  {
+    g: "Protecting yourself",
+    q: [
+      ["What insurance do I need?",
+       "Public liability and professional indemnity are the usual two, and many plan managers will not work with you without them. Premiums are deductible."],
+      ["What records do I have to keep?",
+       "Invoices, receipts, your kilometres, and your shift notes. Five years is the general rule. Back this app up regularly, everything lives in this one browser, so if the device is lost or its data is cleared, the records go with it."],
+      ["When is my tax return due?",
+       "The Australian tax year runs 1 July to 30 June. If you lodge it yourself it is due by 31 October. If you use a registered tax agent you usually get longer, but you need to be on their books before 31 October."],
+      ["Should I get an accountant?",
+       "For a first year of working for yourself, usually yes. A registered tax agent costs a few hundred dollars, the fee is deductible, and they will normally find things you would have missed. This app keeps your records tidy so their job is quicker and cheaper, it does not replace them."],
+    ],
+  },
+];
+
+
+// The manual, in the app rather than in a file nobody opens. Same accordion
+// pattern as the FAQ so there is one thing to learn, not two.
+const MANUAL = [
+  {
+    t: "Getting started",
+    d: "Set up SupportFlow and get ready to record your work.",
+    q: [
+      ["What this app does, and doesn't",
+       "It handles the paperwork around support work: invoices with the right NDIS codes, a running figure for the tax you'll owe, your kilometres, and your service agreements. It is not a rostering system, it records shifts you have done, it does not arrange them. It does not lodge anything with the ATO, prepare a BAS, or replace an accountant."],
+      ["The first thing you see",
+       "A welcome screen, once, explaining the app in three lines. You can start setup or read the manual first. Before normal use, onboarding requires a backup password; that backup-security step cannot be skipped."],
+      ["Finding your way around",
+       "Four fixed bottom navigation areas: Home, Work, Money and Participants. Work, Money and Participants open clean shortcut pages first; choose the feature you need, then use Back to Work, Back to Money or Back to Participants to return to those shortcuts. Home gives you quick-start shortcuts. Settings and Help stay in the fixed top header."],
+      ["Installing on Android",
+       "Open supportflow.work/app in Chrome, open Chrome's menu, then choose Install app or Add to Home screen and confirm. SupportFlow will open from its own Home screen icon. Installing it does not create a SupportFlow cloud account; your working records remain on that app/browser installation and your encrypted backup is stored in the Google Drive account you connect."],
+      ["Installing on iPhone or iPad",
+       "Open supportflow.work/app in Safari, tap Share, choose Add to Home Screen, then tap Add. Open SupportFlow from the new Home screen icon."],
+      ["Installing on a Windows PC",
+       "Open supportflow.work/app in Chrome or Microsoft Edge. Use the Install icon in the address bar, or the browser menu's install-app option, then confirm. SupportFlow opens in its own window and can be pinned to Start or the taskbar."],
+      ["Installing on a Mac",
+       "Open supportflow.work/app in a browser that offers web-app installation and use its Install or Add to Dock option. The wording depends on the browser and macOS version. You can also keep using SupportFlow in the browser without installing it."],
+      ["Step 1 – Your details",
+       "Your name and ABN are required, because they print on every invoice and an invoice without an ABN is not valid, whoever pays you may have to withhold 47%. Add your bank details so they appear for payment. No ABN yet? Apply free at abr.gov.au, and never pay a website that offers to do it for you."],
+      ["Step 2 – Plan managers",
+       "Add every plan management company you invoice: name, contact, accounts email, and payment terms in days. The terms are what set the due date on every invoice automatically. Do this before participants so each one can be linked in a tap. If you deal with none, use \u201cI don't deal with any\u201d."],
+      ["Step 3 – Participants",
+       "For each person: name, NDIS number, and how their plan is managed. Plan managed means their manager is billed, so link them. Self managed and NDIA managed are billed directly, so they need their own payment terms. Set the item you usually bill them for, so new invoices open on the right code. Set their area, which decides your travel time cap."],
+      ["Home and section shortcuts",
+       "Home gives you four Quick Start cards for common actions. Work, Money and Participants each open a clean shortcut page first. Tap a shortcut to open the existing feature, then use Back to Work, Back to Money or Back to Participants near the top to return. The fixed top header and bottom navigation stay available while the middle content scrolls."],
+      ["Red means it still needs you",
+       "Anything outlined in red is required and not yet done. It turns green with a tick once complete. The Summary screen keeps a numbered checklist of whatever is outstanding until it is all finished."],
+    ],
+  },
+  {
+    t: "Logging your work",
+    d: "Shifts, travel and expenses, entered once and used throughout SupportFlow.",
+    q: [
+      ["Adding a shift",
+       "Work \u2192 Shifts gives you a month calendar. Tap Add a shift and enter the participant, date, start and finish. That is all, the app works out which support item applies and shows you why before you save. Use it for work you have done and for work coming up."],
+      ["Your shifts, at a glance",
+       "Below the calendar, Work \u2192 Shifts groups everything by participant rather than listing every shift in a long scroll. Each person gets two totals: Completed, hours and an estimated dollar figure for work already done, and Scheduled, the same for what's still coming up. The estimate uses whatever rate that participant has set as their usual one, not the time-of-day classification an actual invoice works out, so treat it as a guide, not a figure to invoice from. Tap a calendar day instead to see that day's individual shifts."],
+      ["Scheduled, completed, cancelled",
+       "A shift set in the future starts as Scheduled; one dated today or earlier starts as Completed, so you rarely touch the field. Only completed shifts, once their finish time has actually passed, are ready to bill on Money \u2192 Invoices, so booking next Tuesday never prompts you to bill for it. If a past shift is still marked scheduled, the calendar asks whether it went ahead and a single tap confirms it."],
+      ["Cancelled shifts",
+       "Mark the shift cancelled and record the date they told you. The app immediately says whether it is claimable, under seven days notice it is, seven or more it is not. A claimable one is billable the same as completed work, on Money \u2192 Invoices, even though the participant summary on Work \u2192 Shifts leaves cancellations out of its totals."],
+      ["How the time-of-day rules work",
+       "Weekday daytime starts at or after 6am and finishes by 8pm. Evening starts at or after 8pm. Night starts before 6am or runs past midnight. Saturday, Sunday and public holiday go by the day the support was delivered. A sleepover crosses midnight, runs eight hours or more, and lets you sleep when not needed."],
+      ["Shifts that cross 8pm",
+       "The higher evening rate applies to the whole shift, not just the part after 8pm, as long as the same worker does all of it. The app does this for you and reminds you that the rules require discussing that arrangement with the participant, so it belongs in your service agreement."],
+      ["Logging travel",
+       "Work \u2192 Travel. Pick the participant and enter the distance, typed directly as kilometres or worked out from an odometer start and finish. Tick billable if it should go on their invoice. Those same kilometres do two jobs: billed to the participant, and counted as a tax deduction. You enter them once."],
+      ["Logging an expense",
+       "Money \u2192 Expenses. Date, what it was, category, amount. Not sure whether it counts? Type the description and tap Can I claim this?"],
+    ],
+  },
+
+  {
+    t: "Incidents",
+    d: "Record incidents, immediate safety actions, reporting prompts and follow-up.",
+    q: [
+      ["Recording an incident",
+       "Work → Incidents → New incident. Record the affected person, incident date and time, when you became aware, location, what happened, any harm, immediate actions, people involved or witnesses, participant support, follow-up and corrective action. Keep it factual. Incident records stay with the rest of your local SupportFlow records and are included in your encrypted backup."],
+      ["Registered provider setting",
+       "Settings → Business & invoice details asks whether you are a registered NDIS provider. Turn this on only if you are registered. It changes the incident-reporting prompts; it does not decide whether you are required to register."],
+      ["Reportable incident prompts",
+       "For a registered provider, SupportFlow flags the common NDIS Commission reportable-incident categories. Most are shown as a 24-hour notification timeframe from when the provider became aware. An unauthorised restrictive practice is shown as five business days, with a stronger 24-hour warning when harm is recorded. These are prompts, not a legal determination — check the current Commission guidance and submit through the official portal."],
+      ["SupportFlow does not report for you",
+       "SupportFlow never automatically sends an incident to the NDIS Commission, police, emergency services, a participant, plan manager or anyone else. If anyone is in immediate danger call 000. If an incident may be reportable, use the Commission guidance link in the incident screen and make the required notification yourself."],
+      ["Incident register PDF",
+       "Work → Incidents → Export register PDF creates a local PDF summary from the incident records on this device. It can help with review or audit preparation, but you should check the exported information before relying on it."],
+    ],
+  },
+  {
+    t: "Invoicing",
+    d: "Turn completed shifts and travel into accurate invoices.",
+    q: [
+      ["Creating an invoice",
+       "Invoices are built by ticking finished work, not typed up separately, and all of that happens on Money \u2192 Invoices, in a \u201cReady to bill\u201d panel. Work \u2192 Shifts is purely a record, dates, times, status, nothing about billing lives there. Tick the shifts you want on Money \u2192 Invoices, a running total appears for that participant, and Raise invoice creates it already filled in, one line per shift, each with its own date, time and support item code."],
+      ["Adding your shifts automatically",
+       "Ticking happens on Money \u2192 Invoices, in the \u201cReady to bill\u201d panel, not on Work \u2192 Shifts. Only finished shifts not yet billed can be ticked, and ticking someone else's shift while another participant's are already ticked swaps the selection, a running total only means something for one person at a time. Each ticked shift becomes its own line on the invoice, its date, start and finish time, and the correct support item code, nothing is merged or summarised."],
+      ["Adding your travel automatically",
+       "The same pattern on Work \u2192 Travel. Billable trips not yet on an invoice show a checkbox, ticking builds a running kilometre and dollar total for one participant, and Raise invoice creates it. Kilometres can be entered directly or from an odometer start and finish reading, whichever a trip was logged with is how it is shown."],
+      ["Why billed work locks",
+       "Anything attached to an invoice disappears from every other invoice's list, and its row turns green with the invoice number. You cannot edit or delete it until you remove it from that invoice. This is deliberate, it is what stops the same work being billed twice."],
+      ["Charging a cancelled shift",
+       "Mark the shift cancelled on Work \u2192 Shifts and record when it was booked and when they cancelled, the app tells you straight away whether it is claimable. If it is, it shows up on Money \u2192 Invoices with a checkbox alongside completed work, tick it and it goes on an invoice the same way, labelled clearly as a short notice cancellation rather than a delivered shift."],
+      ["Travel time versus kilometres",
+       "They are different claims, both logged on Work \u2192 Travel rather than the invoice. Kilometres are the non-labour travel item. Travel time is an optional field that appears once a trip is marked billable, claimed against the support item itself at the same hourly rate, capped at 30 minutes each way in metro and regional centres, 60 in regional areas, uncapped in remote, the cap depends on where the participant is, not where you live."],
+      ["Sending it",
+       "Preview PDF opens the real, finished document so you can check it before anyone else sees it. Share invoice sends the same PDF straight through Gmail, Outlook, Messages or whatever is installed on your device. Sending marks the invoice Sent, shown as a blue tag on the invoice list. If it passes its due date still unpaid, that tag turns red and reads Overdue instead, no extra step needed. When the money lands, open it and set the status to Paid, the tax figure only counts invoices marked paid."],
+    ],
+  },
+  {
+    t: "Tax and money",
+    d: "Understand your tax estimate, deductions and vehicle kilometres.",
+    q: [
+      ["The set-aside figure",
+       "Money \u2192 Tax shows what to put aside. It uses the current tax rates and the Medicare levy, on your income less your expenses and vehicle deduction, counting only invoices marked Paid, you do not owe tax on money you have not received. Open a second bank account and move it across as you are paid."],
+      ["Why it looks small in July",
+       "The first $18,200 you earn in a year is not taxed, and the figure is year-to-date. Early in the financial year there is genuinely little to set aside. It grows as the year goes on."],
+      ["Your vehicle",
+       "Every trip you log counts automatically at the ATO's cents-per-kilometre rate, up to 5,000 km a year. That rate already includes fuel, servicing, registration, insurance and the car losing value, so do not also claim those as separate expenses. Owning, leasing or hire-purchasing makes no difference under this method."],
+      ["Past 5,000 kilometres",
+       "The app tells you when this method stops counting. The logbook method has no cap and would probably be worth more, but it needs a twelve-week logbook and receipts for running costs. That is a conversation with an accountant, before year end."],
+      ["Starting point for this year",
+       "If you switched to SupportFlow partway through the financial year, Settings has a Starting point panel. Add a rough total for what you had already earned, spent and driven before you started, three numbers, not individual invoices. It joins your tax set-aside figure for the current year only, so the number covers the whole year rather than just the part tracked here. It never shows up as an invoice, an expense or a participant record, and it does not carry into next financial year on its own."],
+      ["The deduction checker",
+       "New checks are capped at 15 a day on each device. Anything you have asked before opens instantly and does not count. Money \u2192 Tax \u2192 Claim check: type anything, steel cap boots, phone bill, travel between clients, and it reads the ATO site and answers with a verdict, the reason in plain English, how to split work and private use, and what evidence to keep. It searches nowhere else: no blogs, no forums, no accounting firms. The links shown underneath are the ATO pages it actually opened, so a reference cannot be invented. If nothing on the ATO site answers your question it says so plainly, rather than guessing. Anything asked before opens instantly."],
+    ],
+  },
+  {
+    t: "GST",
+    d: "Understand the GST threshold, registration and BAS.",
+    q: [
+      ["The trap",
+       "Most NDIS supports are GST-free, so you do not add 10%. But GST-free income still counts toward the $75,000 registration threshold. Being GST-free does not keep you under it. The app tracks your turnover over a rolling twelve months and warns you at 80%, then tells you once you are over, registration is required within 21 days."],
+      ["Registering does not mean charging GST",
+       "Qualifying NDIS supports stay GST-free and your invoice shows GST as $0.00. What changes is that you lodge a BAS each quarter, and you can claim back the GST you paid on fuel, phone and equipment, which often means money coming back to you."],
+      ["Setting your status",
+       "Settings \u2192 GST. Invoices change to match: headed \u201cTax invoice\u201d with a GST-free statement when you are registered, plain \u201cInvoice\u201d when you are not."],
+      ["Lodging your BAS",
+       "Once registered, the Money shortcut page adds BAS: a quarterly summary of what you have invoiced and spent, built from records already entered, nothing typed twice. It opens on whichever quarter actually has activity in it rather than always the current one. It is a worksheet to lodge from, not a lodgement itself, the app does not submit anything to the ATO."],
+    ],
+  },
+  {
+    t: "Agreements and notes",
+    d: "Create service agreements and keep clear support notes.",
+    q: [
+      ["Why service agreements matter",
+       "A written agreement is one of four conditions that keep your supports GST-free. Miss one and a support may become taxable, meaning you could owe 10% you never charged. It is the condition sole traders most often skip."],
+      ["Letting the app write one",
+       "People \u2192 Agreements lists everyone with their agreement status, and Generate one writes the PDF. The PDF is built from what you have already entered, both parties, ABN, NDIS number, plan management, rates, travel and payment terms, plus clauses on cancellations, responsibilities, ending the agreement, GST and complaints, with signature blocks. It is a starting point, not legal advice, so have it looked over before the first one is signed."],
+      ["Recording and reviewing",
+       "Tick the agreement box, then record the date signed, a review date, and where the signed copy is kept. A participant whose review falls within 30 days shows amber and appears by name on the Summary checklist."],
+      ["Shift notes",
+       "Work \u2192 Notes. Write a note against a participant and mark it private or shareable. That mark is about how you have written it, plain and factual for someone else to read, or your own private observations. Ticking it does not send anything."],
+      ["Sending a note",
+       "A shareable note gets a Send button. On a phone you get your usual share sheet: WhatsApp, Telegram, Messages, email, whatever you have installed. You can also email it straight to the participant or their plan manager using the addresses on their records, or copy the text. On a computer the share sheet usually is not available, so email and copy are what you will see. Nothing goes until you press send in whichever app opens."],
+      ["What gets sent, and to whom",
+       "There is a tick box for whether to include their full name and NDIS number. Leave it on when emailing a plan manager, who needs both to match the note to the right person. Turn it off when sending through a messaging app and the note goes out with a first name only. Either way this is personal information about someone else, so send it only to people entitled to see it, and check the participant is comfortable with how you are sending it, some plan managers require email or their own portal. Once sent, the note records the date, and who it went to when the app knows."],
+    ],
+  },
+  {
+    t: "Backups and troubleshooting",
+    d: "Keep your data protected and know what to do when something goes wrong.",
+    q: [
+      ["Your records live on this device only",
+       "There is no account and no cloud sync. Clear your browser data, lose the phone or delete the app, and the records go with it. Settings \u2192 Backup handles this."],
+      ["Every backup is encrypted",
+       "During required onboarding, you create one backup password. New backups use that password until you change it in Settings → Backup. The file is locked with it before it leaves the app, so wherever it ends up (your Drive, an email, a chat) it is unreadable without that passphrase. Nobody at SupportFlow ever sees it or stores it. That also means nobody can reset it. If you lose the passphrase, that backup cannot be recovered by anyone. Write it down somewhere separate from the device, or keep it in a password manager, and do not reuse a password from somewhere else."],
+      ["Restoring a backup",
+       "Choose Restore, pick the file, and enter the passphrase it was made with. Get the passphrase right and it shows you exactly what is in the file, how many participants, invoices and so on, and how many of your current records would be overwritten, before anything changes. Nothing is replaced until you confirm."],
+      ["Automatic Google Drive backups",
+       "Google Drive is connected during required onboarding and the first encrypted backup must succeed before setup continues. After meaningful changes, SupportFlow waits about five minutes and uploads one encrypted backup while the app is active. If you are offline, the backup remains pending and retries when SupportFlow is next opened online. A PWA cannot reliably run while completely closed."],
+      ["Back up now, change account or disconnect",
+       "Settings \u2192 Backup shows the connected Google Drive, last successful backup and status. Back up now starts an immediate encrypted backup; while it is running the button changes to Backing up and additional manual or automatic backup attempts are blocked. Change Google account connects a different Drive account. Disconnect Google Drive stops automatic backups on this device but does not delete backups already stored in Drive."],
+      ["A figure looks wrong",
+       "Check the invoice is marked Paid, because unpaid invoices do not count toward tax. Then check the date falls inside the current financial year, 1 July to 30 June."],
+      ["A shift or trip will not delete",
+       "It is attached to an invoice. Remove it from that invoice first. This is deliberate, so you cannot delete work you have already billed."],
+      ["The due date is blank",
+       "The payer has no payment terms recorded. Open Participants, then the participant or plan manager, and add the number of days."],
+      ["An invoice says no billing email",
+       "The plan manager or participant has no email on file. Add it to their record and it will flow through to every future invoice."],
+      ["Getting support",
+       "Manual & help has a Support tab. Describe what happened, then Email support opens your mail app addressed to us with the subject already set to \u201cSupport NDIS\u201d and your message filled in. Nothing sends until you press send there. A few harmless details, app version, device, and how many records you have, are included automatically so we can help faster. Nothing about a participant is ever included."],
+      ["Privacy and security",
+       "Settings \u2192 Privacy & security explains where your records are stored, how encrypted Google Drive backups work, and what limited information is shared when you deliberately use services such as Claimable or SupportFlow Assistant. The Legal documents section links to the full public Privacy Policy and Terms of Use."],
+      ["Daily limit on checks",
+       "The checker allows 15 questions a day, and the note tidier 30. That is far more than a normal day of work and exists to stop the cost running away, each check reads live pages from the ATO, which is not free. Anything you have already asked opens instantly and does not count against the limit, and it resets the next day."],
+      ["Checking things yourself",
+       "Manual & help has an Official sources tab: the NDIS pricing updates page, the NDIA newsletters you can subscribe to, the NDIS Commission for worker screening and complaints, the ATO occupation guide for support workers, and the Australian Business Register. This app is a convenience, not an authority, when something matters, check the source."],
+      ["When the rates go out of date",
+       "Prices change every 1 July, and sometimes mid-year. The app records when its figures were last checked against the published schedule, and once that is more than a year old it says so on the Summary screen and in Settings rather than quietly looking current. Subscribing to the NDIA provider newsletter is the simplest way to hear about a change when it happens."],
+      ["Where the numbers come from",
+       "Support item codes and prices come from the NDIS Pricing Schedule 2026-27, National column, effective 1 July 2026. The billing rules, time of day, cancellations, travel, come from the Pricing Arrangements and Price Limits 2025-26, the most recent published rules. Prices change every 1 July, so check ndis.gov.au if the year has turned over."],
+    ],
+  },
+];
+
+
+/* ---------------- feedback ---------------- */
+// No server, so feedback leaves as a message the tester sends. Everything is
+// pre-formatted; nothing about a participant ever goes in it.
+const FEEDBACK_TO = "support@supportflow.work";
+
+
+/* ---------------- privacy ---------------- */
+// The full policy, rendered straight through rather than behind accordion
+// taps, because a privacy policy that has to be clicked open several times
+// to read in full is not meaningfully visible.
+const PRIVACY_SECTIONS = [
+  ["The short version",
+   "Your SupportFlow working records stay on your device by default. There is no central SupportFlow participant database. Encrypted backups go to the Google Drive account you connect. Information leaves your device only when a feature needs it or you deliberately share, back up or submit something."],
+  ["Who this policy covers",
+   "This covers SupportFlow™, provided by its developer, contactable at support@supportflow.work, on a phone, tablet or desktop, on a production release or a testing build. As the support worker entering information, you remain responsible for being authorised to collect, store, use and disclose it, under whatever consent or service agreement you hold. This policy explains how the app handles information; it doesn't establish or replace your own authority to collect it. Because SupportFlow may record sensitive and health-related information, it's designed with the standards of the Australian Privacy Principles in mind, though the obligations that apply to any individual support worker depend on their own circumstances."],
+  // BETA TESTING NOTICE: REMOVE THIS SECTION WHEN BETA TESTING ENDS.
+  ["Beta testing privacy rule",
+   "During beta testing, use fictional or dummy participant details when you are testing SupportFlow. Real participant information is not required to participate in the beta. If you choose to use SupportFlow as part of your normal support work with real participant information, you remain responsible for ensuring you have the appropriate authority or consent to collect, record, store, use and disclose that information."],
+  // END BETA TESTING NOTICE
+  ["What you may store",
+   "About you: name, ABN, contact and bank details, GST and business settings. About participants: name, NDIS number, plan management type, contact details, support information, shift notes and service agreement information, which may include health-related detail. About plan managers: organisation, contact and billing details. Records of your work: shifts, timesheets, travel, invoices, expenses, agreements and notes."],
+  ["Where records are stored",
+   "Locally on your device, using the app's local data storage. There's no SupportFlow account, no central participant database, and no routine upload of your records to the developer. Under normal use the developer cannot view your locally stored records. If an optional account or cloud-sync feature is ever introduced, this policy will be updated first, and that feature will be optional."],
+  ["Hosting and Netlify",
+   "SupportFlow is hosted on Netlify. Delivering the app to your device involves Netlify processing ordinary technical request information, such as IP address, browser and device details, and which pages or resources were requested. That's separate from the records you store inside the app. SupportFlow does not intentionally send participant names, NDIS numbers, shift notes or other stored records to Netlify simply because the app is hosted there."],
+  ["The deduction checker (Claim check)",
+   "When you type a claim-check question, that question is sent to the service used to process the request and check relevant ATO material. Do not include participant names, NDIS numbers, health information or other participant details. Claim check is for general tax guidance and is not a participant-record feature."],
+  ["Backups",
+   "Encrypted on your device with AES-256 and a passphrase you choose, before the file goes anywhere you decide, your own cloud storage, an email, or a local download. The developer never receives a copy and cannot decrypt it. If you lose the passphrase, nobody can recover it, including the developer."],
+  ["Shift notes and records you choose to share",
+   "Sent using your own device's mail app or share sheet. You choose the recipient and, where offered, whether to include the participant's full name and NDIS number or less identifying detail, choosing the minimum reasonably necessary. The developer doesn't receive a copy."],
+  ["Feedback and support",
+   "Opened in your own email app; nothing sends until you press send. These may include basic technical information such as app version or device type to help with troubleshooting. Don't include participant names, NDIS numbers or health information in a support message. These are kept only as long as reasonably needed to respond."],
+  ["What SupportFlow doesn't do",
+   "SupportFlow does not sell participant records, operate a central participant database, automatically send your work records to the developer, or submit information to the NDIS Commission, ATO or another authority on your behalf. Features that deliberately share or process information tell you before that information leaves the device."],
+  ["Security: access versus encryption",
+   "The PIN or biometric lock controls access to the app, hashed with PBKDF2 and never stored or recoverable in plain form. It does not encrypt your records. Locally stored records are not independently encrypted at rest in the current version, so SupportFlow also relies on your device's own security. Only backup files are encrypted, with AES-256 and your own passphrase. There's no central database to breach, because none exists."],
+  ["Lost or stolen devices, and data breaches",
+   "The developer cannot detect whether your device has been lost, stolen or accessed without permission. If that happens, secure or remotely lock the device where possible, consider remote erasure, assess what may have been exposed, and work out whether you have your own notification obligations. The Notifiable Data Breaches scheme creates obligations where an entity bound by the Act has a breach likely to cause serious harm; whether that applies depends on the circumstances. Where the developer is subject to that obligation over information the developer actually holds, such as support correspondence, the developer will notify the OAIC and affected individuals as required."],
+  ["Access, correction and deletion",
+   "You can view, correct and delete the records stored locally in SupportFlow using the app's own controls. Because the developer does not hold the central participant record set, requests about locally stored records must be handled on the device that holds them. For information the developer actually holds, such as support correspondence, contact support@supportflow.work."],
+  ["Overseas processing",
+   "SupportFlow uses online hosting and optional processing services that may operate infrastructure outside Australia. Ordinary technical hosting data, and information you deliberately submit to an online feature, may therefore be processed outside Australia. Participant working records remain local unless you choose a feature that sends or shares specific information."],
+  ["Children and participants under 18",
+   "SupportFlow is built for adult support workers and isn't directed at children as users. A support worker may provide services to, and enter information about, a participant under 18; that information should be handled with the same care and under the same consent and NDIS obligations as any other participant's."],
+  ["How long information is kept",
+   "Retention is under your control, since records live on your device; SupportFlow doesn't automatically delete anything. The ATO generally expects business records kept for five years, though other periods can apply. Support or feedback correspondence the developer actually receives is kept only as long as reasonably necessary."],
+  ["Complaints",
+   "Contact the developer first at support@supportflow.work, subject \"Privacy complaint\". Depending on the circumstances you may also complain to the OAIC at oaic.gov.au or 1300 363 992. NDIS-related concerns may also involve the NDIS Quality and Safeguards Commission."],
+  ["Changes to this policy",
+   "If a future change materially affects how information is handled, this policy will be updated with a revised date, and a notice shown in the app where appropriate."],
+];
+
+
+/* ---------------- legal accordions ---------------- */
+function LegalAccordion({ sections }) {
+  const [openIndex, setOpenIndex] = useState(null);
+  return (
+    <>
+      {sections.map(([t, body], i) => {
+        const open = openIndex === i;
+        return (
+          <div className="band" key={t} style={{ paddingTop: 0, paddingBottom: 0 }}>
+            <button
+              type="button"
+              aria-expanded={open}
+              onClick={() => setOpenIndex(open ? null : i)}
+              style={{
+                width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+                gap: 12, padding: "17px 0", border: 0, background: "transparent", color: "inherit",
+                textAlign: "left", cursor: "pointer"
+              }}
+            >
+              <span className="eyebrow">{t}</span>
+              <span aria-hidden="true" style={{ fontSize: 20, lineHeight: 1, color: "var(--tx-3)", transform: open ? "rotate(45deg)" : "none", transition: "transform .16s ease" }}>+</span>
+            </button>
+            {open && (
+              <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.8, maxWidth: "62ch", paddingBottom: 18 }}>{body}</div>
+            )}
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+/* ---------------- data & security ---------------- */
+const DATASEC_SECTIONS = [
+  ["Your records stay on your device",
+   "SupportFlow uses a local-first approach. Participants, shifts, notes, invoices, expenses and other operational records are stored locally using the app's local data storage. There is no central developer-operated database, and under normal operation the developer cannot view your locally stored records."],
+  ["App protection versus encryption",
+   "The optional PIN lock, and biometric authentication where supported, protect access to SupportFlow. Your PIN is hashed with PBKDF2 before storage and never kept in plain text. These features do not independently encrypt the records stored locally by the app."],
+  ["Local data isn't encrypted at rest",
+   "In the current version, SupportFlow's locally stored operational records are not independently encrypted at rest. The app therefore also relies on the security your phone, tablet or computer itself provides. Use a strong device lock, keep the operating system updated, don't share your PIN, don't leave an unlocked device unattended, enable remote locking or wiping where available, and back up regularly."],
+  ["Encrypted backups",
+   "When you create a protected backup, the file is encrypted on your device with AES-256 before export, using the backup password you create during onboarding. The readable password is not stored by SupportFlow and cannot be recovered by the developer. If you lose it, the backup cannot be recovered by the developer. Keep it somewhere secure, separate from the device holding your records."],
+  ["No central participant database",
+   "The developer does not maintain a central database of all users' participant records, which reduces the sensitive information held centrally. It doesn't remove the need to secure your own device."],
+  ["Hosting",
+   "SupportFlow is hosted on Netlify. Your device communicates with Netlify to load and run the app, and Netlify may process normal technical web-hosting information as part of that. Your locally stored participant records are not intentionally uploaded to Netlify simply because the app is hosted there."],
+  ["When information can leave your device",
+   "When you choose to export, back up, email or share it, or when you intentionally submit a question through Claim check. Once information leaves your device to another person or service, its security also depends on that recipient. Always check who you're sending to, and share only what's reasonably necessary."],
+  ["If your device is lost or stolen",
+   "Lock or remotely secure it if possible, consider remote erasure where appropriate, change relevant passwords, consider what participant information may have been accessible, and assess whether you have notification or reporting obligations."],
+  ["Reporting a security concern",
+   "support@supportflow.work. Please don't include participant names, NDIS numbers, health information or other unnecessary participant information when reporting a technical problem."],
+];
+
+function DataSecurity() {
+  return (
+    <>
+      <div className="panel">
+        <div className="eyebrow" style={{ marginBottom: 8 }}>Data &amp; security</div>
+        <div style={{ fontSize: 12, color: "var(--tx-3)", fontWeight: 500 }}>Last updated 18 August 2026</div>
+      </div>
+      <LegalAccordion sections={DATASEC_SECTIONS} />
+    </>
+  );
+}
+
+/* ---------------- privacy, security & about ---------------- */
+const PRIVSEC_SECTIONS = [
+  ["Your data", <>
+    <p>SupportFlow keeps your participant and work records on this device. SupportFlow does not operate a central database containing your participant records.</p>
+    <p>If the app or browser data is cleared, those local records can be lost, which is why encrypted backup is part of setup.</p>
+  </>],
+  ["Backups & Google Drive", <>
+    <p>Your SupportFlow backup is encrypted on this device before it is uploaded to your connected Google Drive. The encrypted backup is stored in your own Drive, not in a central SupportFlow participant database.</p>
+    <p>SupportFlow uses the Google Drive permission needed for backup files it creates or uses. Your backup password is not sent with the backup and is required when restoring on another device.</p>
+    <p>Backup controls, status and the time of the last successful backup are available in Settings → Backup.</p>
+  </>],
+  ["Information shared with other services", <>
+    <p><strong>SupportFlow Assistant:</strong> sends the question you type and generic app/help context needed to answer it. It is designed not to send participant or business records.</p>
+    <p><strong>Early Access:</strong> limited technical and usage events may be recorded to operate the tester program, such as whether a shift, trip, invoice, expense or note was created. Participant content is not included in those events.</p>
+  </>],
+  ["Your privacy", <>
+    <p>The full Privacy Policy explains what SupportFlow handles, where information is stored, third-party services and your privacy choices.</p>
+  </>],
+];
+
+function PrivacySecurity() {
+  return (
+    <>
+      <LegalAccordion sections={PRIVSEC_SECTIONS} />
+      <div className="band" style={{ marginTop: 18 }}>
+        <div className="bandhead"><div className="eyebrow">Legal documents</div></div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <a className="btn ghost tiny" href="/privacy" target="_blank" rel="noreferrer">Privacy Policy ↗</a>
+          <a className="btn ghost tiny" href="/terms" target="_blank" rel="noreferrer">Terms of Use ↗</a>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function About() {
+  return (
+    <>
+      <div className="callout" style={{ marginBottom: 18 }}>
+        <div style={{ fontSize: 11, letterSpacing: ".04em", textTransform: "uppercase", color: "var(--tx-3)", marginBottom: 6 }}>Our mission</div>
+        <div style={{ fontSize: 13.5, lineHeight: 1.75 }}>SupportFlow brings everyday support-work administration together so independent support workers can spend less time managing paperwork and more time doing the work that matters.</div>
+      </div>
+      <div className="panel">
+        <div className="eyebrow" style={{ marginBottom: 8 }}>About SupportFlow</div>
+        <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.8, maxWidth: "62ch" }}>Built for independent Australian support workers and sole traders. SupportFlow brings shifts, participant records, invoices, travel, expenses and everyday business records together in one place.</div>
+      </div>
+      <div className="band">
+        <div className="bandhead"><div className="eyebrow">Independent from the NDIS</div></div>
+        <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.8, maxWidth: "62ch" }}>SupportFlow is an independent product. It is not affiliated with, endorsed by or operated by the NDIA, the NDIS Quality and Safeguards Commission, the ATO or the Australian Government.</div>
+      </div>
+      <div className="band">
+        <div className="bandhead"><div className="eyebrow">Legal &amp; privacy</div></div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <a className="btn ghost tiny" href="/privacy" target="_blank" rel="noreferrer">Privacy Policy ↗</a>
+          <a className="btn ghost tiny" href="/terms" target="_blank" rel="noreferrer">Terms of Use ↗</a>
+        </div>
+      </div>
+      <div style={{ fontSize: 11.5, color: "var(--tx-3)", marginTop: 8, marginBottom: 20 }}>App version {APP_VERSION}</div>
+    </>
+  );
+}
+
+function Support({ data }) {
+  const [what, setWhat] = useState("");
+  const [sent, setSent] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const deviceRef = (() => {
+    try { return localStorage.getItem("ndis:deviceRef") || ""; } catch (e) { return ""; }
+  })();
+
+  const recordCounts = `${data.participants.length} participants, ${data.managers.length} managers, ` +
+    `${data.shifts.length} shifts, ${data.trips.length} trips, ${data.invoices.length} invoices, ` +
+    `${data.expenses.length} expenses, ${data.notes.length} notes`;
+
+  const context = () => [
+    `From: ${(data.profile.name || "(name not set)")}${data.profile.email ? ` <${data.profile.email}>` : " (no email on file)"}`,
+    data.profile.phone ? `Phone: ${data.profile.phone}` : null,
+    deviceRef ? `Device ref: ${deviceRef}` : null,
+    `App version: ${APP_VERSION}`,
+    `Screen: ${window.innerWidth}x${window.innerHeight}`,
+    `Browser: ${navigator.userAgent}`,
+    `Records: ${recordCounts}`,
+  ].filter(Boolean).join("\n");
+
+  const body = () => [
+    what.trim() || "(describe the problem here)",
+    "",
+    context(),
+  ].join("\n");
+
+  const submit = async () => {
+    setSubmitting(true);
+    setSent("");
+    try {
+      const res = await fetch("/.netlify/functions/feedback-submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: what.trim(),
+          name: data.profile.name || "",
+          email: data.profile.email || "",
+          phone: data.profile.phone || "",
+          deviceRef,
+          appVersion: APP_VERSION,
+          screen: `${window.innerWidth}x${window.innerHeight}`,
+          browser: navigator.userAgent,
+          recordCounts,
+        }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || !d.ok) throw new Error("failed");
+      setWhat("");
+      emitTesterActivity("feedback_submitted");
+      setSent("Sent, thanks — we'll get back to you if it needs a reply.");
+    } catch (e) {
+      setSent("Couldn't send that. Try Email or Copy below instead.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(body()); setSent("Copied, paste it into an email or message."); }
+    catch (e) { setSent("Couldn't copy. Select the text below instead."); }
+  };
+
+  return (
+    <>
+      <div className="panel">
+        <div className="eyebrow" style={{ marginBottom: 10 }}>Having a problem?</div>
+        <div style={{ fontSize: 13, color: "var(--tx-2)", lineHeight: 1.65 }}>
+          Tell us what happened and we'll get back to you if it needs a reply.
+        </div>
+      </div>
+
+      <div className="panel">
+        <label className="f" style={{ marginBottom: 0 }}><span>What went wrong?</span>
+          <textarea style={{ minHeight: 130 }} value={what} onChange={(e) => setWhat(e.target.value)}
+            placeholder="What you were doing, what you expected, and what happened instead" />
+        </label>
+        <div style={{ fontSize: 11.5, color: "var(--warn)", marginTop: 8, lineHeight: 1.6 }}>
+          Describe it without using a participant's name or NDIS number, e.g. "the participant I logged
+          a shift for" rather than who they actually are.
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button className="btn" onClick={submit} disabled={!what.trim() || submitting}>
+          {submitting ? "Sending…" : "Send feedback"}
+        </button>
+        <button className="btn ghost" onClick={copy} disabled={!what.trim()}>Copy</button>
+      </div>
+      <div style={{ fontSize: 11.5, color: "var(--tx-3)", marginTop: 10, lineHeight: 1.6 }}>
+        A few harmless details, app version, device, and how many records you have, are included
+        automatically so we can help faster. Nothing about a participant is ever included.
+      </div>
+
+      {sent && <div style={{ marginTop: 12, fontSize: 12.5, color: "var(--good)" }}>{sent}</div>}
+    </>
+  );
+}
+
+// Help-and-navigation only, deliberately: it can explain where a feature
+// lives and how it works, and it can send someone to a screen, but it
+// never creates, edits, deletes or sends anything itself, and it never
+// gives a definitive tax, legal, clinical or compliance answer -- see the
+// system prompt in netlify/functions/supportflow-assistant.mjs, which is
+// where those boundaries are actually enforced, not just stated here.
+const ASSISTANT_QUICK_STARTS = ["Create an invoice", "Log kilometres", "Add a participant", "Restore a backup"];
+const ASSISTANT_WELCOME = { role: "assistant",
+  text: "Hi, I'm the SupportFlow Assistant. Ask me how to use SupportFlow, and I'll help you find your way." };
+
+function SupportFlowAssistant({ onClose, go, currentScreen, openHelp }) {
+  const [messages, setMessages] = useState(() => {
+    try {
+      const raw = localStorage.getItem("ndis:assistantChat");
+      const saved = raw ? JSON.parse(raw) : null;
+      return Array.isArray(saved) && saved.length ? saved : [ASSISTANT_WELCOME];
+    } catch (e) { return [ASSISTANT_WELCOME]; }
+  });
+  const [input, setInput] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [warn, setWarn] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
+  const listRef = useRef(null);
+
+  useEffect(() => {
+    try { localStorage.setItem("ndis:assistantChat", JSON.stringify(messages)); } catch (e) { }
+    if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
+  }, [messages]);
+
+  const clearChat = () => {
+    setMessages([ASSISTANT_WELCOME]);
+    try { localStorage.removeItem("ndis:assistantChat"); } catch (e) { }
+  };
+
+  const send = async (rawText) => {
+    const text = (rawText != null ? rawText : input).trim();
+    if (!text || busy) return;
+    if (looksLikeSensitiveInfo(text)) { setWarn(true); return; }
+    setWarn(false);
+    setUnavailable(false);
+    const history = messages.filter((m) => m !== ASSISTANT_WELCOME).slice(-6)
+      .map((m) => ({ role: m.role, text: m.text }));
+    const next = [...messages, { role: "user", text }];
+    setMessages(next);
+    setInput("");
+    setBusy(true);
+    if (aiLeft("assistant") <= 0) {
+      setMessages([...next, { role: "assistant", text: `That's today's ${AI_CAPS.assistant} questions. The Help section still works normally.` }]);
+      setBusy(false);
+      return;
+    }
+    try {
+      aiBump("assistant");
+      const res = await fetch("/.netlify/functions/supportflow-assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: text, screen: currentScreen || "",
+          manualContext: pickManualContext(text), history }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || !d.text) throw new Error("failed");
+      const m = d.text.match(/\[\[OPEN:([a-z]+)\]\]\s*$/i);
+      const clean = m ? d.text.slice(0, m.index).trim() : d.text;
+      setMessages((cur) => [...cur, { role: "assistant", text: clean, openKey: m ? m[1].toLowerCase() : null }]);
+    } catch (e) {
+      setUnavailable(true);
+      setMessages((cur) => cur.slice(0, -1));   // the question that couldn't be answered isn't kept as a dead end in the transcript
+      setInput(text);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 60, background: "var(--bg)", display: "flex", flexDirection: "column" }}
+      role="dialog" aria-label="SupportFlow Assistant">
+      <div className="topin" style={{ borderBottom: "1px solid var(--line)", flex: "0 0 auto" }}>
+        <div>
+          <div className="disp" style={{ fontSize: 19 }}>SupportFlow Assistant</div>
+          <div style={{ fontSize: 11.5, color: "var(--tx-3)" }}>Help using SupportFlow</div>
+        </div>
+        <button className="iconbtn" onClick={onClose} aria-label="Close assistant">✕</button>
+      </div>
+
+      <div style={{ padding: "10px 22px", borderBottom: "1px solid var(--line-2)", fontSize: 11, color: "var(--tx-3)", lineHeight: 1.6 }}>
+        SupportFlow Assistant provides help using the app. It does not provide legal, tax, accounting,
+        clinical or NDIS advice.
+      </div>
+
+      <div ref={listRef} style={{ flex: "1 1 auto", overflowY: "auto", padding: "16px 22px" }}>
+        {messages.map((m, i) => (
+          <div key={i} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start", marginBottom: 12 }}>
+            <div style={{ maxWidth: "80%", padding: "10px 14px", borderRadius: 12, fontSize: 13.5, lineHeight: 1.55,
+              background: m.role === "user" ? "var(--brass)" : "var(--bg-2)",
+              color: m.role === "user" ? "#14150F" : "var(--tx)",
+              border: m.role === "user" ? "none" : "1px solid var(--line)" }}>
+              {m.text}
+              {m.openKey && (
+                <div style={{ marginTop: 8 }}>
+                  <button className="btn tiny" onClick={() => { openAssistantTarget(m.openKey, go); onClose(); }}>
+                    Open {m.openKey.charAt(0).toUpperCase() + m.openKey.slice(1)}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+        {busy && <div aria-live="polite" style={{ fontSize: 12.5, color: "var(--tx-3)" }}>Thinking…</div>}
+        {unavailable && (
+          <div className="panel" style={{ marginTop: 8 }}>
+            <div style={{ fontSize: 13, marginBottom: 10 }}>SupportFlow Assistant is unavailable right now. You can still use the Help section.</div>
+            <button className="btn ghost tiny" onClick={() => { openHelp(); onClose(); }}>Open Help</button>
+          </div>
+        )}
+        {messages.length <= 1 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
+            {ASSISTANT_QUICK_STARTS.map((q) => (
+              <button key={q} className="btn ghost tiny" onClick={() => send(q)}>{q}</button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div style={{ padding: "12px 22px", borderTop: "1px solid var(--line)", flex: "0 0 auto" }}>
+        {warn && (
+          <div style={{ fontSize: 12, color: "var(--warn)", marginBottom: 8, lineHeight: 1.6 }}>
+            This message may contain personal information. Remove participant-identifying details before sending.
+          </div>
+        )}
+        <div style={{ display: "flex", gap: 8 }}>
+          <input aria-label="Ask SupportFlow a question" value={input}
+            onChange={(e) => { setInput(e.target.value); setWarn(false); }}
+            onKeyDown={(e) => { if (e.key === "Enter") send(); }}
+            placeholder="Ask a question…" style={{ flex: 1 }} />
+          <button className="btn" onClick={() => send()} disabled={busy || !input.trim()} aria-label="Send">Send</button>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
+          <div style={{ fontSize: 10.5, color: "var(--tx-3)" }}>
+            Don't include participant names, NDIS numbers or other personal information.
+          </div>
+          <button className="btn ghost tiny" onClick={clearChat}>Clear conversation</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Help({ data, initialView = "manual" }) {
+  const [open, setOpen] = useState(null);
+  const [view, setView] = useState(initialView);
+  // Navigation supplies the intended Help destination directly. This avoids
+  // the old event-timing race where Feedback could open the previously used tab.
+  useEffect(() => {
+    setView(initialView);
+    setOpen(null);
+  }, [initialView]);
+  const [query, setQuery] = useState("");
+  const set = view === "manual" ? MANUAL : FAQ;
+
+  const searchResults = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    if (term.length < 2) return null;
+    const hits = [];
+    [...MANUAL, ...FAQ].forEach((sec) => {
+      sec.q.forEach(([q, a]) => {
+        if (q.toLowerCase().includes(term) || a.toLowerCase().includes(term) ||
+            (sec.t || "").toLowerCase().includes(term)) {
+          hits.push({ sectionTitle: sec.t, q, a });
+        }
+      });
+    });
+    return hits;
+  }, [query]);
+
+  return (
+    <>
+      <div style={{ marginTop: 10, marginBottom: 14 }}>
+        <input aria-label="Search help" value={query} onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search help — GST, invoices, backup, kilometres…"
+          style={{ width: "100%" }} />
+      </div>
+
+      {searchResults !== null ? (
+        <>
+          <div style={{ fontSize: 11.5, color: "var(--tx-3)", margin: "14px 0 4px" }}>
+            {searchResults.length === 0 ? "Nothing found" : `${searchResults.length} result${searchResults.length === 1 ? "" : "s"}`}
+          </div>
+          {searchResults.length === 0 ? (
+            <div className="panel" style={{ fontSize: 13, color: "var(--tx-2)", lineHeight: 1.65 }}>
+              Nothing matched that. Try a shorter word, or the Support tab if it should be covered
+              and isn't.
+            </div>
+          ) : searchResults.map((r, i) => {
+            const id = "search" + i;
+            const on = open === id;
+            return (
+              <div className="band" key={id}>
+                <div style={{ borderBottom: "1px solid var(--line-2)" }}>
+                  <button
+                    onClick={() => setOpen(on ? null : id)}
+                    style={{ width: "100%", textAlign: "left", background: "none", border: 0, padding: "12px 0",
+                             cursor: "pointer", fontFamily: "inherit" }}>
+                    <div style={{ fontSize: 10.5, color: "var(--tx-3)", marginBottom: 4 }}>{r.sectionTitle}</div>
+                    <div style={{ display: "flex", gap: 12, alignItems: "baseline" }}>
+                      <span style={{ flex: 1, fontSize: 13.5, fontWeight: 600, color: on ? "var(--brass)" : "var(--tx)" }}>{r.q}</span>
+                      <span style={{ color: "var(--tx-3)", fontSize: 15 }}>{on ? "−" : "+"}</span>
+                    </div>
+                  </button>
+                  {on && (
+                    <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.8, paddingBottom: 16, maxWidth: "62ch" }}>
+                      {r.a}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </>
+      ) : (
+      <>
+      <div className="tabnav" style={{ marginTop: 6 }}>
+        {[["manual", "How it works"], ["faq", "Questions"], ["sources", "Sources"], ["support", "Support"]].map(([k, l]) => (
+          <button key={k} data-on={view === k ? 1 : 0} onClick={() => { setView(k); setOpen(null); }}>{l}</button>
+        ))}
+      </div>
+
+      {view === "manual" ? (
+        <div style={{ margin: "18px 0 8px" }}>
+          <div className="disp" style={{ fontSize: 20, marginBottom: 5 }}>User manual</div>
+          <div style={{ fontSize: 12.5, color: "var(--tx-2)", lineHeight: 1.55 }}>
+            Everything you need to set up and use SupportFlow.
+          </div>
+        </div>
+      ) : view !== "support" ? (
+        <div className="panel">
+          <div className="eyebrow" style={{ marginBottom: 10 }}>
+            {view === "faq" ? "Plain-English guide" : view === "sources" ? "Straight from the source" : ""}
+          </div>
+          <div style={{ fontSize: 13, color: "var(--tx-2)", lineHeight: 1.65 }}>
+            {view === "faq"
+              ? <>Written for people new to working for themselves in Australia. General information
+                 only, it is not advice about your own situation, and a registered tax agent is worth
+                 the money in your first year.</>
+              : view === "sources"
+                ? <>This app is a convenience, not an authority. These are the places the figures and
+                   rules actually come from, check them yourself whenever something matters.</>
+                : null}
+          </div>
+        </div>
+      ) : null}
+
+      {view === "support" ? <Support data={data} /> : view === "sources" ? (
+        <>
+          {SOURCES.map((x) => (
+            <a className="row tap" key={x.u} href={x.u} target="_blank" rel="noreferrer"
+              style={{ textDecoration: "none", color: "inherit", display: "flex" }}>
+              <span className="dot" style={{ background: "var(--brass)" }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 600 }}>{x.t} ↗</div>
+                <div style={{ fontSize: 11.5, color: "var(--tx-3)", marginTop: 3, lineHeight: 1.5 }}>{x.d}</div>
+              </div>
+            </a>
+          ))}
+          <div style={{ fontSize: 11.5, color: "var(--tx-3)", lineHeight: 1.7, marginTop: 16 }}>
+            Prices change every 1 July, and sometimes mid-year. Subscribing to the NDIA provider
+            newsletter is the simplest way to hear about it when it happens.
+          </div>
+        </>
+      ) : set.map((sec) => {
+        const sectionId = "section:" + (sec.g || sec.t);
+        const sectionOn = view !== "manual" || open === sectionId || (open || "").startsWith(sectionId + ":");
+        return (
+        <div className="band" key={sec.g || sec.t}>
+          {view === "manual" ? (
+            <button onClick={() => setOpen(sectionOn ? null : sectionId)}
+              style={{ width: "100%", textAlign: "left", background: "none", border: 0, padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
+              <div className="bandhead" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <div className="eyebrow" style={{ color: sectionOn ? "var(--brass)" : "var(--tx)", fontWeight: 700 }}>{sec.t}</div>
+                  {sec.d && <div style={{ fontSize: 12, color: "var(--tx-2)", fontWeight: 500, marginTop: 5, lineHeight: 1.55 }}>{sec.d}</div>}
+                </div>
+                <span style={{ color: "var(--tx-3)", fontSize: 18 }}>{sectionOn ? "−" : "+"}</span>
+              </div>
+            </button>
+          ) : (
+            <div className="bandhead" style={{ display: "block" }}>
+              <div className="eyebrow" style={{ color: "var(--tx)", fontWeight: 700 }}>{sec.g || sec.t}</div>
+              {sec.d && <div style={{ fontSize: 12, color: "var(--tx-2)", fontWeight: 500, marginTop: 5, lineHeight: 1.55 }}>{sec.d}</div>}
+            </div>
+          )}
+          {sectionOn && sec.q.map(([q, a]) => {
+            const id = view === "manual" ? sectionId + ":" + q : (sec.g || sec.t) + q;
+            const on = open === id;
+            return (
+              <div key={q} style={{ borderBottom: "1px solid var(--line-2)" }}>
+                <button
+                  onClick={() => setOpen(on ? (view === "manual" ? sectionId : null) : id)}
+                  style={{ width: "100%", textAlign: "left", background: "none", border: 0, padding: "14px 0",
+                           cursor: "pointer", fontFamily: "inherit", fontSize: 13.5, fontWeight: 600,
+                           color: on ? "var(--brass)" : "var(--tx)", display: "flex", gap: 12, alignItems: "baseline" }}>
+                  <span style={{ flex: 1 }}>{q}</span>
+                  <span style={{ color: "var(--tx-3)", fontSize: 15 }}>{on ? "−" : "+"}</span>
+                </button>
+                {on && (
+                  <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.8, paddingBottom: 16, maxWidth: "62ch" }}>
+                    {a}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        );
+      })}
+      </>)}
+    </>
+  );
+}
+
+/* ---------------- backup ---------------- */
+// Everything lives in this browser's storage, so a real file is the only thing
+// standing between the user and losing a year of records. The file is
+// encrypted with a passphrase the user sets — we never see it, never store it,
+// and cannot recover it. That is the trade: real security, and real
+// responsibility on whoever holds the passphrase.
+const BACKUP_FORMAT = 3;
+const PBKDF2_ITERATIONS = 250000;   // slow on purpose, resists guessing if the file leaks
+
+function backupPayload(data) {
+  return JSON.stringify({
+    format: BACKUP_FORMAT,
+    app: "SupportFlow™",
+    exported: new Date().toISOString(),
+    counts: {
+      participants: data.participants.length, managers: data.managers.length,
+      invoices: data.invoices.length, expenses: data.expenses.length,
+      trips: data.trips.length, notes: data.notes.length,
+    },
+    data,
+    security: {
+      // PIN is stored as a one-way hash + salt and is protected again by the
+      // encrypted backup. WebAuthn/biometric credentials are device-specific.
+      lock: (() => {
+        const l = readLock();
+        if (!l) return null;
+        const { credentialId, ...portableLock } = l;
+        return portableLock;
+      })()
+    },
+  }, null, 2);
+}
+
+// AES-256-GCM via the browser's own Web Crypto — no library, nothing sent
+// anywhere. The passphrase itself never leaves the device and is never part
+// of the encrypted file.
+async function encryptBackup(text, passphrase) {
+  const enc = new TextEncoder();
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(passphrase), "PBKDF2", false, ["deriveKey"]);
+  const key = await crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt, iterations: PBKDF2_ITERATIONS, hash: "SHA-256" },
+    keyMaterial, { name: "AES-GCM", length: 256 }, false, ["encrypt"]
+  );
+  const cipher = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, enc.encode(text));
+  const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+  return JSON.stringify({
+    encrypted: true, format: BACKUP_FORMAT, kdf: "PBKDF2-SHA256", iterations: PBKDF2_ITERATIONS,
+    salt: b64(salt), iv: b64(iv), data: b64(cipher),
+  });
+}
+
+async function decryptBackup(json, passphrase) {
+  const env = JSON.parse(json);
+  if (!env.encrypted) return json;   // an older, unencrypted export
+  const b64d = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+  const enc = new TextEncoder(), dec = new TextDecoder();
+  const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(passphrase), "PBKDF2", false, ["deriveKey"]);
+  const key = await crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt: b64d(env.salt), iterations: env.iterations || PBKDF2_ITERATIONS, hash: "SHA-256" },
+    keyMaterial, { name: "AES-GCM", length: 256 }, false, ["decrypt"]
+  );
+  try {
+    const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64d(env.iv) }, key, b64d(env.data));
+    return dec.decode(plain);
+  } catch (e) {
+    throw new Error("wrong-passphrase");
+  }
+}
+
+function downloadBackup(text, encrypted) {
+  const stamp = new Date().toISOString().slice(0, 10);
+  const blob = new Blob([text], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `supportflow-backup-${stamp}${encrypted ? "" : "-UNENCRYPTED"}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// Share sheet where the browser supports it — this is the Drive / Files route
+// on a phone. Falls back to a plain download. The file is already encrypted
+// by the time it reaches here, so wherever it lands, it lands unreadable.
+async function shareBackup(text, encrypted) {
+  const stamp = new Date().toISOString().slice(0, 10);
+  const name = `supportflow-backup-${stamp}${encrypted ? "" : "-UNENCRYPTED"}.json`;
+  try {
+    const file = new File([text], name, { type: "application/json" });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: "SupportFlow™ backup" });
+      return "shared";
+    }
+  } catch (e) {
+    if (e && e.name === "AbortError") return "cancelled";
+  }
+  downloadBackup(text, encrypted);
+  return "downloaded";
+}
+
+// Accepts both the wrapped export and a bare data object, so a file that's
+// been through some other tool still restores.
+function parseBackup(text) {
+  const raw = JSON.parse(text);
+  const d = raw && raw.data ? raw.data : raw;
+  if (!d || typeof d !== "object") throw new Error("That doesn't look like a backup file.");
+  const need = ["invoices", "participants", "expenses", "trips", "notes"];
+  if (!need.some((k) => Array.isArray(d[k]))) throw new Error("No SupportFlow records found in that file.");
+  return {
+    data: {
+      ...BLANK,
+      ...d,
+      profile: { ...BLANK.profile, ...(d.profile && typeof d.profile === "object" ? d.profile : {}) }
+    },
+    security: raw && raw.security && typeof raw.security === "object" ? raw.security : null,
+    exported: raw.exported || null,
+    counts: raw.counts || null,
+  };
+}
+
+// A crude strength check — enough to catch the worst passphrases without
+// pretending to be a real strength meter.
+// A genuinely random passphrase, offered rather than forced, so someone
+// typing their own guessable word still gets caught by weakPassphrase
+// below, but the easier, safer path is one tap away. Real words rather
+// than random characters, since four real words are both higher entropy
+// than most people's own passwords and much easier to actually write down
+// correctly by hand, which is the whole point once it can never be reset.
+const PASSPHRASE_WORDS = [
+  "amber", "anchor", "autumn", "badge", "basil", "beacon", "birch", "bramble",
+  "canyon", "cedar", "cinder", "clover", "copper", "coral", "cove", "crest",
+  "dune", "ember", "fern", "flint", "forge", "garnet", "glacier", "granite",
+  "harbor", "hazel", "heron", "hollow", "indigo", "ivory", "jasper", "juniper",
+  "kestrel", "lagoon", "lantern", "linen", "lotus", "maple", "marsh", "meadow",
+  "moss", "nectar", "nimbus", "oak", "opal", "orchid", "otter", "pebble",
+  "pine", "plume", "prairie", "quartz", "raven", "reed", "ridge", "river",
+  "rowan", "saffron", "sage", "shale", "slate", "sparrow", "spruce", "summit",
+  "swan", "tansy", "thistle", "tide", "timber", "topaz", "trellis", "tundra",
+  "valley", "velvet", "violet", "walnut", "willow", "zephyr",
+];
+function generatePassphrase() {
+  const idx = crypto.getRandomValues(new Uint32Array(4));
+  const words = Array.from(idx, (n) => PASSPHRASE_WORDS[n % PASSPHRASE_WORDS.length]);
+  const number = crypto.getRandomValues(new Uint32Array(1))[0] % 90 + 10; // two digits, never leading zero
+  return `${words.join("-")}-${number}`;
+}
+
+function weakPassphrase(p) {
+  if (!p || p.length < 10) return "At least 10 characters, longer is safer than clever.";
+  const common = ["password", "passphrase", "letmein", "qwerty", "123456", "supportflow", "ndis2026", "ndis2027"];
+  if (common.some((c) => p.toLowerCase().includes(c))) return "That's a guessable one. A few random words work better than a real password.";
+  if (/^(.)\1+$/.test(p) || /^0123456789/.test(p) || /^abcdefgh/i.test(p)) return "That's a pattern, not a passphrase.";
+  return null;
+}
+
+
+/* ---------------- lock settings ---------------- */
+
+/* ---------------- prior totals ---------------- */
+// A rough starting point for someone switching to SupportFlow partway
+// through the current financial year. Not invoices, not expenses in the
+// normal lists, just three numbers that feed the tax set-aside figure so
+// it reflects the whole year, not just the part tracked in the app.
+function PriorTotalsPanel({ data, save, fy, sectionOpen, onToggleSection }) {
+  const existing = data.priorTotals && data.priorTotals.fy === fy ? data.priorTotals : null;
+  const [open, setOpen] = useState(false);
+  const [income, setIncome] = useState(existing?.income ?? "");
+  const [expenses, setExpenses] = useState(existing?.expenses ?? "");
+  const [km, setKm] = useState(existing?.km ?? "");
+
+  const submit = () => {
+    save({ ...data, priorTotals: { fy, income: Number(income) || 0, expenses: Number(expenses) || 0, km: Number(km) || 0 } });
+    setOpen(false);
+  };
+  const clear = () => {
+    save({ ...data, priorTotals: null });
+    setIncome(""); setExpenses(""); setKm(""); setOpen(false);
+  };
+
+  return (
+    <div className={"stepcard" + (existing ? " done" : "")} style={{ marginTop: 22 }}>
+      <span className="stepnum">{existing ? "✓" : "–"}</span>
+      <span className="stepcard-chev" data-open={sectionOpen ? 1 : 0} onClick={onToggleSection} aria-hidden="true">›</span>
+      <div className="steplead stepcard-head" onClick={onToggleSection}>{existing ? "Complete" : "Optional"}</div>
+      <div className="disp stepcard-head" style={{ fontSize: 17, marginBottom: 4 }} onClick={onToggleSection}>Switched partway through the year?</div>
+      <div className="eyebrow stepcard-head" style={{ marginBottom: sectionOpen ? 10 : 0 }} onClick={onToggleSection}>Starting point for {fyLabel(fy)}</div>
+      {sectionOpen && (
+      <>
+      <div style={{ fontSize: 13, color: "var(--tx-2)", lineHeight: 1.65, marginBottom: 14 }}>
+        If you were using another app or paper before this, add a rough total for what you'd
+        already earned, spent and driven, so your tax set-aside figure covers the whole year, not
+        just the part tracked here. This isn't invoices or expense records, just three numbers to
+        fill the gap.
+      </div>
+
+      {!open && existing && (
+        <>
+          <div style={{ fontSize: 12.5, color: "var(--tx-2)", lineHeight: 1.9 }}>
+            <div>{money0(existing.income)} income</div>
+            <div>{money0(existing.expenses)} expenses</div>
+            {existing.km > 0 && <div>{existing.km} km</div>}
+          </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <button className="btn ghost tiny" onClick={() => setOpen(true)}>Edit</button>
+            <button className="btn ghost tiny" style={{ color: "var(--warn)" }} onClick={() => confirmAndRun("this starting point", clear)}>Remove</button>
+          </div>
+        </>
+      )}
+
+      {!open && !existing && (
+        <button className="btn" onClick={() => setOpen(true)}>Add a starting point</button>
+      )}
+
+      {open && (
+        <>
+          <div className="two">
+            <label className="f"><span>Income before SupportFlow</span>
+              <div className="affix"><i>$</i>
+                <input type="number" inputMode="decimal" value={income} onChange={(e) => setIncome(e.target.value)} placeholder="0.00" />
+              </div>
+            </label>
+            <label className="f"><span>Expenses before SupportFlow</span>
+              <div className="affix"><i>$</i>
+                <input type="number" inputMode="decimal" value={expenses} onChange={(e) => setExpenses(e.target.value)} placeholder="0.00" />
+              </div>
+            </label>
+          </div>
+          <label className="f" style={{ marginBottom: 0 }}><span>Kilometres before SupportFlow</span>
+            <div className="affix suffix"><i>km</i>
+              <input type="number" inputMode="decimal" value={km} onChange={(e) => setKm(e.target.value)} placeholder="0" />
+            </div>
+          </label>
+          <div style={{ fontSize: 11.5, color: "var(--tx-3)", lineHeight: 1.6, marginTop: 10 }}>
+            This is a rough total, not individual invoices or expenses, it won't appear in your
+            invoice list, expense list or participant records. It only feeds this year's tax
+            set-aside figure. It only ever applies to {fyLabel(fy)}, next financial year it stops
+            counting automatically.
+          </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+            <button className="btn" onClick={submit}>Save</button>
+            <button className="btn ghost" onClick={() => setOpen(false)}>Cancel</button>
+          </div>
+        </>
+      )}
+      </>
+      )}
+    </div>
+  );
+}
+
+function LockPanel({ onChange, open, onToggle }) {
+  // Onboarding uses this with no onToggle at all, so it should behave
+  // exactly as before there: always fully shown, no collapse. Settings
+  // passes both, making this section collapsible like its siblings.
+  const collapsible = typeof onToggle === "function";
+  const isOpen = collapsible ? open : true;
+  const [cfg, setCfg] = useState(readLock());
+  const [mode, setMode] = useState(null);        // "set" | null
+  const [len, setLen] = useState(4);
+  const [pin, setPin] = useState("");
+  const [pin2, setPin2] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [bioOk, setBioOk] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => { biometricsAvailable().then(setBioOk); }, []);
+
+  const save = async () => {
+    if (pin.length !== len) { setErr(`Use ${len} digits.`); return; }
+    if (pin !== pin2) { setErr("Those two don't match."); return; }
+    setBusy(true); setErr("");
+    try {
+      const salt = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))));
+      const hash = await hashPin(pin, salt);
+      const next = { len, salt, hash, bioId: null };
+      writeLock(next); setCfg(next); setMode(null);
+      setPin(""); setPin2(""); setMsg("PIN set. It'll be asked for next time you open the app.");
+      onChange?.(next);
+    } catch (e) { setErr("Couldn't save that. Try again."); }
+    finally { setBusy(false); }
+  };
+
+  const addBio = async () => {
+    setBusy(true); setErr("");
+    try {
+      const id = await enrolBiometric();
+      const next = { ...cfg, bioId: id };
+      writeLock(next); setCfg(next);
+      setMsg("Added. You'll be offered it when the app opens, with the PIN as backup.");
+      onChange?.(next);
+    } catch (e) { setErr("Couldn't set that up on this device. Your PIN still works."); }
+    finally { setBusy(false); }
+  };
+
+  const removeBio = () => { const next = { ...cfg, bioId: null }; writeLock(next); setCfg(next); setMsg("Removed."); onChange?.(next); };
+  const turnOff = () => { writeLock(null); setCfg(null); setMsg("Lock turned off."); onChange?.(null); };
+
+  return (
+    <div className={"stepcard" + (cfg ? " done" : "")} style={{ marginTop: 22 }}>
+      <span className="stepnum">{cfg ? "✓" : "–"}</span>
+      {collapsible && <span className="stepcard-chev" data-open={isOpen ? 1 : 0} onClick={onToggle} aria-hidden="true">›</span>}
+      <div className={"steplead" + (collapsible ? " stepcard-head" : "")} onClick={onToggle}>{cfg ? "On" : "Off"}</div>
+      <div className={"eyebrow" + (collapsible ? " stepcard-head" : "")} style={{ marginBottom: isOpen ? 10 : 0 }} onClick={onToggle}>Lock the app</div>
+      {isOpen && (
+      <>
+      <div style={{ fontSize: 13, color: "var(--tx-2)", lineHeight: 1.65, marginBottom: 14 }}>
+        Ask for a PIN before the app opens. Worth having if you use participant details on a phone
+        that gets left on a bench.
+      </div>
+
+      <div style={{ fontSize: 11.5, color: "var(--tx-3)", lineHeight: 1.65, marginBottom: 16,
+                    background: "var(--bg)", border: "1px solid var(--line)", borderRadius: 9, padding: "10px 12px" }}>
+        This keeps casual eyes out. It doesn't encrypt what's stored on the device, so keep your
+        phone's own screen lock on as well. Your backup file is the thing that's properly encrypted.
+      </div>
+
+      {mode === "set" ? (
+        <>
+          <label className="f"><span>How many digits</span>
+            <select value={len} onChange={(e) => { setLen(Number(e.target.value)); setPin(""); setPin2(""); }}>
+              <option value={4}>4 digits</option>
+              <option value={6}>6 digits</option>
+            </select>
+          </label>
+          <div className="two">
+            <label className="f"><span>PIN</span>
+              <input type="password" inputMode="numeric" maxLength={len} value={pin}
+                onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))} />
+            </label>
+            <label className="f"><span>Again</span>
+              <input type="password" inputMode="numeric" maxLength={len} value={pin2}
+                onChange={(e) => setPin2(e.target.value.replace(/\D/g, ""))} />
+            </label>
+          </div>
+          <div className="callout" style={{ borderColor: "var(--req)", marginBottom: 14 }}>
+            <b>Nobody can reset this for you.</b> There's no account behind it, so forgetting the PIN
+            means clearing the app and restoring from a backup. Back up first.
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button className="btn" onClick={save} disabled={busy || !pin || !pin2}>Set PIN</button>
+            <button className="btn ghost" onClick={() => { setMode(null); setPin(""); setPin2(""); setErr(""); }}>Cancel</button>
+          </div>
+        </>
+      ) : !cfg ? (
+        <button className="btn" onClick={() => setMode("set")}>Set a PIN</button>
+      ) : (
+        <>
+          <div style={{ fontSize: 12.5, color: "var(--good)", marginBottom: 14 }}>
+            On, {cfg.len} digits{cfg.bioId ? " with biometric unlock" : ""}.
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button className="btn ghost tiny" onClick={() => setMode("set")}>Change PIN</button>
+            {bioOk && !cfg.bioId && <button className="btn ghost tiny" onClick={addBio} disabled={busy}>
+              Add fingerprint or face
+            </button>}
+            {cfg.bioId && <button className="btn ghost tiny" onClick={removeBio}>Remove biometric</button>}
+            <button className="btn ghost tiny" style={{ color: "var(--warn)" }} onClick={turnOff}>Turn off</button>
+          </div>
+          {!bioOk && !cfg.bioId && (
+            <div style={{ fontSize: 11.5, color: "var(--tx-3)", marginTop: 12, lineHeight: 1.6 }}>
+              This device or browser doesn't offer fingerprint or face unlock to web apps.
+            </div>
+          )}
+        </>
+      )}
+
+      {msg && <div style={{ marginTop: 12, fontSize: 12.5, color: "var(--good)" }}>{msg}</div>}
+      {err && <div style={{ marginTop: 12, fontSize: 12.5, color: "var(--warn)" }}>{err}</div>}
+      </>
+      )}
+    </div>
+  );
+}
+
+
+const GOOGLE_DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+const GOOGLE_DRIVE_AUTH_KEY = "sf_google_drive_auth_v1";
+const GOOGLE_DRIVE_FOLDER_KEY = "sf_google_drive_folder_v1";
+const AUTO_BACKUP_DELAY_MS = 5 * 60 * 1000;
+let autoBackupTimer = null;
+let googleBackupInFlight = null;
+let googleTokenClient = null;
+let googleClientIdCache = null;
+
+function readGoogleDriveAuth() { try { return JSON.parse(localStorage.getItem(GOOGLE_DRIVE_AUTH_KEY) || "null"); } catch (_) { return null; } }
+function googleDriveConnected() { return !!readGoogleDriveAuth(); }
+function clearGoogleDriveAuth() { try { localStorage.removeItem(GOOGLE_DRIVE_AUTH_KEY); localStorage.removeItem(GOOGLE_DRIVE_FOLDER_KEY); } catch (_) {} }
+async function disconnectGoogleDrive() {
+  const auth = readGoogleDriveAuth();
+  if (auth?.accessToken && window.google?.accounts?.oauth2?.revoke) {
+    await new Promise((resolve) => { try { google.accounts.oauth2.revoke(auth.accessToken, () => resolve()); } catch (_) { resolve(); } });
+  }
+  clearGoogleDriveAuth();
+}
+async function changeGoogleDriveAccount() {
+  await disconnectGoogleDrive();
+  return requestGoogleDriveToken("consent select_account");
+}
+async function googleClientId() {
+  if (googleClientIdCache) return googleClientIdCache;
+  const r = await fetch("/.netlify/functions/google-drive-config", { cache: "no-store" });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || !d.clientId) throw new Error("google-drive-not-configured");
+  googleClientIdCache = d.clientId; return d.clientId;
+}
+async function waitForGoogleIdentity() {
+  for (let i=0;i<40;i++) { if (window.google?.accounts?.oauth2) return; await new Promise(r=>setTimeout(r,100)); }
+  throw new Error("google-identity-unavailable");
+}
+async function requestGoogleDriveToken(prompt="consent") {
+  await waitForGoogleIdentity();
+  const clientId = await googleClientId();
+  return await new Promise((resolve,reject) => {
+    googleTokenClient = google.accounts.oauth2.initTokenClient({ client_id: clientId, scope: GOOGLE_DRIVE_SCOPE,
+      callback: (resp) => {
+        if (!resp || resp.error || !resp.access_token) return reject(new Error(resp?.error || "google-auth-failed"));
+        const expiresAt = Date.now() + Math.max(60, Number(resp.expires_in || 3600) - 60) * 1000;
+        const auth = { accessToken: resp.access_token, expiresAt, connectedAt: new Date().toISOString() };
+        localStorage.setItem(GOOGLE_DRIVE_AUTH_KEY, JSON.stringify(auth)); resolve(auth.accessToken);
+      }
+    });
+    googleTokenClient.requestAccessToken({ prompt });
+  });
+}
+async function validGoogleDriveToken(interactive=false) {
+  const a = readGoogleDriveAuth();
+  if (a?.accessToken && Number(a.expiresAt) > Date.now()) return a.accessToken;
+  if (!a && !interactive) throw new Error("google-drive-not-connected");
+  return requestGoogleDriveToken(interactive ? "consent" : "");
+}
+async function driveFetch(url, opts={}) {
+  let token = await validGoogleDriveToken(false);
+  const run = (t) => fetch(url, { ...opts, headers: { ...(opts.headers||{}), Authorization: `Bearer ${t}` } });
+  let r = await run(token);
+  if (r.status === 401) { const a=readGoogleDriveAuth(); if(a){a.expiresAt=0;localStorage.setItem(GOOGLE_DRIVE_AUTH_KEY,JSON.stringify(a));} token = await validGoogleDriveToken(false); r = await run(token); }
+  return r;
+}
+async function ensureSupportFlowDriveFolder() {
+  let id = null; try { id = localStorage.getItem(GOOGLE_DRIVE_FOLDER_KEY); } catch (_) {}
+  if (id) return id;
+  const q = encodeURIComponent("name='SupportFlow Backups' and mimeType='application/vnd.google-apps.folder' and trashed=false");
+  const r = await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)&spaces=drive`);
+  if (!r.ok) throw new Error("drive-folder-list-failed");
+  const d = await r.json(); id = d.files?.[0]?.id;
+  if (!id) {
+    const cr = await driveFetch("https://www.googleapis.com/drive/v3/files?fields=id", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({name:"SupportFlow Backups",mimeType:"application/vnd.google-apps.folder"}) });
+    if (!cr.ok) throw new Error("drive-folder-create-failed"); id = (await cr.json()).id;
+  }
+  localStorage.setItem(GOOGLE_DRIVE_FOLDER_KEY,id); return id;
+}
+async function uploadEncryptedBackupToDrive(encrypted) {
+  const folderId = await ensureSupportFlowDriveFolder();
+  const stamp = new Date().toISOString().replace(/[:.]/g,"-");
+  const boundary = "sf_" + crypto.getRandomValues(new Uint32Array(2)).join("");
+  const meta = JSON.stringify({ name:`supportflow-backup-${stamp}.json`, parents:[folderId], description:"Encrypted SupportFlow™ backup" });
+  const body = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${encrypted}\r\n--${boundary}--`;
+  const r = await driveFetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,createdTime", { method:"POST", headers:{"Content-Type":`multipart/related; boundary=${boundary}`}, body });
+  if (!r.ok) throw new Error("drive-upload-failed");
+  await pruneDriveBackups(folderId); return await r.json();
+}
+async function pruneDriveBackups(folderId) {
+  const q=encodeURIComponent(`'${folderId}' in parents and trashed=false`);
+  const r=await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&orderBy=createdTime desc&pageSize=100&fields=files(id,name,createdTime)`);
+  if(!r.ok)return; const d=await r.json(); const old=(d.files||[]).filter(f=>f.name?.startsWith("supportflow-backup-")).slice(7);
+  for(const f of old) await driveFetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(f.id)}`,{method:"DELETE"}).catch(()=>{});
+}
+async function runSingleGoogleDriveBackup(data) {
+  if (googleBackupInFlight) return googleBackupInFlight;
+  googleBackupInFlight = (async () => {
+    const encrypted = await encryptBackupWithMaster(backupPayload(data));
+    return uploadEncryptedBackupToDrive(encrypted);
+  })();
+  try { return await googleBackupInFlight; }
+  finally { googleBackupInFlight = null; }
+}
+async function performGoogleAutoBackup(data, saveFn=null) {
+  if (!hasBackupMasterKey() || !googleDriveConnected() || !navigator.onLine) return false;
+  await runSingleGoogleDriveBackup(data);
+  const profile={...data.profile,backedUp:today(),backedUpCount:countRecords(data),backupHow:"Google Drive",remindedOn:today(),backupPending:false,lastBackupAt:new Date().toISOString()};
+  if(saveFn) await saveFn({...data,profile}, true); else { try { const next={...data,profile}; await storage.set("ndis:data",JSON.stringify(next)); } catch(_){} }
+  return true;
+}
+function scheduleGoogleAutoBackup(data) {
+  if (!hasBackupMasterKey() || !googleDriveConnected()) return;
+  clearTimeout(autoBackupTimer);
+  try { localStorage.setItem("sf_backup_pending_v1","1"); } catch(_){}
+  autoBackupTimer=setTimeout(async()=>{ try { await performGoogleAutoBackup(data); localStorage.removeItem("sf_backup_pending_v1"); } catch(e) { console.warn("Automatic backup pending",e); } },AUTO_BACKUP_DELAY_MS);
+}
+
+function GoogleDriveSetup({ onConnected }) {
+  const [busy,setBusy]=useState(false), [msg,setMsg]=useState(""), [err,setErr]=useState("");
+  const connected=googleDriveConnected();
+  const connect=async()=>{setBusy(true);setErr("");setMsg("");try{await requestGoogleDriveToken("consent");setMsg("Google Drive connected ✓");onConnected&&onConnected();}catch(e){setErr(e.message==="google-drive-not-configured"?"Google Drive is not configured for this SupportFlow deployment yet.":"Couldn't connect Google Drive. Try again.");}finally{setBusy(false);}};
+  return <div style={{background:"var(--bg)",border:"1px solid var(--line)",borderRadius:10,padding:"15px 16px",marginBottom:12}}>
+    <div className="eyebrow" style={{marginBottom:8}}>Google Drive</div>
+    <div style={{fontSize:12.5,color:"var(--tx-2)",lineHeight:1.6,marginBottom:12}}>SupportFlow uploads only encrypted backup files that it creates. It does not get broad access to your Drive.</div>
+    {connected?<div style={{color:"var(--good)",fontSize:12.5,fontWeight:600}}>Connected ✓</div>:<button className="btn" onClick={connect} disabled={busy}>{busy?"Connecting…":"Connect Google Drive"}</button>}
+    {msg&&<div style={{fontSize:12,color:"var(--good)",marginTop:8}}>{msg}</div>}{err&&<div style={{fontSize:12,color:"var(--warn)",marginTop:8}}>{err}</div>}
+  </div>;
+}
+
+const BACKUP_KEY_STORAGE = "sf_backup_master_v1";
+function hasBackupMasterKey() { try { return !!localStorage.getItem(BACKUP_KEY_STORAGE); } catch (_) { return false; } }
+function getBackupMaster() { try { return JSON.parse(localStorage.getItem(BACKUP_KEY_STORAGE) || "null"); } catch (_) { return null; } }
+function clearBackupMaster() { try { localStorage.removeItem(BACKUP_KEY_STORAGE); } catch (_) {} }
+async function setBackupMaster(passphrase) {
+  const enc = new TextEncoder();
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const material = await crypto.subtle.importKey("raw", enc.encode(passphrase), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits({ name:"PBKDF2", salt, iterations:PBKDF2_ITERATIONS, hash:"SHA-256" }, material, 256);
+  const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+  localStorage.setItem(BACKUP_KEY_STORAGE, JSON.stringify({ salt:b64(salt), key:b64(bits), iterations:PBKDF2_ITERATIONS }));
+}
+async function encryptBackupWithMaster(text) {
+  const master = getBackupMaster();
+  if (!master) throw new Error("backup-password-not-set");
+  const b64d = (x) => Uint8Array.from(atob(x), c => c.charCodeAt(0));
+  const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await crypto.subtle.importKey("raw", b64d(master.key), {name:"AES-GCM"}, false, ["encrypt"]);
+  const cipher = await crypto.subtle.encrypt({name:"AES-GCM", iv}, key, new TextEncoder().encode(text));
+  return JSON.stringify({ encrypted:true, format:BACKUP_FORMAT, kdf:"PBKDF2-SHA256", iterations:master.iterations, salt:master.salt, iv:b64(iv), data:b64(cipher) });
+}
+function BackupPasswordSetup({ data, save, onReady }) {
+  const [pass,setPass]=useState(""); const [pass2,setPass2]=useState(""); const [show,setShow]=useState(false); const [busy,setBusy]=useState(false); const [err,setErr]=useState("");
+  const weak=weakPassphrase(pass);
+  if (hasBackupMasterKey()) return <div className="callout"><b>Backup password set ✓</b><div style={{marginTop:6,fontSize:12.5}}>This password will protect all new backups until you change it in Settings → Backup.</div></div>;
+  const create=async()=>{ if(weak||!pass||pass!==pass2)return; setBusy(true);setErr(""); try{await setBackupMaster(pass); save({...data,profile:{...data.profile,backupPasswordSet:true,backupEvery:"daily"}}); setPass("");setPass2("");onReady&&onReady();}catch(e){setErr("Couldn't set the backup password on this device.");}finally{setBusy(false);} };
+  return <div style={{background:"var(--bg)",border:"1px solid var(--line)",borderRadius:10,padding:"15px 16px"}}>
+    <div className="eyebrow" style={{marginBottom:10}}>Create your backup password</div>
+    <label className="f"><span>Backup password</span><input type={show?"text":"password"} value={pass} onChange={e=>setPass(e.target.value)} placeholder="A few random words work well" /></label>
+    {weak&&pass&&<div style={{fontSize:11.5,color:"var(--warn)",marginTop:-10,marginBottom:14}}>{weak}</div>}
+    <label className="f"><span>Confirm backup password</span><input type={show?"text":"password"} value={pass2} onChange={e=>setPass2(e.target.value)} /></label>
+    <div style={{border:"1px solid var(--req)",background:"var(--req-soft)",borderRadius:9,padding:"12px 13px",marginBottom:14,fontSize:12,lineHeight:1.6}}><b>SupportFlow cannot recover this password.</b> Keep it in a password manager or somewhere safe away from this device. You will need it to restore a backup on another device.</div>
+    {err&&<div style={{fontSize:12,color:"var(--warn)",marginBottom:10}}>{err}</div>}
+    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button className="btn" onClick={create} disabled={busy||!!weak||!pass||pass!==pass2}>{busy?"Securing…":"Set backup password"}</button><button className="btn ghost" type="button" onClick={()=>setShow(!show)}>{show?"Hide":"Show"}</button></div>
+  </div>;
+}
+
+function BackupPanel({ data, save, open, onToggle }) {
+  // Same pattern as LockPanel: no onToggle means "always fully shown,
+  // not collapsible" -- that's how Onboarding uses this, right after the
+  // PIN gate, before Settings' collapsible version exists at all.
+  const collapsible = typeof onToggle === "function";
+  const isOpen = collapsible ? open : true;
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+  const [pending, setPending] = useState(null);     // decrypted file awaiting confirmation
+  const [busy, setBusy] = useState(false);
+  const [mode, setMode] = useState(null);            // "setpass" | "unlock" | null
+  const [pass, setPass] = useState("");
+  const [pass2, setPass2] = useState("");
+  const [unlockPass, setUnlockPass] = useState("");
+  const [unlockFile, setUnlockFile] = useState(null);
+  const [showPass, setShowPass] = useState(false);
+  const [driveConnected, setDriveConnected] = useState(() => googleDriveConnected());
+  const [backupFailed, setBackupFailed] = useState(false);
+  const [driveBusy, setDriveBusy] = useState(false);
+  const backupLockRef = useRef(false);
+  const fileRef = useRef(null);
+
+  const total = countRecords(data);
+  const weak = mode === "setpass" ? weakPassphrase(pass) : null;
+
+  const stampSaved = (how) => save({ ...data, profile: { ...data.profile,
+    backedUp: today(), backedUpCount: countRecords(data), backupHow: how, remindedOn: today(), lastBackupAt: new Date().toISOString() } });
+
+  // ---- creating a backup: always encrypted with the saved backup master key ----
+  const startBackup = async () => {
+    if (backupLockRef.current) return;
+    setErr(""); setMsg(""); setBackupFailed(false);
+    if (!hasBackupMasterKey()) { setMode("setpass"); return; }
+    backupLockRef.current = true;
+    setBusy(true);
+    try {
+      await runSingleGoogleDriveBackup(data);
+      stampSaved("Google Drive"); setBackupFailed(false); setMsg("Encrypted backup saved to Google Drive.");
+    } catch (e) { console.error("Google Drive backup failed", e); setBackupFailed(true); setErr("Backup couldn't be completed. Try again."); } finally { backupLockRef.current = false; setBusy(false); }
+  };
+
+  const runBackup = async (via) => {
+    if (weak) return;
+    if (pass !== pass2) { setErr("Those two don't match."); return; }
+    setBusy(true); setErr("");
+    try {
+      await setBackupMaster(pass);
+      const encrypted = await encryptBackupWithMaster(backupPayload(data));
+      const how = via === "share" ? await shareBackup(encrypted, true) : (downloadBackup(encrypted, true), "downloaded");
+      if (how !== "cancelled") {
+        stampSaved(how);
+        setMsg(how === "shared" ? "Backup shared, encrypted, so it's safe wherever it lands."
+          : "Backup downloaded, encrypted, so it's safe wherever you save it.");
+      }
+    } catch (e) { setErr("Couldn't create the backup file."); }
+    finally { setBusy(false); setMode(null); setPass(""); setPass2(""); }
+  };
+
+  // ---- restoring: pick a file, then unlock it ----
+  const pick = (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    setErr(""); setMsg("");
+    const r = new FileReader();
+    r.onload = () => { setUnlockFile(String(r.result)); setUnlockPass(""); setMode("unlock"); };
+    r.onerror = () => setErr("Couldn't read that file.");
+    r.readAsText(file);
+  };
+
+  const unlock = async () => {
+    setBusy(true); setErr("");
+    try {
+      const plain = await decryptBackup(unlockFile, unlockPass);
+      setPending(parseBackup(plain));
+      setMode(null); setUnlockFile(null); setUnlockPass("");
+    } catch (e) {
+      setErr(e.message === "wrong-passphrase"
+        ? "That passphrase doesn't open this file. Check it and try again."
+        : (e.message || "Couldn't read that file."));
+    } finally { setBusy(false); }
+  };
+
+  const restore = async () => {
+    const restored = {
+      ...BLANK,
+      ...pending.data,
+      profile: { ...BLANK.profile, ...(pending.data?.profile || {}) }
+    };
+    await save(restored, true);
+    if (pending.security && Object.prototype.hasOwnProperty.call(pending.security, "lock")) {
+      const l = pending.security.lock;
+      if (l && l.hash && l.salt) {
+        writeLock({ ...l, credentialId: null, biometric: false });
+        try { localStorage.removeItem(LOCK_HIDDEN_AT_KEY); } catch (_) {}
+      } else if (l === null) {
+        writeLock(null);
+      }
+    }
+    setPending(null);
+    setMsg(pending.security?.lock
+      ? "Full restore complete — business, bank details, records and PIN restored. Re-enable biometrics on this device if wanted."
+      : "Restore complete. This older backup did not contain PIN security data, so set a new PIN if required.");
+  };
+  const c = pending && pending.data;
+
+  return (
+    <div className={"stepcard" + (data.profile.backedUp ? " done" : "")} style={{ marginTop: 22 }}>
+      <span className="stepnum">{data.profile.backedUp ? "✓" : "!"}</span>
+      {collapsible && <span className="stepcard-chev" data-open={isOpen ? 1 : 0} onClick={onToggle} aria-hidden="true">›</span>}
+      <div className={"steplead" + (collapsible ? " stepcard-head" : "")} onClick={onToggle}>{data.profile.backedUp ? "Backed up" : "Never backed up"}</div>
+      <div className={"eyebrow" + (collapsible ? " stepcard-head" : "")} style={{ marginBottom: isOpen ? 10 : 0 }} onClick={onToggle}>Backup</div>
+      {isOpen && (
+      <>
+      <div style={{ fontSize: 13, color: "var(--tx-2)", lineHeight: 1.65, marginBottom: 16 }}>
+        <div style={{ fontWeight: 700, color: "var(--tx)", marginBottom: 6 }}>Your data is protected</div>
+        SupportFlow keeps your records on this device and automatically backs them up securely to your connected Google Drive.
+        <div style={{ marginTop: 8 }}>Your backups are <b>encrypted before they leave your device</b> and can only be restored using your backup password.</div>
+      </div>
+
+      {pending ? (
+        <div className="callout" style={{ borderColor: "var(--req)", marginBottom: 0 }}>
+          <b>Ready to restore this backup?</b>
+          <div style={{ marginTop: 9, fontSize: 12.5, lineHeight: 1.8 }}>
+            Restoring will replace your current SupportFlow records with the records saved in this backup. Review the details below before continuing.<br />
+            {pending.exported && <>Backup taken {fmtDate(pending.exported.slice(0, 10))}.<br /></>}
+            Restoring {c.participants.length} participants, {c.managers.length} plan managers,{" "}
+            {c.invoices.length} invoices, {c.expenses.length} expenses, {c.trips.length} trips,{" "}
+            {c.notes.length} notes.
+            {total > 0 && <><br /><span style={{ color: "var(--req)" }}>Your current {total} records will be overwritten.</span></>}
+          </div>
+          <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button className="btn tiny" onClick={restore}>Restore</button>
+            <button className="btn ghost tiny" onClick={() => setPending(null)}>Cancel</button>
+          </div>
+        </div>
+
+      ) : mode === "setpass" ? (
+        <div style={{ background: "var(--bg)", border: "1px solid var(--line)", borderRadius: 10, padding: "15px 16px" }}>
+          <div className="eyebrow" style={{ marginBottom: 10 }}>Set your backup password</div>
+
+          <button className="btn" type="button" style={{ marginBottom: 14 }}
+            onClick={() => { const g = generatePassphrase(); setPass(g); setPass2(g); setShowPass(true); }}>
+            Generate a strong one for me
+          </button>
+
+          <label className="f"><span>Passphrase</span>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input style={{ flex: 1 }} type={showPass ? "text" : "password"} value={pass}
+                onChange={(e) => setPass(e.target.value)} placeholder="A few random words work well" />
+              <button className="btn ghost tiny" type="button" onClick={() => setShowPass(!showPass)}>{showPass ? "Hide" : "Show"}</button>
+            </div>
+          </label>
+          {weak && <div style={{ fontSize: 11.5, color: "var(--warn)", marginTop: -10, marginBottom: 14 }}>{weak}</div>}
+
+          <label className="f" style={{ marginBottom: 16 }}><span>Type it again</span>
+            <input type={showPass ? "text" : "password"} value={pass2} onChange={(e) => setPass2(e.target.value)} />
+          </label>
+
+          {/* ---- layered warning #2: the moment it matters most, bold and red ---- */}
+          <div style={{ border: "1px solid var(--req)", background: "var(--req-soft)", borderRadius: 9,
+                        padding: "12px 13px", marginBottom: 16 }}>
+            <div style={{ color: "var(--req)", fontWeight: 700, fontSize: 12.5, lineHeight: 1.6 }}>
+              If you lose this passphrase, this backup cannot be recovered, not by us, not by anyone.
+            </div>
+            <div style={{ color: "var(--req)", fontSize: 11.5, lineHeight: 1.6, marginTop: 6, fontWeight: 600 }}>
+              Don't reuse a password from somewhere else, and don't save it in a note on this phone.
+            </div>
+            <div style={{ fontSize: 11.5, color: "var(--tx-2)", lineHeight: 1.6, marginTop: 8 }}>
+              Write it down somewhere separate from the device, or use a password manager. That's the
+              trade for real security, nothing about this backup can be reset or unlocked without it.
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button className="btn" onClick={() => runBackup("share")} disabled={busy || !!weak || !pass || pass !== pass2}>
+              {busy ? "Encrypting…" : "Back up"}
+            </button>
+            <button className="btn ghost" onClick={() => runBackup("download")} disabled={busy || !!weak || !pass || pass !== pass2}>
+              Download file
+            </button>
+            <button className="btn ghost" onClick={() => { setMode(null); setPass(""); setPass2(""); }}>Cancel</button>
+          </div>
+        </div>
+
+      ) : mode === "unlock" ? (
+        <div style={{ background: "var(--bg)", border: "1px solid var(--line)", borderRadius: 10, padding: "15px 16px" }}>
+          <div className="eyebrow" style={{ marginBottom: 10 }}>Enter the passphrase for this backup</div>
+          <label className="f" style={{ marginBottom: 14 }}><span>Passphrase</span>
+            <input type={showPass ? "text" : "password"} value={unlockPass} autoFocus
+              onChange={(e) => setUnlockPass(e.target.value)} onKeyDown={(e) => e.key === "Enter" && unlock()} />
+          </label>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button className="btn" onClick={unlock} disabled={busy || !unlockPass}>{busy ? "Checking…" : "Unlock"}</button>
+            <button className="btn ghost" onClick={() => setShowPass(!showPass)}>{showPass ? "Hide" : "Show"}</button>
+            <button className="btn ghost" onClick={() => { setMode(null); setUnlockFile(null); setUnlockPass(""); }}>Cancel</button>
+          </div>
+        </div>
+
+      ) : (
+        <>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button className="btn" onClick={startBackup} disabled={total === 0 || busy}>{busy ? "Backing up…" : "Back up now"}</button>
+            <button className="btn ghost" onClick={() => fileRef.current && fileRef.current.click()}>Restore</button>
+          </div>
+          <input ref={fileRef} type="file" accept="application/json,.json" onChange={pick} style={{ display: "none" }} />
+          <div style={{marginTop:10,fontSize:11.5,color:"var(--tx-3)"}}>Backup password: {hasBackupMasterKey() ? "Set ✓" : "Not set — required for new encrypted backups"}</div>
+          {hasBackupMasterKey() && <button className="btn ghost tiny" style={{marginTop:8}} onClick={() => { if (confirm("Change the backup password? Existing backup files will still need the password that created them.")) { clearBackupMaster(); setMode("setpass"); } }}>Change backup password</button>}
+
+          <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--line)" }}>
+            <div className="eyebrow" style={{marginBottom:8}}>Automatic backup</div>
+            <div style={{fontSize:12.5,color:driveConnected?"var(--good)":"var(--warn)",fontWeight:600,marginBottom:6}}>Google Drive: {driveConnected?"Connected ✓":"Not connected"}</div>
+            <div style={{fontSize:11.5,color:"var(--tx-3)",lineHeight:1.65}}>SupportFlow automatically creates a new backup after important changes to your records. If you're offline, the backup will be completed the next time you open SupportFlow with an internet connection.</div>
+            {driveConnected ? (
+              <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}>
+                <button className="btn ghost tiny" disabled={driveBusy} onClick={async()=>{setDriveBusy(true);setErr("");setMsg("");try{await changeGoogleDriveAccount();setDriveConnected(true);setBackupFailed(false);setMsg("Google account changed. Use Back up now to create a backup in this Drive.");}catch(e){setDriveConnected(googleDriveConnected());setErr("Couldn't change Google account. Try again.");}finally{setDriveBusy(false);}}}>{driveBusy?"Connecting…":"Change Google account"}</button>
+                <button className="btn ghost tiny" disabled={driveBusy} onClick={async()=>{if(!confirm("Disconnect Google Drive? Automatic backups will stop on this device. Existing backups in Google Drive will not be deleted."))return;setDriveBusy(true);setErr("");setMsg("");try{await disconnectGoogleDrive();setDriveConnected(false);setBackupFailed(false);setMsg("Google Drive disconnected. Existing backups were not deleted.");}finally{setDriveBusy(false);}}}>Disconnect Google Drive</button>
+              </div>
+            ) : <div style={{marginTop:10}}><GoogleDriveSetup onConnected={() => { setDriveConnected(true); setBackupFailed(false); }} /></div>}
+
+            <div style={{ marginTop: 12, fontSize: 11.5, color: "var(--tx-3)", lineHeight: 1.75 }}>
+              <div><b>Last successful backup:</b> {data.profile.backedUp ? (data.profile.lastBackupAt ? new Date(data.profile.lastBackupAt).toLocaleString("en-AU", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true }) : fmtDate(data.profile.backedUp)) : "Not yet backed up"}</div>
+              <div><b>Records backed up:</b> {data.profile.backedUp ? (data.profile.backedUpCount || total) : 0}</div>
+              <div><b>Stored in:</b> {driveConnected ? "Google Drive" : "Google Drive not connected"}</div>
+              <div><b>Status:</b> {backupFailed ? <span style={{color:"var(--warn)"}}>Backup failed</span> : driveConnected && data.profile.backedUp && total === (data.profile.backedUpCount || total) ? <span style={{color:"var(--good)"}}>Up to date ✓</span> : total === 0 ? "Nothing to back up yet" : <span style={{color:"var(--warn)"}}>Backup pending</span>}</div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {msg && <div style={{ marginTop: 12, fontSize: 12.5, color: "var(--good)" }}>{msg}</div>}
+      {err && <div style={{ marginTop: 12, fontSize: 12.5, color: "var(--warn)" }}>{err}</div>}
+      </>
+      )}
+    </div>
+  );
+}
+
+/* ---------------- Settings ---------------- */
+
+
+/* ---------------- business details ---------------- */
+// The one form for name, ABN, GST, contact and payment details, shared by
+// Onboarding and Settings so there is exactly one place these fields, their
+// validation and their formatting can be defined. Onboarding gets the
+// required/step chrome and defers GST to a plain save-with-everything-else
+// field, since there is no turnover history yet to show against the GST
+// threshold. Settings gets the permanent complete/review chrome and keeps
+// GST as its own immediate-save control, since a stale GST status would
+// mean invoices printing "Tax invoice" against a registration that no
+// longer matches reality.
+function BusinessDetailsFields({ p, setP, variant, data, save, turnover }) {
+  const isSettings = variant === "settings";
+
+  const onGstChange = (e) => {
+    const next = { ...p, gstRegistered: e.target.value === "yes" };
+    setP(next);
+    if (isSettings) save({ ...data, profile: next });
+  };
+
+  return (
+    <>
+      <div className="two">
+        <label className="f req">
+          <span style={{ color: (p.name || "").trim() ? undefined : "var(--req)" }}>Full name</span>
+          <input value={p.name || ""} onChange={(e) => setP({ ...p, name: e.target.value })}
+            onBlur={() => setP({ ...p, name: toProperName(p.name) })}
+            style={(p.name || "").trim() ? {} : { borderColor: "var(--req)" }} placeholder="Your full name" />
+        </label>
+        <label className="f">
+          <span style={{ color: !p.abn || isValidAbn(p.abn) ? undefined : "var(--req)" }}>ABN</span>
+          <input value={p.abn || ""} onChange={(e) => setP({ ...p, abn: e.target.value })}
+            onBlur={() => setP({ ...p, abn: formatAbn(p.abn) })}
+            style={!p.abn || isValidAbn(p.abn) ? {} : { borderColor: "var(--req)" }} placeholder="11 digits" />
+          {p.abn && !isValidAbn(p.abn) && (
+            <em style={{ fontSize: 11.5, color: "var(--warn)", fontStyle: "normal", marginTop: 5, display: "block" }}>
+              Doesn't check out as a valid ABN, worth a second look.
+            </em>
+          )}
+        </label>
+      </div>
+
+      <label className="f"><span>Trading name, if different</span>
+        <input value={p.tradingName || ""} onChange={(e) => setP({ ...p, tradingName: e.target.value })}
+          onBlur={() => setP({ ...p, tradingName: toProperName(p.tradingName) })} placeholder="Optional, prints under your name on invoices" />
+      </label>
+
+      {isSettings && (
+        <>
+          <div style={{ fontSize: 13, color: "var(--tx-2)", lineHeight: 1.65, marginBottom: 14 }}>
+            Turnover in the last 12 months: <b style={{ color: "var(--tx)" }}>{money0(turnover)}</b> of the {money0(GST_THRESHOLD)} threshold.
+            NDIS supports being GST-free does <b>not</b> keep you under it, GST-free sales still count.
+          </div>
+          <div className="bar" style={{ marginBottom: 16 }}>
+            <i style={{ width: Math.min(100, (turnover / GST_THRESHOLD) * 100) + "%", background: turnover >= GST_THRESHOLD ? "var(--req)" : undefined }} />
+          </div>
+        </>
+      )}
+
+      {p.gstLookupConflict && (
+        <div className="callout" style={{ borderColor: "var(--warn)", marginBottom: 14 }}>
+          <b>GST status needs review.</b> A lookup on your ABN came back {p.gstLookupConflict.looked_up === "yes" ? "registered for GST" : "not registered for GST"},
+          which doesn't match what's saved here. This hasn't been changed automatically, confirm which is
+          correct and update the setting below if needed.
+        </div>
+      )}
+
+      <label className="f"><span>Are you registered for GST?</span>
+        <select value={p.gstRegistered ? "yes" : "no"} onChange={onGstChange}>
+          <option value="no">Not registered</option>
+          <option value="yes">Registered for GST</option>
+        </select>
+        {isSettings ? (
+          <em style={{ fontSize: 11.5, color: "var(--good)", fontStyle: "normal", marginTop: 6, display: "block" }}>
+            Saved immediately, this one applies to every invoice you generate from now on.
+          </em>
+        ) : (
+          <em style={{ fontSize: 11.5, color: "var(--tx-3)", fontStyle: "normal", marginTop: 6, display: "block", lineHeight: 1.6 }}>
+            Most sole traders start as No. NDIS supports are usually GST-free either way, so this
+            mainly changes what your invoices say. You can change it any time in Settings.
+          </em>
+        )}
+      </label>
+
+
+      <label className="f"><span>Are you a registered NDIS provider?</span>
+        <select value={p.registeredProvider ? "yes" : "no"} onChange={(e) => {
+          const next = { ...p, registeredProvider: e.target.value === "yes" };
+          setP(next);
+          if (isSettings) save({ ...data, profile: next });
+        }}>
+          <option value="no">No / unregistered</option>
+          <option value="yes">Yes, registered provider</option>
+        </select>
+        <em style={{ fontSize: 11.5, color: "var(--tx-3)", fontStyle: "normal", marginTop: 6, display: "block", lineHeight: 1.6 }}>
+          This only controls registered-provider incident reporting prompts. It does not decide whether you are required to register.
+        </em>
+      </label>
+
+      <div className="two" style={{ marginBottom: isSettings ? 0 : 16 }}>
+        <label className="f" style={{ marginBottom: isSettings ? 0 : undefined }}><span>Email</span><input {...F(p, setP)("email")} /></label>
+        <label className="f" style={{ marginBottom: isSettings ? 0 : undefined }}><span>Phone</span><input {...F(p, setP)("phone")} /></label>
+      </div>
+    </>
+  );
+}
+
+function PaymentDetailsFields({ p, setP }) {
+  return (
+    <div className="three">
+      <label className="f"><span>Bank</span><input {...F(p, setP)("bankName")} /></label>
+      <label className="f"><span>BSB</span><input {...F(p, setP)("bsb")} /></label>
+      <label className="f"><span>Account</span><input {...F(p, setP)("account")} /></label>
+    </div>
+  );
+}
+
+function Settings({ data, save, theme, flip, wipeAll, rerun, startPane, helpInitialView }) {
+  const [pane, setPane] = useState(startPane || "settings");
+  // The menu can ask for a different pane while Settings is already open.
+  // useState's initial value is only read once on mount, so without this the
+  // profile menu's Settings/Manual & help shortcuts would do nothing the
+  // second time.
+  useEffect(() => { setPane(startPane || "settings"); }, [startPane]);
+  const [p, setP] = useState(data.profile);
+  const [confirm, setConfirm] = useState(null);
+
+  // Same collapse-to-summary pattern as "Switched partway through the
+  // year?" below: closed and showing a summary + Edit once there's
+  // something real saved, open showing the full form otherwise. Saving
+  // closes it, Edit reopens it, there's no separate faded-button state to
+  // keep in sync with what's actually on screen.
+  const [openBiz, setOpenBiz] = useState(!(!!(p.name || "").trim() && isValidAbn(p.abn)));
+  const [openBank, setOpenBank] = useState(!(p.bankName && p.bsb && p.account));
+  const [openVehicle, setOpenVehicle] = useState(!data.profile.carMethod);
+  const [openRate, setOpenRate] = useState(data.profile.kmRate == null);
+  // Accordion: which top-level section is expanded, if any. Everything
+  // else on this screen already had its own separate "collapsed to a
+  // summary + Edit" state per field group (openBiz etc, above) -- this is
+  // the same idea one level up, so the whole screen doesn't load with
+  // nine sections' full text and forms all open and stacked at once.
+  const [openSection, setOpenSection] = useState(null);
+  const toggleSection = (key) => setOpenSection((cur) => (cur === key ? null : key));
+
+  // Same rule onboarding uses for its own "Required" step, so a name and
+  // ABN entered later here goes through the identical red-to-green change
+  // someone already saw during setup, rather than a different treatment
+  // appearing the second time they see the same requirement.
+  const profileOK = !!(p.name || "").trim() && isValidAbn(p.abn);
+
+  const turnover = gstTurnover(data);
+  const hasReal = data.invoices.length > 0 || data.participants.length > 0 || data.expenses.length > 0;
+  const wipe = () => { setConfirm(null); wipeAll(); };
+
+  // One clear in-app privacy/security overview. Formal legal documents
+  // live at their public URLs so the app does not duplicate legal copy.
+  if (pane === "legal") {
+    return (
+      <>
+        <div className="bandhead" style={{ marginBottom: 16 }}>
+          <div>
+            <div className="disp" style={{ fontSize: 27 }}>Legal &amp; privacy</div>
+            <div style={{ fontSize: 12.5, color: "var(--tx-3)", marginTop: 3 }}>Privacy, security and product information</div>
+          </div>
+          <button className="btn ghost tiny" onClick={() => setPane("settings")}>Settings</button>
+        </div>
+        <div className="panel">
+          <div className="row tap" onClick={() => setPane("privacy-security")}>
+            <div style={{ flex: 1 }}><div style={{ fontSize: 13.5, fontWeight: 600 }}>Privacy &amp; security</div><div style={{ fontSize: 11.5, color: "var(--tx-3)", marginTop: 3 }}>How SupportFlow protects and handles your data</div></div><span style={{ color: "var(--tx-3)", fontSize: 16 }}>›</span>
+          </div>
+          <a className="row tap" href="/privacy" target="_blank" rel="noreferrer" style={{ textDecoration: "none", color: "inherit" }}><div style={{ flex: 1 }}><div style={{ fontSize: 13.5, fontWeight: 600 }}>Privacy Policy ↗</div><div style={{ fontSize: 11.5, color: "var(--tx-3)", marginTop: 3 }}>Full public privacy policy</div></div></a>
+          <a className="row tap" href="/terms" target="_blank" rel="noreferrer" style={{ textDecoration: "none", color: "inherit" }}><div style={{ flex: 1 }}><div style={{ fontSize: 13.5, fontWeight: 600 }}>Terms of Use ↗</div><div style={{ fontSize: 11.5, color: "var(--tx-3)", marginTop: 3 }}>Terms that apply when using SupportFlow</div></div></a>
+          <div className="row tap" onClick={() => setPane("about")}><div style={{ flex: 1 }}><div style={{ fontSize: 13.5, fontWeight: 600 }}>About SupportFlow</div></div><span style={{ color: "var(--tx-3)", fontSize: 16 }}>›</span></div>
+        </div>
+      </>
+    );
+  }
+
+  if (["privacy-security", "about"].includes(pane)) {
+    const isPrivacy = pane === "privacy-security";
+    const heading = isPrivacy ? "Privacy & security" : "About";
+    const sub = isPrivacy ? "Understand where your data is stored and how SupportFlow protects it." : "What SupportFlow is, and isn't";
+    const Body = isPrivacy ? PrivacySecurity : About;
+    return (
+      <div className="legalcopy">
+        <div className="bandhead" style={{ marginBottom: 16 }}>
+          <div><div className="disp" style={{ fontSize: 27 }}>{heading}</div><div style={{ fontSize: 12.5, color: "var(--tx-3)", fontWeight: 500, marginTop: 3 }}>{sub}</div></div>
+          {!isPrivacy && <button className="btn ghost tiny" onClick={() => setPane("legal")}>Legal &amp; Privacy</button>}
+        </div>
+        <Body />
+      </div>
+    );
+  }
+
+  if (pane === "help") {
+    return (
+      <>
+        <div className="bandhead" style={{ marginBottom: 16 }}>
+          <div>
+            <div className="disp" style={{ fontSize: 27 }}>Help</div>
+            <div style={{ fontSize: 12.5, color: "var(--tx-3)", marginTop: 3 }}>Find answers and learn how to use SupportFlow.</div>
+          </div>
+        </div>
+        <div style={{ paddingBottom: 52 }}>
+          <Help data={data} initialView={helpInitialView} />
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div className="bandhead" style={{ marginBottom: 16 }}>
+        <div>
+          <div className="disp" style={{ fontSize: 27 }}>Settings</div>
+          <div style={{ fontSize: 12.5, color: "var(--tx-3)", marginTop: 3 }}>These print on every invoice you issue</div>
+        </div>
+      </div>
+
+      <div className="stepcard done">
+        <span className="stepnum">✓</span>
+        <span className="stepcard-chev" data-open={openSection === "appearance" ? 1 : 0}
+          onClick={() => toggleSection("appearance")} aria-hidden="true">›</span>
+        <div className="steplead stepcard-head" onClick={() => toggleSection("appearance")}>Ready</div>
+        <div className="disp stepcard-head" style={{ fontSize: 19, marginBottom: openSection === "appearance" ? 3 : 0 }}
+          onClick={() => toggleSection("appearance")}>Appearance</div>
+        {openSection === "appearance" && (
+          <>
+            <div style={{ fontSize: 12, color: "var(--tx-3)", marginBottom: 14 }}>
+              Following your phone's setting unless you pick one here. Currently {theme}.
+            </div>
+            <button className="btn" onClick={flip}>Switch to {theme === "dark" ? "light" : "dark"} mode</button>
+          </>
+        )}
+      </div>
+
+      <LockPanel open={openSection === "lock"} onToggle={() => toggleSection("lock")} />
+
+      <div className={"stepcard" + (profileOK ? " done" : "")}>
+        <span className="stepnum">{profileOK ? "✓" : "1"}</span>
+        <div className="steplead">{profileOK ? "Complete" : "Required"}</div>
+        <div className="disp" style={{ fontSize: 19, marginBottom: 3 }}>Business & invoice details</div>
+        <div style={{ fontSize: 12, color: "var(--tx-3)", marginBottom: 14 }}>
+          {profileOK ? "These print on every invoice you issue." : "Finish these to create valid invoices."}
+        </div>
+
+        {!openBiz && profileOK ? (
+          <>
+            <div style={{ fontSize: 12.5, color: "var(--tx-2)", lineHeight: 1.9 }}>
+              <div>{p.name}</div>
+              <div className="mono">ABN {p.abn}</div>
+              <div>{p.gstRegistered ? "Registered for GST" : "Not registered for GST"}</div>
+              <div>{p.registeredProvider ? "Registered NDIS provider" : "Unregistered NDIS provider"}</div>
+              <div>Next invoice: #{String(p.nextInv || 1).padStart(4, "0")}</div>
+            </div>
+            <div style={{ marginTop: 12 }}>
+              <button className="btn ghost tiny" onClick={() => setOpenBiz(true)}>Edit</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <BusinessDetailsFields p={p} setP={setP} variant="settings" data={data} save={save} turnover={turnover} />
+
+            <div style={{ marginTop: 4, marginBottom: 14 }}>
+              <div className="eyebrow" style={{ marginBottom: 10 }}>Next invoice number</div>
+              <label className="f" style={{ maxWidth: 200, marginBottom: 0 }}><span>Next invoice no.</span>
+                <input type="number" value={p.nextInv || 1} onChange={(e) => setP({ ...p, nextInv: Number(e.target.value) })} /></label>
+            </div>
+
+            {p.gstRegistered ? (
+              <div className="callout" style={{ marginTop: 14, marginBottom: 0 }}>
+                Invoices will state that your supports are GST-free with GST shown as $0.00. You'll need to lodge a BAS
+                each quarter even when the GST is nil, and you can claim back GST on business purchases like fuel,
+                phone and equipment, which often puts you in refund.
+              </div>
+            ) : turnover >= GST_THRESHOLD ? (
+              <div className="callout" style={{ marginTop: 14, marginBottom: 0, borderColor: "var(--req)" }}>
+                Your turnover is over the threshold. Registration is required within 21 days of crossing it.
+              </div>
+            ) : null}
+
+            <div style={{ marginTop: 16, display: "flex", gap: 12, alignItems: "center" }}>
+              <button className="btn" disabled={!profileOK}
+                onClick={() => { save({ ...data, profile: p }); setOpenBiz(false); }}>Save details</button>
+              {profileOK && <button className="btn ghost" onClick={() => setOpenBiz(false)}>Cancel</button>}
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className={"stepcard" + (p.bankName && p.bsb && p.account ? " done" : "")}>
+        <span className="stepnum">{p.bankName && p.bsb && p.account ? "✓" : ""}</span>
+        <div className="steplead">{p.bankName && p.bsb && p.account ? "Complete" : "Required"}</div>
+        <div className="disp" style={{ fontSize: 19, marginBottom: 3 }}>Bank details</div>
+        <div style={{ fontSize: 12, color: "var(--tx-3)", marginBottom: 14 }}>
+          Printed on every invoice so the payer knows where to send the money.
+        </div>
+
+        {!openBank && p.bankName && p.bsb && p.account ? (
+          <>
+            <div style={{ fontSize: 12.5, color: "var(--tx-2)", lineHeight: 1.9 }}>
+              <div>{p.bankName}</div>
+              <div className="mono">BSB {p.bsb} · Acc {p.account}</div>
+            </div>
+            <div style={{ marginTop: 12 }}>
+              <button className="btn ghost tiny" onClick={() => setOpenBank(true)}>Edit</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <PaymentDetailsFields p={p} setP={setP} />
+            <div style={{ marginTop: 16, display: "flex", gap: 12, alignItems: "center" }}>
+              <button className="btn"
+                onClick={() => { save({ ...data, profile: p }); setOpenBank(false); }}
+                disabled={!p.bankName || !p.bsb || !p.account}>Save bank details</button>
+              {p.bankName && p.bsb && p.account && <button className="btn ghost" onClick={() => setOpenBank(false)}>Cancel</button>}
+            </div>
+          </>
+        )}
+      </div>
+
+      <PriorTotalsPanel data={data} save={save} fy={fyOf(today())}
+        sectionOpen={openSection === "prior"} onToggleSection={() => toggleSection("prior")} />
+
+      <BackupPanel data={data} save={save} open={openSection === "backup"} onToggle={() => toggleSection("backup")} />
+
+      <div className={"stepcard" + (data.profile.carMethod ? " done" : "")} style={{ marginTop: 22 }}>
+        <span className="stepnum">{data.profile.carMethod ? "✓" : "–"}</span>
+        <div className="steplead">{data.profile.carMethod ? "Set" : "Optional"}</div>
+        <div className="disp" style={{ fontSize: 19, marginBottom: 3 }}>Vehicle</div>
+        <div style={{ fontSize: 12, color: "var(--tx-3)", marginBottom: 14 }}>
+          Every trip you log becomes a tax deduction at the ATO's cents-per-kilometre rate,
+          separately from any travel you bill to a participant.
+        </div>
+
+        {!openVehicle && data.profile.carMethod ? (
+          <>
+            <div style={{ fontSize: 12.5, color: "var(--tx-2)", lineHeight: 1.9 }}>
+              <div>{p.carMethod === "off" ? "Not calculated" : p.carMethod === "logbook" ? "Logbook method" : "Cents per kilometre"}</div>
+              {p.carMethod !== "off" && <div className="mono">{money(Number(p.carRate ?? CAR.rate))}/km{p.carMethod === "logbook" && p.logbookPct ? ` · ${p.logbookPct}% business use` : ""}</div>}
+            </div>
+            <div style={{ marginTop: 12 }}>
+              <button className="btn ghost tiny" onClick={() => setOpenVehicle(true)}>Edit</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <label className="f"><span>How you hold the vehicle</span>
+              <select value={p.carOwn || "own"} onChange={(e) => setP({ ...p, carOwn: e.target.value })}>
+                <option value="own">I own it</option>
+                <option value="lease">Leased</option>
+                <option value="hp">Hire purchase or rent-to-buy</option>
+                <option value="other">Something else</option>
+              </select>
+              <em style={{ fontSize: 11.5, color: "var(--tx-3)", fontStyle: "normal", marginTop: 5, display: "block" }}>
+                {p.carOwn === "other"
+                  ? "Cents per km only covers cars, under one tonne and fewer than nine seats. Utes, vans and motorbikes need the actual-cost method instead, which this app doesn't calculate."
+                  : "Cents per km works the same whether you own, lease or hire-purchase, so this doesn't change the figure. It matters only if you later switch to the logbook method."}
+              </em>
+            </label>
+
+            <div className="two">
+              <label className="f" style={{ marginBottom: 0 }}><span>Method</span>
+                <select value={p.carMethod || "cents"} onChange={(e) => setP({ ...p, carMethod: e.target.value })}>
+                  <option value="cents">Cents per kilometre</option>
+                  <option value="logbook">Logbook</option>
+                  <option value="off">Don't calculate it</option>
+                </select>
+              </label>
+              <label className="f" style={{ marginBottom: 0 }}><span>Rate per km</span>
+                <input type="number" step="0.01" value={p.carRate ?? CAR.rate}
+                  onChange={(e) => setP({ ...p, carRate: e.target.value })} />
+              </label>
+            </div>
+            <em style={{ fontSize: 11.5, color: "var(--tx-3)", fontStyle: "normal", marginTop: 10, display: "block", lineHeight: 1.6 }}>
+              {CAR.rate * 100}c is the {CAR.year} rate, capped at {CAR.cap.toLocaleString()} km per car.
+            </em>
+
+            {p.carMethod === "logbook" && (
+              <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--line)" }}>
+                <label className="f" style={{ marginBottom: 0 }}>
+                  <span>Business-use percentage, from your own 12-week logbook</span>
+                  <input type="number" min="0" max="100" step="1" value={p.logbookPct || ""}
+                    onChange={(e) => setP({ ...p, logbookPct: e.target.value })} placeholder="e.g. 68" />
+                </label>
+                <em style={{ fontSize: 11.5, color: "var(--tx-3)", fontStyle: "normal", marginTop: 6, display: "block", lineHeight: 1.6 }}>
+                  This app doesn't keep the logbook itself, a genuine 12-week record and receipts for
+                  running costs are required by the ATO. Once you have the percentage, enter it here and
+                  the app applies it to your logged vehicle expenses (Vehicle running costs and Fuel, in
+                  Expenses) to estimate the deduction. It has no kilometre cap, unlike cents per km.
+                </em>
+              </div>
+            )}
+            <div style={{ marginTop: 16, display: "flex", gap: 12, alignItems: "center" }}>
+              <button className="btn" onClick={() => {
+                const vehicleProfile = {
+                  ...p,
+                  carOwn: p.carOwn || "own",
+                  carMethod: p.carMethod || "cents",
+                  carRate: p.carRate ?? CAR.rate
+                };
+                setP(vehicleProfile);
+                save({ ...data, profile: vehicleProfile });
+                setOpenVehicle(false);
+              }}>Save vehicle settings</button>
+              {data.profile.carMethod && <button className="btn ghost" onClick={() => setOpenVehicle(false)}>Cancel</button>}
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className={"stepcard" + (data.profile.kmRate != null ? " done" : "")} style={{ marginTop: 22 }}>
+        <span className="stepnum">{data.profile.kmRate != null ? "✓" : "–"}</span>
+        <div className="steplead">{data.profile.kmRate != null ? "Set" : "Optional"}</div>
+        <div className="disp" style={{ fontSize: 19, marginBottom: 3 }}>Support item rates</div>
+        <div style={{ fontSize: 12, color: "var(--tx-3)", lineHeight: 1.65, marginBottom: 12 }}>
+          Codes and rates come from the <b>{PRICE_SOURCE.doc}</b> ({PRICE_SOURCE.version}), Schedule 1,
+          {" "}{PRICE_SOURCE.column} column, effective {PRICE_SOURCE.effective}. Remote and Very Remote
+          loadings are not applied, if you work in a remote area, edit the rate on the invoice line.
+        </div>
+        <div style={{ fontSize: 12.5, color: ratesStale() ? "var(--warn)" : "var(--tx-3)", lineHeight: 1.65, marginBottom: 12 }}>
+          {ratesStale()
+            ? <><b>These rates are more than a year old.</b> A newer schedule has almost certainly been
+               published, check before you invoice, and update the app.</>
+            : <>Last checked against the source on {fmtDate(PRICE_SOURCE.verified)}.</>}
+        </div>
+        <a className="btn ghost tiny" href={PRICE_SOURCE.url} target="_blank" rel="noreferrer">Check the current schedule ↗</a>
+
+        {!openRate && data.profile.kmRate != null ? (
+          <>
+            <div style={{ fontSize: 12.5, color: "var(--tx-2)", marginTop: 16 }}>
+              Travel rate: <span className="mono">{money(Number(p.kmRate))}/km</span>
+            </div>
+            <div style={{ marginTop: 12 }}>
+              <button className="btn ghost tiny" onClick={() => setOpenRate(true)}>Edit</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <label className="f" style={{ marginTop: 16, marginBottom: 0 }}><span>Travel rate per km</span>
+              <div className="affix"><i>$</i>
+                <input type="number" step="0.01" value={p.kmRate ?? TRAVEL_ITEM.rate}
+                  onChange={(e) => setP({ ...p, kmRate: e.target.value })} />
+              </div>
+              <em style={{ fontSize: 11.5, color: "var(--tx-3)", fontStyle: "normal", marginTop: 5, display: "block" }}>
+                Provider travel is claimed as actual non-labour cost. The per-km figure sits in the PAPL rules, not the price tables, confirm yours.
+              </em>
+            </label>
+            <div style={{ marginTop: 16, display: "flex", gap: 12, alignItems: "center" }}>
+              <button className="btn" onClick={() => { save({ ...data, profile: p }); setOpenRate(false); }}>Save rate</button>
+              {data.profile.kmRate != null && <button className="btn ghost" onClick={() => setOpenRate(false)}>Cancel</button>}
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="stepcard done" style={{ marginTop: 22 }} onClick={() => setPane("legal")}>
+        <span className="stepnum">✓</span>
+        <span className="stepcard-chev" aria-hidden="true">›</span>
+        <div className="steplead">Information</div>
+        <div className="disp" style={{ fontSize: 19, marginBottom: 3 }}>Legal &amp; privacy</div>
+        <div style={{ fontSize: 12, color: "var(--tx-3)" }}>Privacy &amp; security, Privacy Policy, Terms of Use and About SupportFlow.</div>
+      </div>
+
+      <div className={"stepcard" + (hasReal ? " done" : "")} style={{ marginTop: 22 }}>
+        <span className="stepnum">{hasReal ? "✓" : "–"}</span>
+        <div className="steplead">{hasReal ? "In use" : "Empty"}</div>
+        <div className="disp" style={{ fontSize: 19, marginBottom: 3 }}>Records</div>
+        <div style={{ fontSize: 12, color: "var(--tx-3)", marginBottom: 14 }}>
+          {hasReal
+            ? "Back your records up before clearing anything, there is no undo."
+            : "Nothing recorded yet. Start by adding a participant."}
+        </div>
+
+        {confirm === "wipe" ? (
+          <div className="callout" style={{ marginBottom: 0 }}>
+            Clears every record: participants, plan managers, shifts, invoices, expenses, trips and notes. Your own details and settings stay.
+            <div style={{ marginTop: 11, display: "flex", gap: 8 }}>
+              <button className="btn tiny" style={{ color: "var(--warn)" }} onClick={wipe}>Yes, clear it</button>
+              <button className="btn ghost tiny" onClick={() => setConfirm(null)}>Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button className="btn ghost tiny" onClick={rerun}>Run setup again</button>
+            <button className="btn ghost tiny" onClick={() => setConfirm("wipe")}>Clear all records</button>
+          </div>
+        )}
+      </div>
+
+      <div className="band" style={{ marginTop: 22 }}>
+        <div className="callout">
+          Income tax only, this app doesn't calculate GST amounts or prepare your BAS. It tracks your turnover against the $75,000 threshold and formats invoices to match your registration status, but the BAS itself is on you or your accountant.
+        </div>
+      </div>
+    </>
+  );
+}
+
+
+/* ---------------- error boundary ---------------- */
+// Without this, any error thrown while rendering unmounts the whole tree and
+// leaves a genuinely blank screen with nothing written anywhere, which is
+// almost impossible to report or diagnose. The startup wrapper in app.html
+// only catches errors thrown before the app mounts, so anything that breaks
+// later, opening Settings, tapping a tab, was previously silent. This turns
+// that into a readable message with the actual error, so a crash can be
+// reported instead of guessed at. Written without JSX since it's a class
+// component sitting outside the normal component tree.
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  componentDidCatch(error, info) {
+    try { console.error("SupportFlow crashed:", error, info); } catch (e) { }
+  }
+  render() {
+    if (!this.state.error) return this.props.children;
+    const e = this.state.error;
+    const detail = (e && (e.stack || e.message)) ? String(e.stack || e.message) : String(e);
+    return React.createElement("div", { className: "sl", "data-theme": "dark", style: { padding: 24, minHeight: "100vh" } },
+      React.createElement("div", { className: "disp", style: { fontSize: 22, marginBottom: 8 } }, "Something broke on this screen"),
+      React.createElement("div", { style: { fontSize: 13, color: "var(--tx-2)", lineHeight: 1.6, marginBottom: 16 } },
+        "Your saved records are safe, nothing has been deleted. Reload the app to carry on. If it keeps happening, the detail below is what's needed to fix it."),
+      React.createElement("button", {
+        className: "btn",
+        style: { marginBottom: 18 },
+        onClick: function () { window.location.reload(); },
+      }, "Reload the app"),
+      React.createElement("pre", {
+        style: {
+          fontSize: 10.5, lineHeight: 1.5, color: "var(--tx-3)", background: "var(--bg-2)",
+          border: "1px solid var(--line)", borderRadius: 10, padding: 12,
+          whiteSpace: "pre-wrap", wordBreak: "break-word", overflowX: "auto",
+        },
+      }, "v" + APP_VERSION + "\n\n" + detail)
+    );
+  }
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(
+  React.createElement(ErrorBoundary, null, React.createElement(App))
+);
