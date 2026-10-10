@@ -928,36 +928,6 @@ SupportFlow is an independent software product and is not affiliated with, endor
 
 
 
-## Early Access tester activity telemetry
-
-During the Early Access testing program, SupportFlow records limited tester/app activity metadata so the developer can tell whether a tester is actively evaluating the app and which major areas have been tried. This may include app-open activity, active days, app version, broad device type, and use of major sections such as Shifts, Notes, Travel, Invoices, Expenses, Tax and Help, plus metadata that a record was created or feedback was submitted.
-
-This telemetry does **not** include participant names, NDIS numbers, progress-note text, invoice contents, addresses, financial amounts, service details or other participant/client record content. Tester activity is used only to administer the Early Access program, assess feature coverage and improve SupportFlow. Tester telemetry will be reviewed at public launch; tester-specific monitoring will be removed or replaced by the production analytics disclosure that matches what the released product actually collects.
-
-
-
-### Full restore
-Current backups include business and invoice details, bank/payment details, operational records, settings stored in the main data profile, and the portable PIN hash/salt. On restore these profile fields are merged explicitly so blank defaults cannot overwrite restored business or banking values. Biometric/WebAuthn credentials are not portable between devices and must be enabled again after restore. Backups created before the full-restore fix may not contain PIN security state.
-
-
-# SupportFlow pricing — Build 27
-
-**No monthly subscription. No monthly fees. Pay only when you invoice.**
-
-New accounts receive **5 free invoice credits**.
-
-| Pack | Price (AUD) | Invoice credits |
-|---|---:|---:|
-| Casual | $7.99 | 10 |
-| Most Popular | $19.99 | 30 |
-| Best Value | $39.99 | 100 |
-
-Credits never expire. Creating, editing and previewing drafts is free. One credit is consumed when an invoice is finalised. A 24-hour correction rule is reserved for accidental finalisation so a genuine correction does not unfairly consume another credit.
-
-SupportFlow Pro remains separate from invoice-volume credits and is reserved for advanced business dashboards, reporting, exports and analytics.
-
-**Implementation note:** paid credits must only be added after server-side payment confirmation. The browser/client must never be trusted to grant paid credits.
-
 
 ## Incidents
 

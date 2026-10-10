@@ -50,8 +50,8 @@
 # "Join the waitlist" button in the first place. This one's permanent.
 [[redirects]]
   from = "/waitlist"
-  to = "/waitlist.html"
-  status = 200
+  to = "/app"
+  status = 301
 
 # The tester admin dashboard. Not linked from anywhere on the public
 # site -- reaching it at all requires knowing this exact path, and
@@ -122,8 +122,8 @@
 
 [[redirects]]
   from = "/waitlist"
-  to = "/waitlist.html"
-  status = 200
+  to = "/app"
+  status = 301
 
 [[redirects]]
   from = "/privacy"
