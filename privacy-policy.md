@@ -371,8 +371,3 @@ If a new optional feature involves external storage, synchronisation, artificial
 
 
 
-## Early Access tester activity telemetry
-
-During the Early Access testing program, SupportFlow records limited tester/app activity metadata so the developer can tell whether a tester is actively evaluating the app and which major areas have been tried. This may include app-open activity, active days, app version, broad device type, and use of major sections such as Shifts, Notes, Travel, Invoices, Expenses, Tax and Help, plus metadata that a record was created or feedback was submitted.
-
-This telemetry does **not** include participant names, NDIS numbers, progress-note text, invoice contents, addresses, financial amounts, service details or other participant/client record content. Tester activity is used only to administer the Early Access program, assess feature coverage and improve SupportFlow. Tester telemetry will be reviewed at public launch; tester-specific monitoring will be removed or replaced by the production analytics disclosure that matches what the released product actually collects.

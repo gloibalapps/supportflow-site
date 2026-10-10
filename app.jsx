@@ -442,7 +442,7 @@ async function askModel(prompt, opts) {
 // Verified against the NDIS Pricing Schedule 2026-27 (v1.2, 22 July 2026),
 // Schedule 1 — Disability Support Workers. National column, effective 1 July 2026.
 // https://www.ndis.gov.au/providers/pricing-arrangements
-const APP_VERSION = "27";
+const APP_VERSION = "32";
 
 const PRICE_SOURCE = {
   doc: "NDIS Pricing Schedule 2026-27",
@@ -1779,30 +1779,6 @@ function LockScreen({ onUnlock, onForgot }) {
 }
 
 
-// Early Access tester telemetry: privacy-safe event names only. Never send record content.
-const TESTER_ACTIVITY_EVENTS = new Set(["app_opened","section_shifts","section_notes","section_travel","section_incidents","section_invoices","section_expenses","section_tax","section_help","shift_created","trip_created","invoice_created","expense_created","note_created","feedback_submitted"]);
-function emitTesterActivity(eventName) {
-  if (!TESTER_ACTIVITY_EVENTS.has(eventName)) return;
-  let deviceRef = "";
-  try { deviceRef = localStorage.getItem("ndis:deviceRef") || ""; } catch (e) { }
-  if (!deviceRef) return;
-  fetch("/.netlify/functions/tester-activity", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ deviceRef, event: eventName, appVersion: APP_VERSION,
-      deviceType: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? "mobile" : "desktop" }),
-    keepalive: true,
-  }).catch(() => {});
-}
-
-try {
-  const now = Date.now(), last = Number(localStorage.getItem("sf_tester_last_open_ping") || 0);
-  if (now - last > 15 * 60 * 1000) {
-    localStorage.setItem("sf_tester_last_open_ping", String(now));
-    emitTesterActivity("app_opened");
-  }
-} catch (_) {}
-
 function App() {
   const [theme, setTheme] = useState("dark");
   const [tab, setTab] = useState("home");
@@ -1827,13 +1803,6 @@ function App() {
   const [pplTab, setPplTab] = useState("participants"); // participants | managers | agreements
   const [openPt, setOpenPt] = useState(null);
   const [openPane, setOpenPane] = useState(null); // null | "help" | "privacy"
-  useEffect(() => {
-    let eventName = null;
-    if (tab === "invoices") eventName = ({ shifts: "section_shifts", travel: "section_travel", notes: "section_notes", incidents: "section_incidents" })[invTab] || null;
-    else if (tab === "summary") eventName = ({ invoices: "section_invoices", expenses: "section_expenses", position: "section_tax", bas: "section_tax" })[sumTab] || null;
-    else if (tab === "settings" && (openPane === "help" || openPane === "support")) eventName = "section_help";
-    if (eventName) emitTesterActivity(eventName);
-  }, [tab, invTab, sumTab, openPane]);
   const [helpInitialView, setHelpInitialView] = useState("manual"); // manual | support
   const [menuOpen, setMenuOpen] = useState(false);
   const [helpMenuOpen, setHelpMenuOpen] = useState(false);
@@ -1970,12 +1939,6 @@ function App() {
   }, [loaded]);
 
   const save = async (next, skipAutoBackup = false) => {
-    // Count only newly created work records as meaningful tester activity.
-    // No record content, participant information, amounts or notes leave the device.
-    const eventMap = [["shifts", "shift_created"], ["trips", "trip_created"], ["invoices", "invoice_created"], ["expenses", "expense_created"], ["notes", "note_created"]];
-    eventMap.forEach(([key, eventName]) => {
-      if (Array.isArray(next[key]) && Array.isArray(data[key]) && next[key].length > data[key].length) emitTesterActivity(eventName);
-    });
     setData(next);
     try { await storage.set("ndis:data", JSON.stringify(next)); } catch (e) { console.error(e); }
     if (!skipAutoBackup && next.onboarded) scheduleGoogleAutoBackup(next);
@@ -4980,7 +4943,6 @@ function Incidents({ data, save }) {
     const rec = { ...r, id: r.id || uid(), createdAt: r.createdAt || now, updatedAt: now };
     const next = r.id ? incidents.map((x) => x.id === r.id ? rec : x) : [...incidents, rec];
     save({ ...data, incidents: next });
-    if (!r.id) emitTesterActivity("incident_created");
     setEdit(null);
   };
   const drop = (id) => {
@@ -6630,7 +6592,7 @@ const MANUAL = [
 
 
 /* ---------------- feedback ---------------- */
-// No server, so feedback leaves as a message the tester sends. Everything is
+// No server, so feedback leaves as a message the user sends. Everything is
 // pre-formatted; nothing about a participant ever goes in it.
 const FEEDBACK_TO = "support@supportflow.work";
 
@@ -6762,7 +6724,6 @@ const PRIVSEC_SECTIONS = [
   </>],
   ["Information shared with other services", <>
     <p><strong>SupportFlow Assistant:</strong> sends the question you type and generic app/help context needed to answer it. It is designed not to send participant or business records.</p>
-    <p><strong>Early Access:</strong> limited technical and usage events may be recorded to operate the tester program, such as whether a shift, trip, invoice, expense or note was created. Participant content is not included in those events.</p>
   </>],
   ["Your privacy", <>
     <p>The full Privacy Policy explains what SupportFlow handles, where information is stored, third-party services and your privacy choices.</p>
@@ -6862,7 +6823,6 @@ function Support({ data }) {
       const d = await res.json().catch(() => ({}));
       if (!res.ok || !d.ok) throw new Error("failed");
       setWhat("");
-      emitTesterActivity("feedback_submitted");
       setSent("Sent, thanks — we'll get back to you if it needs a reply.");
     } catch (e) {
       setSent("Couldn't send that. Try Email or Copy below instead.");

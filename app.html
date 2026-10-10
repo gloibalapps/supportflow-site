@@ -32,24 +32,6 @@
   #boot p{font-size:13px;text-align:center;margin:0}
   #boot .err{color:#C2703B;max-width:30ch;line-height:1.6}
   @keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(.94);opacity:.72}}
-  #gate{position:fixed;inset:0;display:none;place-items:center;background:#12140E;z-index:10000;
-    font-family:'Instrument Sans',system-ui,sans-serif;padding:24px;box-sizing:border-box}
-  #gate.show{display:grid}
-  #gate .card{width:100%;max-width:340px;text-align:center}
-  #gate .seal{width:52px;height:52px;border-radius:15px;margin:0 auto 20px;background:linear-gradient(148deg,#E0A83F,#C8913A);display:grid;place-items:center;font-family:'Fraunces',serif;font-size:26px;color:#14150F}
-  #gate h1{font-family:'Fraunces',serif;font-weight:500;font-size:22px;color:#F3F1E9;margin:0 0 6px}
-  #gate p{color:#8B8E82;font-size:13px;line-height:1.6;margin:0 0 22px}
-  #gate input{width:100%;box-sizing:border-box;background:#1B1D15;border:1px solid #34382A;
-    border-radius:10px;color:#F3F1E9;font-size:16px;text-align:center;letter-spacing:.06em;
-    text-transform:uppercase;padding:13px 14px;font-family:'Instrument Sans',system-ui,sans-serif}
-  #gate input:focus{outline:none;border-color:#C8913A}
-  #gate button{width:100%;margin-top:12px;background:linear-gradient(148deg,#E0A83F,#C8913A);
-    border:none;border-radius:10px;color:#14150F;font-weight:600;font-size:14px;padding:13px;
-    font-family:'Instrument Sans',system-ui,sans-serif;cursor:pointer}
-  #gate button:disabled{opacity:.55}
-  #gate .gerr{color:#C2703B;font-size:12.5px;margin-top:12px;min-height:16px}
-  #gate .glink{color:#8B8E82;font-size:12px;margin-top:22px}
-  #gate .glink a{color:#C8913A;text-decoration:none}
 </style>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -88,8 +70,6 @@
     <p id="bootmsg">Starting up…</p>
   </div>
 </div>
-
-
 
 <div id="root"></div>
 
@@ -539,7 +519,7 @@ async function askModel(prompt, opts) {
 // Verified against the NDIS Pricing Schedule 2026-27 (v1.2, 22 July 2026),
 // Schedule 1 — Disability Support Workers. National column, effective 1 July 2026.
 // https://www.ndis.gov.au/providers/pricing-arrangements
-const APP_VERSION = "27";
+const APP_VERSION = "32";
 
 const PRICE_SOURCE = {
   doc: "NDIS Pricing Schedule 2026-27",
@@ -1865,30 +1845,6 @@ function LockScreen({ onUnlock, onForgot }) {
 }
 
 
-// Early Access tester telemetry: privacy-safe event names only. Never send record content.
-const TESTER_ACTIVITY_EVENTS = new Set(["app_opened","section_shifts","section_notes","section_travel","section_incidents","section_invoices","section_expenses","section_tax","section_help","shift_created","trip_created","invoice_created","expense_created","note_created","feedback_submitted"]);
-function emitTesterActivity(eventName) {
-  if (!TESTER_ACTIVITY_EVENTS.has(eventName)) return;
-  let deviceRef = "";
-  try { deviceRef = localStorage.getItem("ndis:deviceRef") || ""; } catch (e) { }
-  if (!deviceRef) return;
-  fetch("/.netlify/functions/tester-activity", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ deviceRef, event: eventName, appVersion: APP_VERSION,
-      deviceType: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? "mobile" : "desktop" }),
-    keepalive: true,
-  }).catch(() => {});
-}
-
-try {
-  const now = Date.now(), last = Number(localStorage.getItem("sf_tester_last_open_ping") || 0);
-  if (now - last > 15 * 60 * 1000) {
-    localStorage.setItem("sf_tester_last_open_ping", String(now));
-    emitTesterActivity("app_opened");
-  }
-} catch (_) {}
-
 function App() {
   const [theme, setTheme] = useState("dark");
   const [tab, setTab] = useState("home");
@@ -1913,13 +1869,6 @@ function App() {
   const [pplTab, setPplTab] = useState("participants"); // participants | managers | agreements
   const [openPt, setOpenPt] = useState(null);
   const [openPane, setOpenPane] = useState(null); // null | "help" | "privacy"
-  useEffect(() => {
-    let eventName = null;
-    if (tab === "invoices") eventName = ({ shifts: "section_shifts", travel: "section_travel", notes: "section_notes", incidents: "section_incidents" })[invTab] || null;
-    else if (tab === "summary") eventName = ({ invoices: "section_invoices", expenses: "section_expenses", position: "section_tax", bas: "section_tax" })[sumTab] || null;
-    else if (tab === "settings" && (openPane === "help" || openPane === "support")) eventName = "section_help";
-    if (eventName) emitTesterActivity(eventName);
-  }, [tab, invTab, sumTab, openPane]);
   const [helpInitialView, setHelpInitialView] = useState("manual"); // manual | support
   const [menuOpen, setMenuOpen] = useState(false);
   const [helpMenuOpen, setHelpMenuOpen] = useState(false);
@@ -2056,12 +2005,6 @@ function App() {
   }, [loaded]);
 
   const save = async (next, skipAutoBackup = false) => {
-    // Count only newly created work records as meaningful tester activity.
-    // No record content, participant information, amounts or notes leave the device.
-    const eventMap = [["shifts", "shift_created"], ["trips", "trip_created"], ["invoices", "invoice_created"], ["expenses", "expense_created"], ["notes", "note_created"]];
-    eventMap.forEach(([key, eventName]) => {
-      if (Array.isArray(next[key]) && Array.isArray(data[key]) && next[key].length > data[key].length) emitTesterActivity(eventName);
-    });
     setData(next);
     try { await storage.set("ndis:data", JSON.stringify(next)); } catch (e) { console.error(e); }
     if (!skipAutoBackup && next.onboarded) scheduleGoogleAutoBackup(next);
@@ -5066,7 +5009,6 @@ function Incidents({ data, save }) {
     const rec = { ...r, id: r.id || uid(), createdAt: r.createdAt || now, updatedAt: now };
     const next = r.id ? incidents.map((x) => x.id === r.id ? rec : x) : [...incidents, rec];
     save({ ...data, incidents: next });
-    if (!r.id) emitTesterActivity("incident_created");
     setEdit(null);
   };
   const drop = (id) => {
@@ -6716,7 +6658,7 @@ const MANUAL = [
 
 
 /* ---------------- feedback ---------------- */
-// No server, so feedback leaves as a message the tester sends. Everything is
+// No server, so feedback leaves as a message the user sends. Everything is
 // pre-formatted; nothing about a participant ever goes in it.
 const FEEDBACK_TO = "support@supportflow.work";
 
@@ -6848,7 +6790,6 @@ const PRIVSEC_SECTIONS = [
   </>],
   ["Information shared with other services", <>
     <p><strong>SupportFlow Assistant:</strong> sends the question you type and generic app/help context needed to answer it. It is designed not to send participant or business records.</p>
-    <p><strong>Early Access:</strong> limited technical and usage events may be recorded to operate the tester program, such as whether a shift, trip, invoice, expense or note was created. Participant content is not included in those events.</p>
   </>],
   ["Your privacy", <>
     <p>The full Privacy Policy explains what SupportFlow handles, where information is stored, third-party services and your privacy choices.</p>
@@ -6948,7 +6889,6 @@ function Support({ data }) {
       const d = await res.json().catch(() => ({}));
       if (!res.ok || !d.ok) throw new Error("failed");
       setWhat("");
-      emitTesterActivity("feedback_submitted");
       setSent("Sent, thanks — we'll get back to you if it needs a reply.");
     } catch (e) {
       setSent("Couldn't send that. Try Email or Copy below instead.");
@@ -8654,11 +8594,6 @@ ReactDOM.createRoot(document.getElementById("root")).render(
 (function(){
   var boot=document.getElementById('boot');
   var msg=document.getElementById('bootmsg');
-  var gate=document.getElementById('gate');
-  var gateCode=document.getElementById('gateCode');
-  var gateBtn=document.getElementById('gateBtn');
-  var gateErr=document.getElementById('gateErr');
-  var gateWaitlist=document.getElementById('gateWaitlist');
 
   function fail(text){ if(!msg)return; msg.className='err'; msg.textContent=text; }
   window.addEventListener('error',function(e){
@@ -8718,6 +8653,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     });
   }
 
+  // Public access: normal onboarding and device security still apply.
   startApp();
 })();
 </script>
