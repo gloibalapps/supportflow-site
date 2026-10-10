@@ -1,0 +1,50 @@
+{
+  "name": "SupportFlow",
+  "short_name": "SupportFlow",
+  "description": "Business admin assistant for independent NDIS support workers \u2014 invoices, tax set-aside, travel and service agreements.",
+  "start_url": "./app.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#12140E",
+  "theme_color": "#12140E",
+  "lang": "en-AU",
+  "categories": [
+    "business",
+    "finance",
+    "productivity"
+  ],
+  "icons": [
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Open SupportFlow",
+      "short_name": "Open",
+      "url": "./app.html",
+      "icons": [
+        {
+          "src": "./icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}

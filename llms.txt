@@ -1,0 +1,18 @@
+# SupportFlow
+
+> SupportFlow is an app for independent NDIS support workers in Australia. It keeps shifts, progress notes, kilometres, expenses, invoices and a running tax estimate in one private app that works offline once loaded.
+
+## Main pages
+
+- [Home](https://supportflow.work/): what SupportFlow does and how to get started
+- [Pricing](https://supportflow.work/pricing.html): plans and prices
+- [Invoice template](https://supportflow.work/ndis-support-worker-invoice-template): NDIS invoice template for support workers
+- [Progress notes template](https://supportflow.work/ndis-support-worker-progress-notes): NDIS progress notes template
+- [About SupportFlow](https://supportflow.work/about-supportflow.md): full product description
+- [User manual](https://supportflow.work/user-manual.md): how the app works
+- [Privacy policy](https://supportflow.work/privacy): how data is handled
+- [Terms of use](https://supportflow.work/terms): terms of use
+
+## The app
+
+- [Open SupportFlow](https://supportflow.work/app): the app runs in the browser

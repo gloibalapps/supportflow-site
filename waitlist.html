@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SupportFlow — Early Access for the first 50 testers</title>
+<meta name="description" content="SupportFlow is opening beta testing to the first 50 NDIS support workers. Free while testing, 90 days free at launch." />
+<meta name="robots" content="noindex, follow" />
+<link rel="canonical" href="https://supportflow.work/waitlist" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --bg:#F7F5EE; --bg-2:#FFFFFF; --panel:#FFFFFF; --border:#E4E0D2;
+    --tx-1:#1B1D15; --tx-2:#4A4C3F; --tx-3:#8B8E7A;
+    --brass:#B9822E; --brass-2:#E0A83F; --brass-ink:#14150F;
+    --good:#3F7B57; --warn:#B4552E;
+    font-family:'Instrument Sans',system-ui,sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#12140E; --bg-2:#181A12; --panel:#1B1D15; --border:#2E3122;
+      --tx-1:#F3F1E9; --tx-2:#C7C5B5; --tx-3:#8B8E82;
+      --brass:#E0A83F; --brass-2:#C8913A; --brass-ink:#14150F;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#12140E; --bg-2:#181A12; --panel:#1B1D15; --border:#2E3122;
+    --tx-1:#F3F1E9; --tx-2:#C7C5B5; --tx-3:#8B8E82;
+    --brass:#E0A83F; --brass-2:#C8913A; --brass-ink:#14150F;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--tx-1)}
+  body{line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:640px;margin:0 auto;padding:0 20px}
+  header.top{padding:22px 0 0;display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .brand{display:flex;align-items:center;gap:10px}
+  .havecode{font-size:12.5px;color:var(--tx-3);text-decoration:none;white-space:nowrap}
+  .havecode:hover{color:var(--brass)}
+  .seal{width:34px;height:34px;border-radius:10px;flex:0 0 auto;background:linear-gradient(148deg,var(--brass-2),var(--brass));display:grid;place-items:center;font-family:'Fraunces',serif;font-size:17px;color:var(--brass-ink)}
+  .brand b{font-family:'Fraunces',serif;font-weight:500;font-size:16px}
+
+  .hero{padding:52px 0 8px}
+  .eyebrow{font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--brass);font-weight:600;margin-bottom:14px}
+  h1{font-family:'Fraunces',serif;font-weight:500;font-size:clamp(30px,7vw,44px);line-height:1.08;margin:0 0 16px;letter-spacing:-.01em}
+  h1 em{font-style:italic;color:var(--brass)}
+  .sub{color:var(--tx-2);font-size:16.5px;line-height:1.65;max-width:52ch;margin:0 0 28px}
+
+  .counter{display:inline-flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--border);
+    border-radius:999px;padding:8px 16px 8px 8px;font-size:13px;color:var(--tx-2);margin-bottom:36px}
+  .counter .dot{width:8px;height:8px;border-radius:50%;background:var(--good);flex:0 0 auto;animation:pulse 1.8s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+  .counter b{color:var(--tx-1)}
+  .bar{width:120px;height:5px;border-radius:99px;background:var(--border);overflow:hidden;flex:0 0 auto}
+  .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--brass-2),var(--brass));border-radius:99px;transition:width .5s ease}
+
+  .offer{background:var(--panel);border:1px solid var(--border);border-radius:18px;padding:26px 24px;margin-bottom:36px}
+  .offer .row{display:flex;gap:14px;padding:13px 0;border-top:1px solid var(--border)}
+  .offer .row:first-child{border-top:none;padding-top:0}
+  .offer .row:last-child{padding-bottom:0}
+  .offer .ico{width:30px;height:30px;border-radius:9px;flex:0 0 auto;display:grid;place-items:center;
+    background:color-mix(in srgb, var(--brass) 16%, transparent);color:var(--brass);font-size:15px;font-weight:700}
+  .offer .row h3{margin:0 0 3px;font-size:14.5px;font-weight:600}
+  .offer .row p{margin:0;font-size:13px;color:var(--tx-3);line-height:1.55}
+
+  .ask{font-size:13px;color:var(--tx-3);line-height:1.7;margin-bottom:40px;padding:14px 16px;
+    border-left:2px solid var(--brass);background:color-mix(in srgb, var(--brass) 6%, transparent);border-radius:0 10px 10px 0}
+  .ask b{color:var(--tx-2)}
+
+  form{background:var(--panel);border:1px solid var(--border);border-radius:18px;padding:26px 24px;margin-bottom:20px}
+  form h2{font-family:'Fraunces',serif;font-weight:500;font-size:20px;margin:0 0 4px}
+  form > p.lead{color:var(--tx-3);font-size:13px;margin:0 0 22px}
+  .f{display:block;margin-bottom:16px}
+  .f span{display:block;font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--tx-3);font-weight:600;margin-bottom:7px}
+  .f input, .f select, .f textarea{
+    width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--tx-1);
+    font-size:15px;padding:12px 13px;font-family:inherit;resize:vertical}
+  .f input:focus, .f select:focus, .f textarea:focus{outline:none;border-color:var(--brass)}
+  .f textarea{min-height:70px}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media (max-width:480px){.two{grid-template-columns:1fr}}
+  button.submit{width:100%;background:linear-gradient(148deg,var(--brass-2),var(--brass));border:none;border-radius:12px;
+    color:var(--brass-ink);font-weight:700;font-size:15px;padding:15px;font-family:inherit;cursor:pointer;margin-top:6px}
+  button.submit:disabled{opacity:.55;cursor:default}
+  .formerr{color:var(--warn);font-size:12.5px;margin-top:10px;min-height:16px}
+  .privacy{font-size:11.5px;color:var(--tx-3);margin-top:14px;line-height:1.6}
+
+  .success{display:none;text-align:center;padding:44px 24px;background:var(--panel);border:1px solid var(--border);border-radius:18px;margin-bottom:20px}
+  .success.show{display:block}
+  .success .check{width:46px;height:46px;border-radius:50%;background:color-mix(in srgb, var(--good) 18%, transparent);
+    color:var(--good);display:grid;place-items:center;margin:0 auto 16px;font-size:22px}
+  .success h2{font-family:'Fraunces',serif;font-weight:500;font-size:21px;margin:0 0 8px}
+  .success p{color:var(--tx-3);font-size:13.5px;line-height:1.6;max-width:38ch;margin:0 auto}
+
+  footer{text-align:center;color:var(--tx-3);font-size:12px;padding:10px 0 50px;line-height:1.7}
+  footer a{color:var(--tx-3)}
+</style>
+
+<!-- Google Analytics (public website only) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-ZTS8CJB9DG"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-ZTS8CJB9DG', {
+    'allow_google_signals': false,
+    'allow_ad_personalization_signals': false
+  });
+</script>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><div class="seal">S</div><b>SupportFlow</b></div>
+    <a class="havecode" href="/app">Already have a code?</a>
+  </header>
+
+  <section class="hero">
+    <div class="eyebrow">Early access · 50 spots</div>
+    <h1>Help build the invoicing tool <em>you</em> actually asked for.</h1>
+    <p class="sub">SupportFlow turns your shifts and travel into NDIS-ready invoices, works out the right item and rate for you, and shows what to set aside for tax as you go. We're opening it to the first 50 support workers before anyone else gets in.</p>
+
+    <div class="counter">
+      <span class="dot"></span>
+      <span id="counterText"><b>…</b> of 50 spots taken</span>
+      <span class="bar"><i id="counterBar" style="width:0%"></i></span>
+    </div>
+
+    <div class="offer">
+      <div class="row">
+        <div class="ico">$</div>
+        <div><h3>90 days free at launch</h3><p>This is free while beta testing — no subscription, nothing charged, no clock running. Beta may be changed, paused, or ended at any time. Once beta is finalised and SupportFlow properly launches, subscribing gets you 90 days free from the moment you subscribe, not from today.</p></div>
+      </div>
+      <div class="row">
+        <div class="ico">→</div>
+        <div><h3>A direct line to the person building it</h3><p>You're not filing a ticket into a queue. What you flag gets looked at and, more often than not, shipped.</p></div>
+      </div>
+      <div class="row">
+        <div class="ico">★</div>
+        <div><h3>You shape what ships next</h3><p>Early testers get first say on the roadmap — what's built next comes from what actually gets used and what gets in the way.</p></div>
+      </div>
+    </div>
+
+    <div class="ask">
+      <b>What we ask in return:</b> use it for real work, and tell us honestly when something's wrong, confusing, or missing. That's it — no set schedule, no surveys, just real feedback from real shifts.
+    </div>
+  </section>
+
+  <form id="waitlistForm">
+    <h2 id="formHeading">Join early access</h2>
+    <p class="lead">Spots go to a mix of sole traders and small teams so the feedback covers real, varied billing situations.</p>
+
+    <label class="f"><span>Name</span><input type="text" id="fName" required /></label>
+    <label class="f"><span>Email</span><input type="email" id="fEmail" required /></label>
+
+    <div class="two">
+      <label class="f"><span>You're a…</span>
+        <select id="fRole">
+          <option value="Sole trader / independent support worker">Sole trader / independent worker</option>
+          <option value="Small provider / small team">Small provider / small team</option>
+          <option value="Plan manager">Plan manager</option>
+          <option value="Other">Other</option>
+        </select>
+      </label>
+      <label class="f"><span>Participants you support</span>
+        <select id="fParticipants">
+          <option value="1-3">1–3</option>
+          <option value="4-8">4–8</option>
+          <option value="9-15">9–15</option>
+          <option value="16+">16+</option>
+        </select>
+      </label>
+    </div>
+
+    <label class="f"><span>How do you currently invoice? (optional)</span>
+      <textarea id="fWhy" placeholder="Spreadsheet, another app, on paper — whatever's true, it helps us understand what we're replacing"></textarea>
+    </label>
+
+    <button type="submit" class="submit" id="submitBtn">Request my invite</button>
+    <div class="formerr" id="formErr"></div>
+    <p class="privacy" id="formPrivacy">Sent straight to you automatically — your access code if a spot's open, or added to the waitlist if all 50 are taken. During Early Access, SupportFlow records privacy-safe tester activity (such as a shift or invoice being created) to manage tester participation. No participant details, notes, invoice contents or amounts are sent. Never sold or shared.</p>
+  </form>
+
+  <div class="success" id="successBox">
+    <div class="check">✓</div>
+    <h2>You're on the list</h2>
+    <p>If you're one of the first 50, you'll get an email with your access code. If the list fills before we reach you, we'll say so and let you know if a spot opens up.</p>
+  </div>
+
+  <footer>
+  <br><span>SupportFlow™ · © 2026 SupportFlow. All rights reserved.</span></footer>
+</div>
+
+<script>
+(function () {
+  var FN_URL = 'https://mfmxqchivstevbrwkxok.supabase.co/functions/v1/public-api';
+  var SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1mbXhxY2hpdnN0ZXZicndreG9rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0MTk0ODQsImV4cCI6MjEwMTk5NTQ4NH0.NJCCA0smlEfmgqaoDuEL6iOHThijTZrOVKuwHoBjy5U';
+  // Signup itself now goes through this Netlify function instead -- it
+  // records the signup AND assigns a code AND emails it, all in one step.
+  // waitlist_count stays on the Supabase function above since it's just a
+  // read, unrelated to any of that.
+  var JOIN_URL = '/.netlify/functions/waitlist-join';
+  var TOTAL_SPOTS = 50;
+
+  function callApi(body) {
+    return fetch(FN_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: SUPA_KEY },
+      body: JSON.stringify(body)
+    }).then(function (r) { return r.json(); });
+  }
+
+  function loadCounter() {
+    callApi({ action: 'waitlist_count' }).then(function (res) {
+      var taken = (res && typeof res.taken === 'number') ? res.taken : 0;
+      document.getElementById('counterText').innerHTML = '<b>' + taken + '</b> of ' + TOTAL_SPOTS + ' spots taken';
+      document.getElementById('counterBar').style.width = Math.min(100, (taken / TOTAL_SPOTS) * 100) + '%';
+      // The word "waitlist" should only appear once there's actually
+      // something to wait for. While spots remain, signing up gets you
+      // straight in -- calling that a waitlist would be wrong.
+      var full = taken >= TOTAL_SPOTS;
+      document.getElementById('formHeading').textContent = full ? 'Join the waitlist' : 'Join early access';
+      document.getElementById('submitBtn').textContent = full ? 'Join the waitlist' : 'Request my invite';
+    }).catch(function () {
+      document.getElementById('counterText').innerHTML = 'First 50 testers, spots limited';
+    });
+  }
+  loadCounter();
+
+  var form = document.getElementById('waitlistForm');
+  var btn = document.getElementById('submitBtn');
+  var err = document.getElementById('formErr');
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    err.textContent = '';
+    var name = document.getElementById('fName').value.trim();
+    var email = document.getElementById('fEmail').value.trim();
+    if (!name || !email) { err.textContent = 'Name and email are required.'; return; }
+
+    btn.disabled = true;
+    var priorLabel = btn.textContent;
+    btn.textContent = 'Sending…';
+
+    fetch(JOIN_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: name,
+        email: email,
+        role: document.getElementById('fRole').value,
+        participants_supported: document.getElementById('fParticipants').value,
+        why: document.getElementById('fWhy').value.trim()
+      })
+    }).then(function (r) { return r.json(); }).then(function (res) {
+      if (!res || res.ok !== true) throw new Error('request failed');
+      form.style.display = 'none';
+      document.getElementById('successBox').classList.add('show');
+      // The email itself (invite with code, or waitlist notice) already
+      // says which one they got -- res.invited is only used here to tweak
+      // the on-screen message so it doesn't over-promise a code that
+      // wasn't actually assigned.
+      if (res.invited === false) {
+        var successBox = document.getElementById('successBox');
+        if (successBox) {
+          var note = document.createElement('p');
+          note.style.marginTop = '10px';
+          note.textContent = "All 50 spots are taken right now, you're on the waiting list, check your email.";
+          successBox.appendChild(note);
+        }
+      }
+    }).catch(function () {
+      btn.disabled = false;
+      btn.textContent = priorLabel;
+      err.textContent = "Couldn't send that, check your connection and try again.";
+    });
+  });
+})();
+</script>
+
+<div style="text-align:center;margin:18px 0 24px"><a href="/sfsd.html">View the SupportFlow workflow guide</a></div>
+</body>
+</html>

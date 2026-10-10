@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="warm" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#E8C171"/>
+      <stop offset="0.5" stop-color="#D4A03D"/>
+      <stop offset="1" stop-color="#A9762A"/>
+    </linearGradient>
+  </defs>
+
+  <!-- A single continuous ribbon of constant width, winding into a clean S.
+       Reads as "flow" (a road, a river, a current) and as the brand's own
+       initial, with no heads, limbs, or other figurative detail that could
+       misread at small sizes or from a distance. -->
+  <path d="M 344 118
+           C 344 118, 300 90, 232 90
+           C 152 90, 100 132, 100 190
+           C 100 244, 142 272, 214 284
+           L 298 298
+           C 350 306, 380 328, 380 366
+           C 380 412, 336 442, 264 442
+           C 190 442, 148 414, 148 414"
+        fill="none" stroke="url(#warm)" stroke-width="72"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
