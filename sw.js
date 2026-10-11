@@ -30,6 +30,9 @@ self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(CACHE)
       .then((c) => c.addAll(CORE))
+      // Take over immediately so a redeploy replaces an older worker (and its
+      // stale cached pages) without waiting for every tab to be closed.
+      .then(() => self.skipWaiting())
   );
 });
 
