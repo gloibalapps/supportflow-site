@@ -1,29 +1,32 @@
-// Creates a Stripe Checkout Session for whichever plan the user picked, with
-// the 14-day trial applied. The browser never sees a secret key or talks to
+// Creates a Stripe Checkout Session for a one-time invoice credit pack.
+// SupportFlow has no subscription: people start with 5 free credits and buy
+// packs as they need them. The browser never sees a secret key or talks to
 // Stripe directly — it calls this function, gets back a URL, and redirects.
 //
 // Set in Netlify: Site configuration → Environment variables
-//   STRIPE_SECRET_KEY   the restricted key (rk_test_... while in the sandbox)
-//   STRIPE_PRICE_MONTHLY the monthly plan's Price ID, from Stripe: Product catalogue
-//   STRIPE_PRICE_YEARLY  the yearly plan's Price ID, from Stripe: Product catalogue
-//   SITE_URL             e.g. https://ndisapptest.netlify.app (no trailing slash)
+//   STRIPE_SECRET_KEY     the restricted key (rk_test_... while in the sandbox)
+//   STRIPE_PRICE_CASUAL   Price ID of the one-time "10 credits" product (A$7.99)
+//   STRIPE_PRICE_POPULAR  Price ID of the one-time "30 credits" product (A$19.99)
+//   STRIPE_PRICE_VALUE    Price ID of the one-time "100 credits" product (A$39.99)
+//   SITE_URL              e.g. https://supportflow.work (no trailing slash)
 
 const STRIPE_API = "https://api.stripe.com/v1";
-const TRIAL_DAYS = 14;
-// Early-access testers get 90 days instead of 14, applied automatically
-// from the device reference set when they entered their access code at
-// the app's gate — nobody has to type in a coupon at checkout.
-const EARLY_ACCESS_TRIAL_DAYS = 90;
 
-function priceFor(plan) {
-  if (plan === "monthly") return process.env.STRIPE_PRICE_MONTHLY;
-  if (plan === "yearly") return process.env.STRIPE_PRICE_YEARLY;
-  return null;
-}
+// Kept in step with CREDIT_PACKS in invoice-credit-rules.js. The credit
+// count travels in session metadata so the webhook never has to guess it
+// from the amount paid (which a promo code would change).
+const PACKS = Object.freeze({
+  casual: { credits: 10, env: "STRIPE_PRICE_CASUAL" },
+  popular: { credits: 30, env: "STRIPE_PRICE_POPULAR" },
+  value: { credits: 100, env: "STRIPE_PRICE_VALUE" },
+});
+
+const json = (obj, status = 200) =>
+  new Response(JSON.stringify(obj), { status, headers: { "Content-Type": "application/json" } });
 
 function formBody(obj) {
   // Stripe's API takes application/x-www-form-urlencoded, including for
-  // nested fields like subscription_data[trial_period_days].
+  // nested fields like metadata[pack].
   return Object.entries(obj)
     .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
     .join("&");
@@ -37,83 +40,53 @@ export default async (req) => {
   const key = process.env.STRIPE_SECRET_KEY;
   const site = process.env.SITE_URL;
   if (!key || !site) {
-    return new Response(JSON.stringify({ error: "Billing isn't configured on this site yet." }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    return json({ error: "Billing isn't configured on this site yet." }, 500);
   }
 
   let body;
   try {
     body = await req.json();
   } catch {
-    return new Response(JSON.stringify({ error: "Malformed request." }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+    return json({ error: "Malformed request." }, 400);
   }
 
-  const plan = body?.plan;
-  const price = priceFor(plan);
+  // `plan` accepted as an alias so an older app build sending the pack name
+  // under that field still works.
+  const packName = String(body?.pack ?? body?.plan ?? "").trim().toLowerCase();
+  const pack = PACKS[packName];
+  if (!pack) {
+    return json({ error: "Choose a credit pack: casual, popular or value." }, 400);
+  }
+  const price = process.env[pack.env];
   if (!price) {
-    return new Response(JSON.stringify({ error: "Choose monthly or yearly." }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+    return json({ error: "That credit pack isn't available yet." }, 500);
   }
 
-  // The device reference the app generated, so the webhook has something
-  // stable to attach this subscription to in Supabase once Stripe confirms
-  // the session. Without this, a completed checkout has no way back to the
-  // person who paid.
+  // The device reference the app generated, so the webhook knows whose
+  // account to add the credits to once Stripe confirms payment. Without
+  // this, a completed checkout has no way back to the person who paid.
   const clientReferenceId = typeof body?.clientReferenceId === "string" ? body.clientReferenceId.trim() : "";
   if (!clientReferenceId) {
-    return new Response(JSON.stringify({ error: "Missing device reference." }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+    return json({ error: "Missing device reference." }, 400);
   }
 
-  // An optional promotion code (FREEYEAR / FREEMONTH) the user typed in.
-  // Stripe validates it itself, including the redemption cap, so a used-up
-  // or wrong code just fails at checkout with Stripe's own message.
+  // An optional promotion code the user typed in. Stripe validates it
+  // itself, including any redemption cap.
   const promoCode = typeof body?.promoCode === "string" ? body.promoCode.trim() : "";
 
-  // Was this device one of the 50 early-access testers? Checked against
-  // Supabase directly with the service key — never trusts anything the
-  // browser claims about itself. A failed check just falls back to the
-  // normal 14-day trial rather than blocking checkout entirely.
-  let trialDays = TRIAL_DAYS;
-  const supaUrl = process.env.SUPABASE_URL;
-  const supaKey = process.env.SUPABASE_SERVICE_KEY;
-  if (supaUrl && supaKey) {
-    try {
-      const earlyResp = await fetch(`${supaUrl}/rest/v1/rpc/is_early_access_device`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: supaKey,
-          Authorization: `Bearer ${supaKey}`,
-        },
-        body: JSON.stringify({ p_device_ref: clientReferenceId }),
-      });
-      const isEarlyAccess = await earlyResp.json();
-      if (isEarlyAccess === true) trialDays = EARLY_ACCESS_TRIAL_DAYS;
-    } catch {
-      // Couldn't confirm either way — proceed with the standard trial
-      // rather than failing checkout over a status lookup.
-    }
-  }
-
   const params = {
-    mode: "subscription",
+    mode: "payment",
     "line_items[0][price]": price,
     "line_items[0][quantity]": 1,
-    "subscription_data[trial_period_days]": trialDays,
     client_reference_id: clientReferenceId,
+    // Payment mode doesn't create a Stripe customer by default. We need one
+    // so restore-purchase.mjs can find this buyer again by email later.
+    customer_creation: "always",
+    "metadata[pack]": packName,
+    "metadata[credits]": pack.credits,
+    "payment_intent_data[metadata][pack]": packName,
     success_url: `${site}/app?checkout=success`,
     cancel_url: `${site}/app?checkout=cancelled`,
-    "payment_method_collection": "if_required", // no card needed to start the trial itself
     allow_promotion_codes: promoCode ? "false" : "true", // manual code below takes precedence
   };
 
@@ -129,9 +102,10 @@ export default async (req) => {
       const match = found?.data?.[0];
       if (match) {
         params["discounts[0][promotion_code]"] = match.id;
+        delete params.allow_promotion_codes; // Stripe rejects both together
       } else {
-        // Invalid or exhausted code: fall back to letting Stripe's own
-        // checkout page prompt for one, rather than failing the whole request.
+        // Invalid or exhausted code: let Stripe's own checkout page prompt
+        // for one, rather than failing the whole request.
         params.allow_promotion_codes = "true";
       }
     } catch {
@@ -151,20 +125,11 @@ export default async (req) => {
     const session = await resp.json();
 
     if (!resp.ok) {
-      return new Response(JSON.stringify({ error: session?.error?.message || "Stripe couldn't create the checkout session." }), {
-        status: 502,
-        headers: { "Content-Type": "application/json" },
-      });
+      return json({ error: session?.error?.message || "Stripe couldn't create the checkout session." }, 502);
     }
 
-    return new Response(JSON.stringify({ url: session.url }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (e) {
-    return new Response(JSON.stringify({ error: "Couldn't reach Stripe. Try again in a moment." }), {
-      status: 502,
-      headers: { "Content-Type": "application/json" },
-    });
+    return json({ url: session.url });
+  } catch {
+    return json({ error: "Couldn't reach Stripe. Try again in a moment." }, 502);
   }
 };

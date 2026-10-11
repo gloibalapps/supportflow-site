@@ -519,7 +519,7 @@ async function askModel(prompt, opts) {
 // Verified against the NDIS Pricing Schedule 2026-27 (v1.2, 22 July 2026),
 // Schedule 1 — Disability Support Workers. National column, effective 1 July 2026.
 // https://www.ndis.gov.au/providers/pricing-arrangements
-const APP_VERSION = "32";
+const APP_VERSION = "1";
 
 const PRICE_SOURCE = {
   doc: "NDIS Pricing Schedule 2026-27",
@@ -1646,7 +1646,7 @@ function TrialEndedNotice({ onClose }) {
     let ref;
     try { ref = localStorage.getItem("ndis:deviceRef"); } catch (e) { }
     if (!ref) {
-      ref = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
+      ref = (crypto.randomUUID ? crypto.randomUUID() : "10000000-1000-4000-8000-100000000000".replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)));
       try { localStorage.setItem("ndis:deviceRef", ref); } catch (e) { }
     }
     fetch("/.netlify/functions/create-checkout", {

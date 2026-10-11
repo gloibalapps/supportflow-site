@@ -1,22 +1,25 @@
-// Lets someone who already has an active trial or subscription reconnect a
-// new device to it, instead of accidentally starting a second paid
-// subscription. There's no login system by design (records stay local, no
-// account/password to manage) — the email they paid with is the only thing
-// that ties a person back to their Stripe subscription, so that's what this
-// asks for.
+// Lets someone who has bought credit packs reconnect a new device to their
+// existing credit balance, instead of losing it after reinstalling or
+// switching phones. There's no login system by design (records stay local,
+// no account/password to manage) — the email they paid with at Stripe
+// checkout is the only thing that ties a person back to their purchases, so
+// that's what this asks for.
 //
 // How it works: look up the Stripe customer by email, find the Supabase
-// account already linked to that customer (created by stripe-webhook.mjs
-// when they first checked out), and hand the browser that account's id.
-// The browser then adopts it as its own ndis:deviceRef, so the very next
-// status check (check-status.mjs) resolves to the existing subscription.
+// account already linked to that customer (written by stripe-webhook.mjs
+// when they first bought a pack), and hand the browser that account's id
+// and credit balance. The browser then adopts the id as its own
+// ndis:deviceRef, so the next status check (check-status.mjs) resolves to
+// the same balance.
+//
+// Response: { deviceRef, credits }
 //
 // Known trade-off, worth revisiting once email sending is wired up: this
 // trusts whatever email is typed in, with no confirmation step. Someone
 // who knows another person's checkout email could restore onto their own
 // device too. It doesn't expose any of that person's app data (records are
 // per-device, never uploaded) and doesn't charge anyone extra — the
-// realistic downside is two devices sharing one seat, which is generally
+// realistic downside is two devices drawing on one credit balance, which is generally
 // no different to how such device restores commonly begin. A proper fix
 // is a magic-link confirmation email before restoring; add once Resend
 // (or similar) is configured.
@@ -55,7 +58,7 @@ export default async (req) => {
 
   const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
   if (!email || !email.includes("@")) {
-    return new Response(JSON.stringify({ error: "Enter the email you used to subscribe." }), {
+    return new Response(JSON.stringify({ error: "Enter the email you used at checkout." }), {
       status: 400,
       headers: { "Content-Type": "application/json" },
     });
@@ -71,7 +74,7 @@ export default async (req) => {
     const custData = await custResp.json();
     const customers = custData?.data || [];
     if (!customers.length) {
-      return new Response(JSON.stringify({ error: "No subscription found for that email." }), {
+      return new Response(JSON.stringify({ error: "No purchases found for that email." }), {
         status: 404,
         headers: { "Content-Type": "application/json" },
       });
@@ -82,7 +85,7 @@ export default async (req) => {
     const customerIds = customers.map((c) => c.id);
     const filter = customerIds.map((id) => `"${id}"`).join(",");
     const acctResp = await fetch(
-      `${supaUrl}/rest/v1/accounts?stripe_customer_id=in.(${filter})&select=id,stripe_customer_id&order=last_seen_at.desc&limit=1`,
+      `${supaUrl}/rest/v1/accounts?stripe_customer_id=in.(${filter})&select=id,stripe_customer_id,credit_balance&order=last_seen_at.desc&limit=1`,
       {
         headers: {
           apikey: supaKey,
@@ -93,13 +96,13 @@ export default async (req) => {
     const accounts = await acctResp.json();
     const account = accounts?.[0];
     if (!account) {
-      return new Response(JSON.stringify({ error: "No subscription found for that email." }), {
+      return new Response(JSON.stringify({ error: "No purchases found for that email." }), {
         status: 404,
         headers: { "Content-Type": "application/json" },
       });
     }
 
-    return new Response(JSON.stringify({ deviceRef: account.id }), {
+    return new Response(JSON.stringify({ deviceRef: account.id, credits: Number(account.credit_balance) || 0 }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });

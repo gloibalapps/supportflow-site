@@ -1,20 +1,33 @@
-// Stripe tells us here when a trial starts, converts, renews, fails, or gets
-// cancelled. This is the one function that actually decides whether the app
-// unlocks for someone — so it verifies Stripe's signature on every request
-// rather than trusting whatever hits the endpoint. Skipping that check would
-// let anyone POST a fake "payment succeeded" event and grant themselves access.
+// Stripe tells us here when a credit pack purchase has been paid. This is
+// the one function that actually adds credits to someone's account — so it
+// verifies Stripe's signature on every request rather than trusting whatever
+// hits the endpoint. Skipping that check would let anyone POST a fake
+// "payment succeeded" event and grant themselves free credits.
 //
 // Set in Netlify: Site configuration → Environment variables
 //   STRIPE_SECRET_KEY      same restricted key as create-checkout.mjs
 //   STRIPE_WEBHOOK_SECRET  whsec_..., shown once you register this endpoint
 //                          in Stripe: Developers → Webhooks → Add endpoint
-//                          → https://yoursite.netlify.app/.netlify/functions/stripe-webhook
+//                          → https://supportflow.work/.netlify/functions/stripe-webhook
+//                          (event: checkout.session.completed, plus
+//                          checkout.session.async_payment_succeeded if you
+//                          enable delayed payment methods)
 //   SUPABASE_URL           your project's URL, from Supabase: Settings -> API
 //   SUPABASE_SERVICE_KEY   the service_role key (server-side only, never the anon key)
+//
+// Database objects used (see CREDIT-PACKS-MIGRATION.sql):
+//   accounts.credit_balance, credit_purchases table, add_credits() RPC.
 
 import crypto from "node:crypto";
 
 const TOLERANCE_SECONDS = 300; // reject anything claiming to be older than 5 minutes
+
+// Kept in step with CREDIT_PACKS in invoice-credit-rules.js.
+const PACK_CREDITS = Object.freeze({ casual: 10, popular: 30, value: 100 });
+// Fallback only, for sessions created without metadata: full-price amounts
+// in cents. A discounted session without metadata won't match, and is
+// retried/logged rather than guessed at.
+const AMOUNT_TO_PACK = Object.freeze({ 799: "casual", 1999: "popular", 3999: "value" });
 
 function verifyStripeSignature(payload, header, secret) {
   if (!header) return false;
@@ -41,16 +54,20 @@ function verifyStripeSignature(payload, header, secret) {
   return crypto.timingSafeEqual(a, b);
 }
 
+function supaHeaders(extra = {}) {
+  return {
+    apikey: process.env.SUPABASE_SERVICE_KEY,
+    Authorization: `Bearer ${process.env.SUPABASE_SERVICE_KEY}`,
+    "Content-Type": "application/json",
+    ...extra,
+  };
+}
+
 async function supabaseUpsert(table, row, onConflict) {
   const url = `${process.env.SUPABASE_URL}/rest/v1/${table}?on_conflict=${onConflict}`;
   const resp = await fetch(url, {
     method: "POST",
-    headers: {
-      apikey: process.env.SUPABASE_SERVICE_KEY,
-      Authorization: `Bearer ${process.env.SUPABASE_SERVICE_KEY}`,
-      "Content-Type": "application/json",
-      Prefer: "resolution=merge-duplicates,return=minimal",
-    },
+    headers: supaHeaders({ Prefer: "resolution=merge-duplicates,return=minimal" }),
     body: JSON.stringify(row),
   });
   if (!resp.ok) {
@@ -59,16 +76,123 @@ async function supabaseUpsert(table, row, onConflict) {
   }
 }
 
-async function findAccountByStripeCustomer(customerId) {
-  const url = `${process.env.SUPABASE_URL}/rest/v1/accounts?stripe_customer_id=eq.${customerId}&select=id`;
+// Records the purchase, keyed on the Stripe session id. Returns true only
+// the first time a given session is seen — Stripe can deliver the same
+// event more than once, and credits must never be added twice.
+async function recordPurchaseOnce(row) {
+  const url = `${process.env.SUPABASE_URL}/rest/v1/credit_purchases?on_conflict=stripe_session_id`;
   const resp = await fetch(url, {
-    headers: {
-      apikey: process.env.SUPABASE_SERVICE_KEY,
-      Authorization: `Bearer ${process.env.SUPABASE_SERVICE_KEY}`,
-    },
+    method: "POST",
+    headers: supaHeaders({ Prefer: "resolution=ignore-duplicates,return=representation" }),
+    body: JSON.stringify(row),
   });
-  const rows = await resp.json();
-  return rows?.[0]?.id || null;
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(`Supabase insert failed on credit_purchases: ${resp.status} ${text}`);
+  }
+  const rows = await resp.json().catch(() => []);
+  return Array.isArray(rows) && rows.length > 0;
+}
+
+async function deletePurchase(sessionId) {
+  await fetch(
+    `${process.env.SUPABASE_URL}/rest/v1/credit_purchases?stripe_session_id=eq.${encodeURIComponent(sessionId)}`,
+    { method: "DELETE", headers: supaHeaders() }
+  ).catch(() => {});
+}
+
+// Atomic increment via the add_credits RPC. Falls back to read-then-write
+// only if the RPC hasn't been created yet (PostgREST answers 404).
+async function addCredits(accountId, credits) {
+  const base = process.env.SUPABASE_URL;
+  const rpc = await fetch(`${base}/rest/v1/rpc/add_credits`, {
+    method: "POST",
+    headers: supaHeaders(),
+    body: JSON.stringify({ p_account_id: accountId, p_credits: credits }),
+  });
+  if (rpc.ok) return;
+  if (rpc.status !== 404) {
+    const text = await rpc.text().catch(() => "");
+    throw new Error(`add_credits RPC failed: ${rpc.status} ${text}`);
+  }
+
+  console.warn("stripe-webhook: add_credits RPC missing, using non-atomic fallback");
+  const cur = await fetch(
+    `${base}/rest/v1/accounts?id=eq.${encodeURIComponent(accountId)}&select=credit_balance,credits_expire_at,free_credits_remaining`,
+    { headers: supaHeaders() }
+  );
+  if (!cur.ok) throw new Error(`Couldn't read credit_balance: ${cur.status}`);
+  const row = (await cur.json())?.[0] || {};
+  // Same 30-day rule as the add_credits RPC: compound while the window is
+  // open, start fresh once it has lapsed. Either way the window resets.
+  const expireAt = row.credits_expire_at ? new Date(row.credits_expire_at) : null;
+  const windowOpen = expireAt && expireAt.getTime() >= Date.now();
+  const now = new Date();
+  const update = {
+    credit_balance: windowOpen ? (Number(row.credit_balance) || 0) + credits : credits,
+    credits_expire_at: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    last_seen_at: now.toISOString(),
+    ...(windowOpen ? {} : { free_credits_remaining: 0 }),
+  };
+  const patch = await fetch(`${base}/rest/v1/accounts?id=eq.${encodeURIComponent(accountId)}`, {
+    method: "PATCH",
+    headers: supaHeaders({ Prefer: "return=minimal" }),
+    body: JSON.stringify(update),
+  });
+  if (!patch.ok) {
+    const text = await patch.text().catch(() => "");
+    throw new Error(`Couldn't update credit_balance: ${patch.status} ${text}`);
+  }
+}
+
+async function handlePaidSession(session) {
+  if (session.mode !== "payment") return; // nothing else is sold
+  if (session.payment_status !== "paid" && session.payment_status !== "no_payment_required") {
+    // Delayed payment methods: wait for async_payment_succeeded.
+    return;
+  }
+
+  const accountId = session.client_reference_id;
+  if (!accountId) {
+    // Can't be retried into success, so log and acknowledge.
+    console.error(`stripe-webhook: session ${session.id} has no client_reference_id`);
+    return;
+  }
+
+  const packName = session.metadata?.pack || AMOUNT_TO_PACK[session.amount_total];
+  const credits = Number(session.metadata?.credits) || PACK_CREDITS[packName];
+  if (!packName || !credits) {
+    throw new Error(`Couldn't work out the credit pack for session ${session.id} (amount ${session.amount_total})`);
+  }
+
+  // Make sure the account row exists before crediting it.
+  await supabaseUpsert("accounts", {
+    id: accountId,
+    ...(session.customer ? { stripe_customer_id: session.customer } : {}),
+    last_seen_at: new Date().toISOString(),
+  }, "id");
+
+  const isNew = await recordPurchaseOnce({
+    account_id: accountId,
+    pack: packName,
+    credits,
+    amount_aud: (Number(session.amount_total) || 0) / 100,
+    stripe_session_id: session.id,
+    purchased_at: new Date().toISOString(),
+  });
+  if (!isNew) {
+    console.log(`stripe-webhook: session ${session.id} already credited, skipping`);
+    return;
+  }
+
+  try {
+    await addCredits(accountId, credits);
+  } catch (e) {
+    // Undo the purchase record so Stripe's retry can credit it properly,
+    // instead of the retry seeing a "done" row and skipping.
+    await deletePurchase(session.id);
+    throw e;
+  }
 }
 
 export default async (req) => {
@@ -102,94 +226,20 @@ export default async (req) => {
 
   try {
     switch (event.type) {
-      // A checkout completed — either the trial just started, or a paid
-      // session finished. The device/account id we set as client_reference_id
-      // in create-checkout.mjs is how we know whose row this is.
-      case "checkout.session.completed": {
-        const session = event.data.object;
-        const accountRef = session.client_reference_id;
-        const customerId = session.customer;
-        if (accountRef && customerId) {
-          await supabaseUpsert("accounts", {
-            id: accountRef,
-            stripe_customer_id: customerId,
-            last_seen_at: new Date().toISOString(),
-          }, "id");
-        }
+      case "checkout.session.completed":
+      case "checkout.session.async_payment_succeeded":
+        await handlePaidSession(event.data.object);
         break;
-      }
-
-      // Fires on creation, renewal, trial-to-paid conversion, plan changes,
-      // and status changes generally. This is the main source of truth for
-      // "is this subscription currently active."
-      case "customer.subscription.created":
-      case "customer.subscription.updated": {
-        const sub = event.data.object;
-        const accountId = await findAccountByStripeCustomer(sub.customer);
-        if (!accountId) {
-          // Stripe doesn't guarantee event order: this can arrive before
-          // checkout.session.completed has created the accounts row for
-          // this customer yet. Throwing (rather than logging and moving
-          // on) makes Stripe retry with backoff, so the next attempt
-          // succeeds once that row exists -- instead of silently losing
-          // the subscription link forever.
-          throw new Error(`No matching account yet for customer ${sub.customer} (will retry)`);
-        }
-        const price = sub.items?.data?.[0]?.price;
-        await supabaseUpsert("subscriptions", {
-          account_id: accountId,
-          stripe_subscription_id: sub.id,
-          status: sub.status, // trialing | active | past_due | canceled | incomplete
-          plan: price?.recurring?.interval === "year" ? "yearly" : "monthly",
-          trial_end: sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
-          current_period_end: sub.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : null,
-          cancel_at_period_end: !!sub.cancel_at_period_end,
-          updated_at: new Date().toISOString(),
-        }, "stripe_subscription_id");
-        break;
-      }
-
-      case "customer.subscription.deleted": {
-        const sub = event.data.object;
-        const accountId = await findAccountByStripeCustomer(sub.customer);
-        if (!accountId) {
-          throw new Error(`No matching account yet for customer ${sub.customer} (will retry)`);
-        }
-        await supabaseUpsert("subscriptions", {
-          account_id: accountId,
-          stripe_subscription_id: sub.id,
-          status: "canceled",
-          updated_at: new Date().toISOString(),
-        }, "stripe_subscription_id");
-        break;
-      }
-
-      // The trial ended without a payment method, or a renewal charge
-      // failed. Reflect that as past_due; the app decides separately what
-      // past_due actually means for access (full lock vs read-only).
-      case "invoice.payment_failed": {
-        const invoice = event.data.object;
-        const accountId = await findAccountByStripeCustomer(invoice.customer);
-        if (accountId && invoice.subscription) {
-          await supabaseUpsert("subscriptions", {
-            account_id: accountId,
-            stripe_subscription_id: invoice.subscription,
-            status: "past_due",
-            updated_at: new Date().toISOString(),
-          }, "stripe_subscription_id");
-        }
-        break;
-      }
 
       default:
-        // Unhandled event types are fine to ignore — Stripe sends many more
-        // than we need, and acknowledging with 200 stops needless retries.
+        // Unhandled event types are fine to ignore — acknowledging with 200
+        // stops needless retries.
         break;
     }
   } catch (e) {
     console.error("stripe-webhook: handler error", e);
-    // Return 500 so Stripe retries — an event we failed to record should not
-    // be silently dropped.
+    // Return 500 so Stripe retries — a purchase we failed to credit should
+    // not be silently dropped.
     return new Response("Internal error", { status: 500 });
   }
 
