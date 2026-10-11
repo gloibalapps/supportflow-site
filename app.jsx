@@ -119,6 +119,9 @@ html,body{overscroll-behavior-y:none;background:#14150F;height:100%;overflow-x:h
 .creditpill .coin{width:8px;height:8px;border-radius:50%;background:var(--brass)}
 .creditpill.empty{border-color:rgba(194,112,59,.45);background:rgba(194,112,59,.08);color:var(--warn)}
 .creditpill.empty .coin{background:var(--warn)}
+.creditpill.warning{border-color:rgba(194,112,59,.6);background:rgba(194,112,59,.12)}
+.creditpill.warning .coin{background:var(--warn)}
+.creditpill .exp{font-size:9.5px;color:var(--tx-3);letter-spacing:0;text-transform:none}
 .menu button.buycredits{display:flex;align-items:center;gap:9px;color:var(--brass-lift);font-weight:600}
 .menu button.buycredits svg{flex:0 0 auto;color:var(--brass)}
 .creditnotice{margin-top:10px;padding:11px 13px;border-radius:11px;border:1px solid rgba(200,145,58,.45);background:rgba(200,145,58,.09);font-size:12.5px;line-height:1.55;color:var(--tx-2)}
@@ -451,7 +454,7 @@ async function askModel(prompt, opts) {
 // Verified against the NDIS Pricing Schedule 2026-27 (v1.2, 22 July 2026),
 // Schedule 1 — Disability Support Workers. National column, effective 1 July 2026.
 // https://www.ndis.gov.au/providers/pricing-arrangements
-const APP_VERSION = "3";
+const APP_VERSION = "4";
 
 const PRICE_SOURCE = {
   doc: "NDIS Pricing Schedule 2026-27",
@@ -1835,6 +1838,7 @@ function App() {
   // (billing unconfigured), so nothing is shown and nothing is blocked.
   const [creditBalance, setCreditBalance] = useState(null);
   const [creditsExpired, setCreditsExpired] = useState(false);
+  const [creditExpiresIn, setCreditExpiresIn] = useState(null); // days remaining
 
   useEffect(() => {
     const onCredits = (e) => {
@@ -1862,6 +1866,14 @@ function App() {
           if (d.status === "ok" || d.status === "none") {
             setCreditBalance(Number(d.credits) || 0);
             setCreditsExpired(!!d.expired);
+            if (d.expiresAt) {
+              const exp = new Date(d.expiresAt).getTime();
+              const now = Date.now();
+              const daysLeft = Math.ceil((exp - now) / 86400000);
+              setCreditExpiresIn(daysLeft > 0 ? daysLeft : null);
+            } else {
+              setCreditExpiresIn(null);
+            }
           } else if (d.status === "unconfigured") {
             setCreditBalance(null); // dev mode: unlimited
             setCreditsExpired(false);
@@ -2321,12 +2333,15 @@ function App() {
             <button className="btn ghost tiny" onClick={() => { setMenuOpen(false); setHelpInitialView("support"); setOpenPane("help"); go("settings"); }}
               title="Feedback" aria-label="Feedback">Feedback</button>
             {typeof creditBalance === "number" && (
-              <button className={`creditpill${creditBalance > 0 ? "" : " empty"}`}
+              <button className={`creditpill${creditBalance > 0 ? "" : " empty"}${creditExpiresIn !== null && creditExpiresIn <= 3 ? " warning" : ""}`}
                 onClick={() => window.open(PRICING_URL, "_blank", "noopener")}
-                title={creditsExpired ? "Your invoice credits have expired. Buy more credits" : "Invoice credits. Buy more credits"}
-                aria-label={creditsExpired ? "Invoice credits expired. Buy credits" : `${creditBalance} invoice credits. Buy credits`}>
+                title={creditsExpired ? "Your invoice credits have expired. Buy more credits" : creditExpiresIn !== null ? `${creditBalance} credits remaining • Expires in ${creditExpiresIn} day${creditExpiresIn === 1 ? "" : "s"}` : `${creditBalance} invoice credits. Buy more credits`}
+                aria-label={creditsExpired ? "Invoice credits expired. Buy credits" : creditExpiresIn !== null ? `${creditBalance} credits • Expires in ${creditExpiresIn} days` : `${creditBalance} invoice credits`}>
                 <span className="coin" aria-hidden="true" />
-                {creditsExpired ? "Expired" : <>{creditBalance}<span className="lbl">{creditBalance === 1 ? " credit" : " credits"}</span></>}
+                {creditsExpired ? "Expired" : <>
+                  {creditBalance}<span className="lbl">{creditBalance === 1 ? " credit" : " credits"}</span>
+                  {creditExpiresIn !== null && <span className="lbl exp"> • Exp {creditExpiresIn}d</span>}
+                </>}
               </button>
             )}
             <div style={{ position: "relative" }}>
