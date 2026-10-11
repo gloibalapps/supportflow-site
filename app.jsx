@@ -292,12 +292,11 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 .hubhead{padding:24px 0 19px}
 .hubhead .disp{font-size:31px;line-height:1.05}
 .hubhead p{margin:8px 0 0;color:var(--tx-3);font-size:13.5px;line-height:1.55;max-width:560px}
-.shortcutmeta{background:linear-gradient(145deg,var(--bg-3),var(--bg-2));border:1px solid var(--line);border-bottom:0;border-radius:18px 18px 0 0;padding:16px 16px 13px;box-shadow:0 10px 30px rgba(0,0,0,.12)}
-.homecardscroll{background:linear-gradient(145deg,var(--bg-3),var(--bg-2));border:1px solid var(--line);border-top:0;border-radius:0 0 18px 18px;padding:0 16px 16px;box-shadow:0 10px 30px rgba(0,0,0,.12)}
+/* Home "Quick start" heading: flat, like the Work/Money/Participants hub headings (no panel). */
+.shortcutmeta{padding:0 0 14px}
 .shortcuttitle{font-size:13px;font-weight:700;margin-bottom:4px}
 .shortcuthelp{font-size:12px;color:var(--tx-3);line-height:1.5}
 .shortgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
-.homeflowgrid{grid-template-columns:1fr}
 .shortcard{position:relative;min-height:128px;text-align:left;border:1px solid var(--line);border-radius:16px;background:linear-gradient(145deg,var(--bg-3),var(--bg-2));padding:15px;color:var(--tx);font-family:inherit;cursor:pointer;transition:transform .16s,border-color .16s,background .16s;display:flex;flex-direction:column;align-items:flex-start}
 .shortcard:hover{transform:translateY(-1px);border-color:rgba(200,145,58,.5)}
 .shortcard.wide{grid-column:1/-1;min-height:102px}
@@ -312,8 +311,6 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
   .hubpage{width:100%;padding:0 14px;bottom:calc(84px + env(safe-area-inset-bottom))}
   .homehello .greet,.hubhead .disp{font-size:29px}
   .shortcard{min-height:124px;padding:14px}
-  .shortcutmeta{padding:14px 14px 12px}
-  .homecardscroll{padding:0 14px 14px}
 }
 
 `;
@@ -442,7 +439,7 @@ async function askModel(prompt, opts) {
 // Verified against the NDIS Pricing Schedule 2026-27 (v1.2, 22 July 2026),
 // Schedule 1 — Disability Support Workers. National column, effective 1 July 2026.
 // https://www.ndis.gov.au/providers/pricing-arrangements
-const APP_VERSION = "1";
+const APP_VERSION = "2";
 
 const PRICE_SOURCE = {
   doc: "NDIS Pricing Schedule 2026-27",
@@ -2363,8 +2360,8 @@ function App() {
                 <div className="shortcuthelp">Shortcuts open the SupportFlow screens you already use.</div>
               </div>
             </div>
-            <div className="hubscroll homecardscroll">
-              <div className="shortgrid homeflowgrid">
+            <div className="hubscroll">
+              <div className="shortgrid">
                 <ShortcutCard icon="shift" tone="pink" title="Add a shift" sub="Open the existing Add Shift form." onClick={() => { setOpenNewShiftRequest(true); go("invoices", "shifts"); }}/>
                 <ShortcutCard icon="notes" tone="teal" title="Add a note" sub="Open the existing progress notes screen." onClick={() => go("invoices", "notes")}/>
                 <ShortcutCard icon="travel" tone="violet" title="Travel" sub="Open the existing travel screen." onClick={() => go("invoices", "travel")}/>
