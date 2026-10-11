@@ -55,7 +55,30 @@
     <a class="hide-mobile" href="/pricing">Pricing</a>
     <a class="page-navcta" href="/app">Open App</a>
   </nav>
-</header><main class="w"><h1>Simple pricing. No monthly subscription.</h1><p class="lead">Start with <b>5 invoice credits free</b>. Buy more when you need them. Credits are valid for 30 days from purchase. Buy more within your window and the balance compounds — your 30 days resets from the new purchase date.</p><div class="plans"><section class="p"><div class="tag">CASUAL</div><h2>10 invoices</h2><div class="price">A$7.99</div><p>80c per invoice. Prices in AUD.</p><a class="btn" href="/app">Start free</a></section><section class="p pop"><div class="tag">MOST POPULAR</div><h2>30 invoices</h2><div class="price">A$19.99</div><p>About 67c per invoice. Prices in AUD.</p><a class="btn" href="/app">Start free</a></section><section class="p"><div class="tag">BEST VALUE</div><h2>100 invoices</h2><div class="price">A$39.99</div><p>40c per invoice. Prices in AUD.</p><a class="btn" href="/app">Start free</a></section></div><div class="fine"><b>How credits work:</b> one credit is used when an invoice is finalised. Drafting, previewing and editing before finalisation costs nothing. Credits are valid for 30 days from purchase. Buy more within your window and the balance compounds — your 30 days resets from the new purchase date. If your credits lapse, your next purchase starts a fresh 30-day window with the new credits only. New accounts start with 5 free credits, valid for 30 days from sign-up. All prices are in Australian dollars (AUD) and include GST where applicable. SupportFlow Pro remains separate for future advanced business dashboards, reporting, exports and analytics.</div></main><footer style="border-top:1px solid #2A2D23;padding:28px clamp(20px,3.6vw,40px) 36px;max-width:1120px;margin:0 auto;font-size:12px;color:#8B8E82;font-family:'Instrument Sans',system-ui,sans-serif">
+</header><main class="w"><h1>Simple pricing. No monthly subscription.</h1><p class="lead">Start with <b>5 invoice credits free</b>. Buy more when you need them. Credits are valid for 30 days from purchase. Buy more within your window and the balance compounds — your 30 days resets from the new purchase date.</p><div class="plans">
+  <section class="p">
+    <div class="tag">CASUAL</div>
+    <h2>10 invoices</h2>
+    <div class="price">A$7.99</div>
+    <p>80c per invoice. Prices in AUD.</p>
+    <button class="btn" onclick="startCheckout('casual')">Buy 10 credits</button>
+  </section>
+  <section class="p pop">
+    <div class="tag">MOST POPULAR</div>
+    <h2>30 invoices</h2>
+    <div class="price">A$19.99</div>
+    <p>About 67c per invoice. Prices in AUD.</p>
+    <button class="btn" onclick="startCheckout('popular')">Buy 30 credits</button>
+  </section>
+  <section class="p">
+    <div class="tag">BEST VALUE</div>
+    <h2>100 invoices</h2>
+    <div class="price">A$39.99</div>
+    <p>40c per invoice. Prices in AUD.</p>
+    <button class="btn" onclick="startCheckout('value')">Buy 100 credits</button>
+  </section>
+</div>
+<p id="checkout-msg" style="text-align:center;color:#C2703B;font-size:14px;margin-top:12px;min-height:20px"></p><div class="fine"><b>How credits work:</b> one credit is used the <b>first time you preview a new invoice</b>. After that initial preview, re-previewing, editing and saving the same invoice costs nothing extra. Credits are valid for 30 days from purchase. Buy more within your window and the balance compounds — your 30 days resets from the new purchase date. If your credits lapse, your next purchase starts a fresh 30-day window with the new credits only. New accounts start with 5 free credits, valid for 30 days from sign-up. All prices are in Australian dollars (AUD) and include GST where applicable. SupportFlow Pro remains separate for future advanced business dashboards, reporting, exports and analytics.</div></main><footer style="border-top:1px solid #2A2D23;padding:28px clamp(20px,3.6vw,40px) 36px;max-width:1120px;margin:0 auto;font-size:12px;color:#8B8E82;font-family:'Instrument Sans',system-ui,sans-serif">
   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:22px;flex-wrap:wrap;margin-bottom:18px">
     <div style="font-weight:650;color:#8B8E82">SupportFlow™<br><span style="font-weight:400;color:#6B6E62">Built in South Australia</span></div>
     <div style="display:flex;gap:18px;flex-wrap:wrap">
@@ -68,4 +91,30 @@
     Independent admin tool, not affiliated with or endorsed by the NDIA or NDIS. &middot; General information only, not tax or legal advice.
   </div>
 </footer>
+<script>
+function startCheckout(plan) {
+  var msg = document.getElementById('checkout-msg');
+  msg.textContent = 'Starting checkout…';
+  var ref = localStorage.getItem('ndis:deviceRef');
+  if (!ref) {
+    ref = typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, function(c) {
+          return (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16);
+        });
+    try { localStorage.setItem('ndis:deviceRef', ref); } catch(e) {}
+  }
+  fetch('/.netlify/functions/create-checkout', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({plan: plan, clientReferenceId: ref})
+  })
+  .then(function(r){ return r.json().then(function(d){ return {ok:r.ok, d:d}; }); })
+  .then(function(res){
+    if (res.ok && res.d.url) { window.location.href = res.d.url; return; }
+    msg.textContent = res.d.error || 'Something went wrong. Please try again.';
+  })
+  .catch(function(){ msg.textContent = 'Network error. Please try again.'; });
+}
+</script>
 </body></html>

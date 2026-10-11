@@ -77,7 +77,7 @@
 <p>This short version is an overview. The full policy below explains how information is handled.</p>
 <hr>
 <h2>1. Who this policy covers</h2>
-<p>This policy covers SupportFlow™ (the app), provided by its developer, contactable at <strong>globalappsai@gmail.com</strong>.</p>
+<p>This policy covers SupportFlow™ (the app), provided by its developer, contactable at <strong>support@supportflow.work</strong>.</p>
 <p>It applies whether you use the app on a phone, tablet or desktop browser, and whether you are using a production release or authorised testing build.</p>
 <p>SupportFlow™ is designed for support workers, including sole traders, who may record information about NDIS participants.</p>
 <p>As the support worker entering information into the app, you remain responsible for ensuring that you are authorised to collect, store, use and disclose the participant information you enter into SupportFlow, including under any applicable consent, service agreement or other authority.</p>
@@ -136,7 +136,7 @@
 <p>There is:</p>
 <ul>
 <li>No SupportFlow user account required to hold these records</li>
-<li>No central participant database operated by the developer</li>
+<li>No central participant database operated by the developer (see section 4 for the limited credit-system records that are stored server-side)</li>
 <li>No routine upload of participant records to the developer</li>
 </ul>
 <p>Under normal operation, the developer cannot view your locally stored participant records, shifts, invoices, expenses or notes.</p>
@@ -164,6 +164,16 @@
 <h3>Public website analytics</h3>
 <p>The public SupportFlow website uses Google Analytics 4 to understand basic website usage, such as page visits, sessions, general device/browser information and how visitors move through the public website. This analytics tagging is not included in the private SupportFlow app workspace, admin area, market page or tester-management pages.</p>
 <p>SupportFlow configures Google Analytics for measurement only and disables Google Signals and advertising-personalisation signals in the website tag. Participant records, progress notes, invoice contents, NDIS numbers, locally stored app records and encrypted backup contents are not intentionally sent to Google Analytics.</p>
+<h3>Credit and billing records</h3>
+<p>SupportFlow uses a credit system to manage invoice usage. To operate this system, the following information is stored in a secure server-side database (Supabase, operated by Supabase Inc. and hosted on Amazon Web Services infrastructure):</p>
+<ul>
+<li>An <strong>anonymous device identifier</strong> generated on your device (a random UUID stored in your browser's local storage). This identifier is not linked to your name, email or any other personal information unless you choose to purchase credits.</li>
+<li>Your <strong>current credit balance</strong> and the date your credits expire.</li>
+<li>A <strong>record of which invoice numbers have already been charged</strong> a credit, so that re-previewing the same invoice does not consume an additional credit.</li>
+</ul>
+<p>This information is held only for the purpose of operating the credit system. The developer does not use it for profiling, advertising or any other purpose.</p>
+<p>When you purchase credits, your payment is processed by <strong>Stripe</strong> (Stripe, Inc.), a third-party payment service. Stripe receives your <strong>email address, payment card details and billing information</strong> as part of the checkout process. SupportFlow does not store your card number. Stripe handles payment data under its own privacy policy and applicable payment industry security standards. The device identifier used to connect your purchase to your credit balance is passed to Stripe as a reference; it does not identify you to SupportFlow by name.</p>
+<p>Credit purchase records (amount, date, pack type and the anonymous device identifier) are retained in the SupportFlow credit database for as long as reasonably necessary to operate the service, resolve disputes and comply with applicable law. You can request deletion of credit records associated with your device identifier by contacting <strong>support@supportflow.work</strong>.</p>
 <h3>Website fonts</h3>
 <p>SupportFlow's public website and app shell load typefaces (Fraunces and Instrument Sans) from <strong>Google Fonts</strong> (fonts.googleapis.com / fonts.gstatic.com). When your browser downloads these font files, Google receives a standard network request that may include your IP address, browser type and the referring page. SupportFlow does not control how Google handles that connection data. Google's privacy policy applies to that request.</p>
 <p>No participant records, NDIS numbers, shift notes or other locally stored app data are transmitted to Google as part of font loading.</p>
@@ -220,7 +230,7 @@
 <h2>7. What SupportFlow does not do</h2>
 <p>Under the current version described by this policy, SupportFlow does not:</p>
 <ul>
-<li>Maintain a central developer-operated database of participant records</li>
+<li>Maintain a central developer-operated database of participant records (a limited credit-management record is kept server-side as described in section 4)</li>
 <li>Sell participant or support-worker information</li>
 <li>Rent or trade personal information</li>
 <li>Build advertising profiles from participant records</li>
@@ -269,7 +279,7 @@
 <p>Where export functionality is available, you may also export your records.</p>
 <p>The developer generally cannot retrieve, correct or delete your locally stored participant records because the developer does not possess them.</p>
 <p>If you have sent the developer a support or feedback email containing personal information, you may request deletion of information held by the developer by contacting:</p>
-<p><strong>globalappsai@gmail.com</strong></p>
+<p><strong>support@supportflow.work</strong></p>
 <h2>11. Overseas processing and services you choose</h2>
 <p>SupportFlow is designed to keep participant records on your device. The two main circumstances in which overseas processing may occur are:</p>
 <ul>
@@ -291,7 +301,7 @@
 <p>Information actually received by the developer, such as feedback or support correspondence, will be retained only for as long as reasonably necessary for the purpose for which it was received or as otherwise required by law.</p>
 <h2>14. Complaints</h2>
 <p>If you believe your privacy, or a participant's privacy, has not been handled properly in connection with SupportFlow, contact the developer:</p>
-<p><strong>Email:</strong> globalappsai@gmail.com <strong>Subject:</strong> Privacy complaint</p>
+<p><strong>Email:</strong> support@supportflow.work <strong>Subject:</strong> Privacy complaint</p>
 <p>The developer will investigate and respond within a reasonable period.</p>
 <p>Depending on the circumstances and applicable law, you may also have the right to make a complaint to the Office of the Australian Information Commissioner (OAIC).</p>
 <p><strong>OAIC website:</strong> oaic.gov.au <strong>Phone:</strong> 1300 363 992</p>
@@ -303,7 +313,7 @@
 <p>Where appropriate, a notice will also be displayed within the app.</p>
 <p>If a new optional feature involves external storage, synchronisation, artificial intelligence processing or another third-party service, the relevant information handling will be explained before or when that feature is introduced.</p>
 <h2>16. Contact</h2>
-<p><strong>Developer:</strong> SupportFlow™ <strong>Email:</strong> globalappsai@gmail.com</p>
+<p><strong>Developer:</strong> SupportFlow™ <strong>Email:</strong> support@supportflow.work</p>
 <hr>
 <p class="italic">This policy describes SupportFlow™'s data-handling practices as accurately as possible. It does not constitute legal advice to support workers about their individual privacy, NDIS, taxation, record-keeping or service-provider obligations. Those obligations may vary according to individual circumstances, applicable legislation, NDIS requirements and agreements with participants.</p>
   </div>
