@@ -454,7 +454,7 @@ async function askModel(prompt, opts) {
 // Verified against the NDIS Pricing Schedule 2026-27 (v1.2, 22 July 2026),
 // Schedule 1 — Disability Support Workers. National column, effective 1 July 2026.
 // https://www.ndis.gov.au/providers/pricing-arrangements
-const APP_VERSION = "7";
+const APP_VERSION = "8";
 
 const PRICE_SOURCE = {
   doc: "NDIS Pricing Schedule 2026-27",
@@ -2380,9 +2380,9 @@ function App() {
                     </svg>
                     <span>
                       {creditsExpired
-                        ? <><b>Invoice credits</b><br/><span style={{ fontSize: 11, color: "var(--warn)" }}>Expired — buy more to continue</span></>
+                        ? <><b style={{ color: "var(--warn)" }}>Credits expired</b><br/><span style={{ fontSize: 11, color: "var(--tx-3)" }}>Buy more to keep invoicing</span></>
                         : typeof creditBalance === "number"
-                          ? <><b>Invoice credits</b><br/><span style={{ fontSize: 11, color: creditExpiresIn !== null && creditExpiresIn <= 3 ? "var(--warn)" : "var(--tx-3)" }}>{creditBalance} remaining{creditExpiresIn !== null ? ` · Exp ${creditExpiresIn}d` : ""}</span></>
+                          ? <><span style={{ fontSize: 16, fontWeight: 700, color: "var(--ink)", lineHeight: 1.2, display: "block" }}>{creditBalance} credits</span><span style={{ fontSize: 11, color: creditExpiresIn !== null && creditExpiresIn <= 3 ? "var(--warn)" : "var(--tx-3)" }}>{creditExpiresIn !== null ? `Expires in ${creditExpiresIn} day${creditExpiresIn === 1 ? "" : "s"}` : "Buy credits"}</span></>
                           : <b>Buy credits</b>}
                     </span>
                   </button>
