@@ -69,7 +69,7 @@
   </div>
   <div class="wrap">
 <h1>Privacy Policy: SupportFlow™</h1>
-<p class="italic">Last updated: 18 August 2026</p>
+<p class="italic">Last updated: 11 October 2026</p>
 <h2>The short version</h2>
 <p>Your SupportFlow records stay on your device by default. There is no SupportFlow user account and no central database operated by the developer that stores your participant records, shift notes, invoices or other work records.</p>
 <p>SupportFlow™ is hosted using Netlify. When you access the app, Netlify may process ordinary technical information required to deliver and secure the app, such as your IP address, browser or device information and web requests. Your participant records are not intentionally sent to Netlify as part of storing or managing them in SupportFlow.</p>
@@ -83,6 +83,7 @@
 <p>As the support worker entering information into the app, you remain responsible for ensuring that you are authorised to collect, store, use and disclose the participant information you enter into SupportFlow, including under any applicable consent, service agreement or other authority.</p>
 <p>This policy explains how SupportFlow handles information. It does not establish or replace your own authority or legal obligations concerning participant information.</p>
 <p>Because SupportFlow may be used to record sensitive and health-related information, the app has been designed with the standards of the Australian Privacy Principles (APPs) under the <em>Privacy Act 1988</em> (Cth) in mind.</p>
+<p>SupportFlow is designed and marketed for use in Australia. It is not intentionally directed at users in the European Economic Area, the United Kingdom or other territories subject to the EU General Data Protection Regulation (GDPR) or equivalent frameworks. If you are located in one of those jurisdictions, you use the app subject to your own assessment of applicable obligations.</p>
 <p>The privacy obligations applying to an individual support worker or business depend on their particular circumstances.</p>
 <!-- BETA TESTING NOTICE: REMOVE WHEN BETA TESTING ENDS -->
 <div class="callout"><strong>Beta testing privacy rule</strong><br>During beta testing, use fictional or dummy participant details when you are testing SupportFlow. Real participant information is not required to participate in the beta.<br><br>If you choose to use SupportFlow as part of your normal support work with real participant information, you remain responsible for ensuring you have the appropriate authority or consent to collect, record, store, use and disclose that information.</div>
@@ -163,6 +164,10 @@
 <h3>Public website analytics</h3>
 <p>The public SupportFlow website uses Google Analytics 4 to understand basic website usage, such as page visits, sessions, general device/browser information and how visitors move through the public website. This analytics tagging is not included in the private SupportFlow app workspace, admin area, market page or tester-management pages.</p>
 <p>SupportFlow configures Google Analytics for measurement only and disables Google Signals and advertising-personalisation signals in the website tag. Participant records, progress notes, invoice contents, NDIS numbers, locally stored app records and encrypted backup contents are not intentionally sent to Google Analytics.</p>
+<h3>Website fonts</h3>
+<p>SupportFlow's public website and app shell load typefaces (Fraunces and Instrument Sans) from <strong>Google Fonts</strong> (fonts.googleapis.com / fonts.gstatic.com). When your browser downloads these font files, Google receives a standard network request that may include your IP address, browser type and the referring page. SupportFlow does not control how Google handles that connection data. Google's privacy policy applies to that request.</p>
+<p>No participant records, NDIS numbers, shift notes or other locally stored app data are transmitted to Google as part of font loading.</p>
+<p>If you prefer not to have your browser connect to Google's font servers, you can block those domains in your browser settings or use a browser extension that restricts third-party requests. The app will fall back to your device's default system fonts.</p>
 <h2>5. When your information may leave your device</h2>
 <p>Although your SupportFlow records are stored locally by default, certain actions can cause information to leave your device.</p>
 <h3>5.1 Claimable deduction checker</h3>
@@ -208,6 +213,10 @@
 <p><strong>Do not include participant names, NDIS numbers, health information or other unnecessary participant information in feedback or support messages.</strong></p>
 <p>Support and feedback emails may be retained for as long as reasonably necessary to investigate the issue, respond to you and improve the app.</p>
 <h2>6. Development assistance</h2>
+<p>SupportFlow was built with assistance from AI-powered tools, including large-language model coding and writing assistants. These tools were used to help write, review and refine code, interface text and documentation.</p>
+<p>That development-time use is entirely separate from Claimable's runtime API feature.</p>
+<p>No real participant records, real support-worker business records or production user data were used in building or testing SupportFlow. All development and testing relied on fictional, synthetic or anonymised data only.</p>
+<p>Development assistance tools retain data in accordance with their own privacy policies. No special arrangement with those providers grants SupportFlow access to data submitted through their general interfaces.</p>
 <h2>7. What SupportFlow does not do</h2>
 <p>Under the current version described by this policy, SupportFlow does not:</p>
 <ul>
@@ -226,12 +235,13 @@
 <p>A 4 or 6 digit PIN is hashed using PBKDF2 before storage and is not stored or recoverable by the developer in plain text.</p>
 <p>Where supported by the device and app configuration, fingerprint or facial authentication may also be used.</p>
 <p>The PIN or biometric lock protects <strong>access to the app</strong>. It should not be interpreted as encryption of the underlying locally stored records.</p>
-<h3>Local records</h3>
-<p>SupportFlow's locally stored records are not independently encrypted at rest by the app in the current version.</p>
-<p>SupportFlow therefore relies partly on the security protections provided by your phone, tablet or computer.</p>
-<p>You should protect your device using appropriate measures such as:</p>
+<h3>Local records — encryption limitation</h3>
+<p><strong>Important limitation:</strong> SupportFlow's locally stored records — including participant details, shift notes, invoices and other work records — are <strong>not independently encrypted at rest by the app itself</strong> in the current version. They are protected by the storage model of the underlying browser or operating system, not by a separate encryption layer applied by SupportFlow.</p>
+<p>This is a real limitation worth understanding. It means that if someone gains access to your device's storage directly (for example, via a forensic or data-extraction tool on an unlocked device), they may be able to read your locally stored records without needing to open SupportFlow.</p>
+<p>The PIN or biometric lock built into SupportFlow controls access to the app's interface, not the underlying storage. It is not a substitute for device-level encryption.</p>
+<p>SupportFlow therefore relies on the security protections provided by your phone, tablet or computer, and strongly recommends that you:</p>
 <ul>
-<li>A strong device PIN, password or biometric lock</li>
+<li>A strong device PIN, password or biometric lock (ideally with full-device encryption enabled in your OS settings)</li>
 <li>Current operating-system and security updates</li>
 <li>Appropriate physical security</li>
 <li>Remote locking or wiping where your device supports it</li>
@@ -261,8 +271,12 @@
 <p>If you have sent the developer a support or feedback email containing personal information, you may request deletion of information held by the developer by contacting:</p>
 <p><strong>globalappsai@gmail.com</strong></p>
 <h2>11. Overseas processing and services you choose</h2>
-<p>The two main circumstances in which overseas processing may occur are:</p>
-<p>This does not mean your locally stored participant database is uploaded to either provider.</p>
+<p>SupportFlow is designed to keep participant records on your device. The two main circumstances in which overseas processing may occur are:</p>
+<ul>
+<li><strong>Netlify (United States)</strong> — Netlify hosts the SupportFlow application. When you open the app or any SupportFlow web page, your browser connects to Netlify's servers to download the application files. Netlify may process standard technical connection data such as your IP address and browser information as described in section 4. Your participant records are not sent to Netlify as part of this process.</li>
+<li><strong>Google (United States, and other countries where Google operates)</strong> — If you connect Google Drive, the encrypted backup file created on your device is stored in your own Google Drive account. Google processes that file under its own terms. SupportFlow does not send your backup password to Google. When the app is loaded, Google Fonts may also receive a standard font request as described in section 4. Your locally stored participant records are not intentionally uploaded to Google as part of normal operation.</li>
+</ul>
+<p>This does not mean your locally stored participant database is uploaded to either provider. The overseas connection relates to hosting, font delivery and, where you choose to use it, encrypted Drive backup — not to routine participant record storage.</p>
 <p>You may also choose to use third-party services to store or transmit information exported from SupportFlow, such as your own cloud-storage, email, file-sharing or device-backup service.</p>
 <p>Those services operate under their own privacy and data-handling terms.</p>
 <h2>12. Children and participants under 18</h2>
