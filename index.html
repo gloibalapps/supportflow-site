@@ -15,9 +15,14 @@
 <meta property="og:description" content="Manage shifts, invoices, notes, kilometres, expenses and tax records in one private, offline-friendly app for independent Australian support workers." />
 <meta property="og:url" content="https://supportflow.work/" />
 <meta property="og:locale" content="en_AU" />
-<meta name="twitter:card" content="summary" />
+<meta property="og:image" content="https://supportflow.work/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="NDIS SupportFlow — admin software for independent Australian support workers" />
+<meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="NDIS Support Worker Software | SupportFlow" />
 <meta name="twitter:description" content="Manage shifts, invoices, notes, kilometres, expenses and tax records in one private, offline-friendly app." />
+<meta name="twitter:image" content="https://supportflow.work/og-image.png" />
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -43,6 +48,45 @@
       },
       "isAccessibleForFree": true,
       "inLanguage": "en-AU"
+    }
+,
+    {
+      "@type": "FAQPage",
+      "@id": "https://supportflow.work/#faq",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Is my participant information private?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. Your records stay on your device by default and are not stored in a central SupportFlow database."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What happens if I lose or change my phone?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Your records live on that device only. If you have backed up using an encrypted file with a passphrase only you know, you can restore on a new device. If you haven't backed up, that data is genuinely gone."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does it work without internet?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Once you've opened it successfully one time, the core app keeps working with no connection at all. A few features that genuinely need the internet, like sending an email, wait until you're back online."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How do I get started?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Open SupportFlow and complete the setup for your business, passcode and encrypted backup."
+          }
+        }
+      ]
     }
   ]
 }
@@ -342,6 +386,12 @@
     .hero-features{max-width:34ch;margin:0 auto;line-height:1.65}
     .actions{margin:22px auto 0;width:100%;max-width:420px}
   }
+
+  /* accessibility: skip to content */
+  .skip-link{position:absolute;top:-60px;left:16px;z-index:9999;padding:10px 18px;
+    background:var(--brass);color:#14150F;font-weight:700;font-size:13.5px;
+    border-radius:0 0 10px 10px;text-decoration:none;transition:top .15s}
+  .skip-link:focus{top:0}
 </style>
 <script async src="https://static.opinly.ai/p.js" data-key="pk-pVWKMw6xUXs-YzPdRZqZLUbtqJIuabWyzvBWFKY"></script>
 
@@ -359,15 +409,16 @@
 </head>
 <body>
 
+<a class="skip-link" href="#main-content">Skip to main content</a>
 <section class="hero">
   <div class="wash"></div>
   <header class="mast">
     <div class="brand"><div class="seal">S</div><div class="wordmark">SupportFlow</div></div>
-    <nav class="mastnav"></nav>
+    <nav class="mastnav"><a class="navlink" href="./ndis-support-worker-invoice-template">Invoice Guide</a><a class="navlink" href="./ndis-support-worker-progress-notes">Notes Guide</a><a class="navlink" href="./pricing.html">Pricing</a><a class="btn navcta" href="./app">Open App</a></nav>
   </header>
-  <main class="block">
+  <main id="main-content" class="block">
     <div class="kicker rise">For independent support workers</div>
-    <h1 id="title" class="rise"><span class="line">NDIS</span><span class="line">Support<span class="flow">Flow</span></span></h1>
+    <h1 id="title" class="rise" aria-label="NDIS SupportFlow"><span class="line">NDIS</span><span class="line">Support<span class="flow">Flow</span></span></h1>
     <p class="tag rise">Your support work, organised in one place.</p>
     <div class="hero-features rise">Invoices &bull; Shifts &bull; Notes &bull; Kilometres &bull; Expenses &bull; Tax</div>
     <div class="hero-trust rise">Private by design &bull; Works offline</div>
@@ -417,7 +468,7 @@
          kilometres count toward your vehicle deduction at the ATO's rate. Entered once, used twice.</p>
     </div>
     <div class="shot">
-      <img src="./shot-travel.png" alt="The travel screen in SupportFlow, showing billable kilometres and the matching tax deduction" loading="lazy" />
+      <div class="slot"><b>Travel &amp; Kilometres</b>Record a trip once — it attaches to the invoice and counts toward your vehicle deduction.</div>
     </div>
   </div>
 
@@ -499,7 +550,7 @@
   <div class="trust-grid">
     <div class="tcard">
       <b>Is my participant information private?</b>
-      <span>Yes. Private by design · Works offline and aren't stored in a central SupportFlow database.</span>
+      <span>Yes. Your records stay on your device by default and are not stored in a central SupportFlow database.</span>
     </div>
     <div class="tcard">
       <b>What happens if I lose or change my phone?</b>
@@ -570,7 +621,6 @@
       <div class="footer-links">
         <a href="./ndis-support-worker-invoice-template">NDIS Invoice Guide</a>
         <a href="./ndis-support-worker-progress-notes">Progress Notes Guide</a>
-        <a href="./blog">Blog</a>
       </div>
     </div>
     <div class="footer-group">

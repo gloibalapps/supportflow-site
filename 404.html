@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Page not found | SupportFlow</title>
+<meta name="robots" content="noindex" />
+<link rel="icon" href="./icon-192.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{--ink:#12140E;--ink-2:#1A1D15;--brass:#C8913A;--brass-lift:#E0A83F;--paper:#F2EFE4;--muted:#8B8E82;--line:#2A2D23}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--ink);color:var(--paper);font-family:'Instrument Sans',ui-sans-serif,system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;min-height:100svh;display:flex;flex-direction:column}
+  header{padding:16px clamp(20px,3.6vw,40px);border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:12px}
+  .seal{width:32px;height:32px;border-radius:9px;
+    background:linear-gradient(148deg,var(--brass-lift),var(--brass));
+    display:grid;place-items:center;font-family:'Fraunces',serif;font-size:16px;color:#14150F}
+  .wordmark{font-size:12.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  main{flex:1;display:flex;align-items:center;justify-content:center;padding:clamp(48px,8vw,100px) 24px;text-align:center}
+  .wrap{max-width:500px}
+  .code{font-family:'Fraunces',Georgia,serif;font-size:clamp(80px,18vw,130px);font-weight:300;
+    line-height:1;letter-spacing:-.04em;color:var(--brass);margin-bottom:16px;
+    background:linear-gradient(96deg,var(--brass-lift),var(--brass) 60%,#9C6F2B);
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  h1{font-family:'Fraunces',Georgia,serif;font-weight:400;
+    font-size:clamp(26px,4vw,38px);line-height:1.15;letter-spacing:-.02em;margin-bottom:14px}
+  p{color:var(--muted);font-size:clamp(14px,1.7vw,16px);line-height:1.65;margin-bottom:32px}
+  .links{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+  .btn{font-family:inherit;font-size:14px;font-weight:600;padding:13px 24px;border-radius:11px;
+    border:1px solid var(--brass);background:var(--brass);color:#14150F;cursor:pointer;
+    text-decoration:none;display:inline-block;transition:background .16s,transform .16s}
+  .btn:hover{background:var(--brass-lift);transform:translateY(-1px)}
+  .btn.quiet{background:none;color:var(--paper);border-color:var(--line)}
+  .btn.quiet:hover{border-color:var(--brass);color:var(--brass-lift)}
+  footer{padding:20px clamp(20px,3.6vw,40px);border-top:1px solid var(--line);
+    text-align:center;font-size:12px;color:var(--muted)}
+  footer a{color:var(--brass);text-decoration:none}
+  footer a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+<header>
+  <a href="/" style="display:flex;align-items:center;gap:11px;text-decoration:none">
+    <div class="seal">S</div>
+    <div class="wordmark">SupportFlow</div>
+  </a>
+</header>
+<main>
+  <div class="wrap">
+    <div class="code" aria-hidden="true">404</div>
+    <h1>This page doesn't exist</h1>
+    <p>The link you followed may be outdated, or the page may have moved. Head back to the homepage to find what you need.</p>
+    <div class="links">
+      <a class="btn" href="/">Go to homepage</a>
+      <a class="btn quiet" href="./app">Open SupportFlow</a>
+    </div>
+  </div>
+</main>
+<footer>
+  <span>SupportFlow™</span> &middot;
+  <a href="./privacy.html">Privacy Policy</a> &middot;
+  <a href="./terms.html">Terms of Use</a> &middot;
+  <span>Independent admin tool, not affiliated with the NDIA or NDIS.</span>
+</footer>
+</body>
+</html>
