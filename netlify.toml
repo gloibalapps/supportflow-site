@@ -113,24 +113,23 @@
   [headers.values]
     Cache-Control = "no-cache, no-store, must-revalidate"
 
-
-# Build 27: explicit friendly-route fallbacks
+# Block direct access to raw Markdown source files.
+# These are internal documents and should not be publicly served.
 [[redirects]]
-  from = "/app"
-  to = "/app.html"
+  from = "/*.md"
+  to = "/404.html"
+  status = 404
+  force = true
+
+# Clean URL for pricing page.
+[[redirects]]
+  from = "/pricing"
+  to = "/pricing.html"
   status = 200
 
+# Custom 404 — Netlify picks up 404.html automatically when it exists in publish dir,
+# but this explicit rule ensures it applies to all unmatched paths.
 [[redirects]]
-  from = "/waitlist"
-  to = "/app"
-  status = 301
-
-[[redirects]]
-  from = "/privacy"
-  to = "/privacy.html"
-  status = 200
-
-[[redirects]]
-  from = "/terms"
-  to = "/terms.html"
-  status = 200
+  from = "/*"
+  to = "/404.html"
+  status = 404
