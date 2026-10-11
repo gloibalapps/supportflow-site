@@ -79,6 +79,14 @@
     <button class="btn" onclick="startCheckout('value')">Buy 100 credits</button>
   </section>
 </div>
+<section class="p" id="test-pack" style="display:none;margin-top:16px;border-style:dashed">
+  <div class="tag">OWNER TEST</div>
+  <h2>1 invoice</h2>
+  <div class="price">A$0.50</div>
+  <p>Live payment test pack. Hidden from the public.</p>
+  <button class="btn" onclick="startCheckout('test')">Buy 1 test credit</button>
+</section>
+<script>if(/[?&]test=1\b/.test(location.search))document.getElementById('test-pack').style.display='block';</script>
 <p id="checkout-msg" style="text-align:center;color:#C2703B;font-size:14px;margin-top:12px;min-height:20px"></p><div class="fine"><b>How credits work:</b> one credit is used the <b>first time you preview a new invoice</b>. After that initial preview, re-previewing, editing and saving the same invoice costs nothing extra. Credits are valid for 30 days from purchase. Buy more within your window and the balance compounds — your 30 days resets from the new purchase date. If your credits lapse, your next purchase starts a fresh 30-day window with the new credits only. New accounts start with 5 free credits, valid for 30 days from sign-up. All prices are in Australian dollars (AUD) and include GST where applicable. SupportFlow Pro remains separate for future advanced business dashboards, reporting, exports and analytics.</div></main><footer style="border-top:1px solid #2A2D23;padding:28px clamp(20px,3.6vw,40px) 36px;max-width:1120px;margin:0 auto;font-size:12px;color:#8B8E82;font-family:'Instrument Sans',system-ui,sans-serif">
   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:22px;flex-wrap:wrap;margin-bottom:18px">
     <div style="font-weight:650;color:#8B8E82">SupportFlow™<br><span style="font-weight:400;color:#6B6E62">Built in South Australia</span></div>

@@ -174,7 +174,9 @@ async function handlePaidSession(session) {
 
   const isNew = await recordPurchaseOnce({
     account_id: accountId,
-    pack: packName,
+    // credit_purchases.pack only allows casual/popular/value; the hidden test
+    // pack is recorded as casual (its 1 credit / A$0.50 tells it apart).
+    pack: packName === "test" ? "casual" : packName,
     credits,
     amount_aud: (Number(session.amount_total) || 0) / 100,
     stripe_session_id: session.id,

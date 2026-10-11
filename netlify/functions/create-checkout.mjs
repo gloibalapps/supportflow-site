@@ -19,6 +19,9 @@ const PACKS = Object.freeze({
   casual: { credits: 10, env: "STRIPE_PRICE_CASUAL" },
   popular: { credits: 30, env: "STRIPE_PRICE_POPULAR" },
   value: { credits: 100, env: "STRIPE_PRICE_VALUE" },
+  // Hidden owner test pack (A$0.50, Stripe's AUD minimum) for checking the
+  // live purchase flow end to end. Only offered on /pricing?test=1.
+  test: { credits: 1, env: "STRIPE_PRICE_TEST" },
 });
 
 const json = (obj, status = 200) =>
