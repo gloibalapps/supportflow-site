@@ -113,6 +113,18 @@ html,body{overscroll-behavior-y:none;background:#14150F;height:100%;overflow-x:h
   border-radius:9px;background:none;cursor:pointer;font-family:inherit;font-size:13.5px;
   font-weight:500;color:var(--tx-2);transition:background .15s,color .15s}
 .menu button:hover{background:var(--bg-3);color:var(--tx)}
+/* Invoice credit balance pill (header) + Buy credits menu item + out-of-credits notice. */
+.creditpill{height:26px;padding:0 10px;border-radius:99px;border:1px solid rgba(200,145,58,.45);background:rgba(200,145,58,.10);color:var(--brass-lift);font-family:inherit;font-size:11.5px;font-weight:600;letter-spacing:.01em;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;transition:border-color .15s,background .15s}
+.creditpill:hover{border-color:var(--brass);background:rgba(200,145,58,.16)}
+.creditpill .coin{width:8px;height:8px;border-radius:50%;background:var(--brass)}
+.creditpill.empty{border-color:rgba(194,112,59,.45);background:rgba(194,112,59,.08);color:var(--warn)}
+.creditpill.empty .coin{background:var(--warn)}
+.menu button.buycredits{display:flex;align-items:center;gap:9px;color:var(--brass-lift);font-weight:600}
+.menu button.buycredits svg{flex:0 0 auto;color:var(--brass)}
+.creditnotice{margin-top:10px;padding:11px 13px;border-radius:11px;border:1px solid rgba(200,145,58,.45);background:rgba(200,145,58,.09);font-size:12.5px;line-height:1.55;color:var(--tx-2)}
+.creditnotice a{color:var(--brass-lift);font-weight:700;text-decoration:none;white-space:nowrap}
+.creditnotice a:hover{text-decoration:underline}
+@media(max-width:420px){.creditpill .lbl{display:none}}
 .lockwrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;
   justify-content:center;padding:40px 26px;text-align:center;background:var(--bg)}
 .lockmark{margin-bottom:16px;opacity:.95}
@@ -439,7 +451,7 @@ async function askModel(prompt, opts) {
 // Verified against the NDIS Pricing Schedule 2026-27 (v1.2, 22 July 2026),
 // Schedule 1 — Disability Support Workers. National column, effective 1 July 2026.
 // https://www.ndis.gov.au/providers/pricing-arrangements
-const APP_VERSION = "2";
+const APP_VERSION = "3";
 
 const PRICE_SOURCE = {
   doc: "NDIS Pricing Schedule 2026-27",
@@ -1819,11 +1831,25 @@ function App() {
   const [subStatus, setSubStatus] = useState(null); // null while unknown
   const [trialEnd, setTrialEnd] = useState(null);
 
+  // Invoice credit balance for the header pill. null = unknown / unlimited
+  // (billing unconfigured), so nothing is shown and nothing is blocked.
+  const [creditBalance, setCreditBalance] = useState(null);
+  const [creditsExpired, setCreditsExpired] = useState(false);
+
   useEffect(() => {
-    const ref = (() => {
-      try { return localStorage.getItem("ndis:deviceRef"); } catch (e) { return null; }
-    })();
-    if (!ref) { setSubStatus("unconfigured"); return; }
+    const onCredits = (e) => {
+      const d = (e && e.detail) || {};
+      if (typeof d.balance === "number") { setCreditBalance(d.balance); if (d.balance > 0) setCreditsExpired(false); }
+      else if (typeof d.delta === "number") setCreditBalance((b) => (typeof b === "number" ? Math.max(0, b + d.delta) : b));
+    };
+    window.addEventListener("sf:credits", onCredits);
+    return () => window.removeEventListener("sf:credits", onCredits);
+  }, []);
+
+  useEffect(() => {
+    // Every device needs a stable reference so its free starter credits and
+    // purchases can be found; created here on first launch if missing.
+    const ref = getDeviceRef();
 
     let cancelled = false;
     const check = () => {
@@ -1833,6 +1859,13 @@ function App() {
           if (cancelled) return;
           setSubStatus(d.status || "error");
           setTrialEnd(d.trialEnd || null);
+          if (d.status === "ok" || d.status === "none") {
+            setCreditBalance(Number(d.credits) || 0);
+            setCreditsExpired(!!d.expired);
+          } else if (d.status === "unconfigured") {
+            setCreditBalance(null); // dev mode: unlimited
+            setCreditsExpired(false);
+          }
         })
         .catch(() => { if (!cancelled) setSubStatus((s) => s || "error"); });
     };
@@ -2287,6 +2320,15 @@ function App() {
             {/* TEMP: testing-phase shortcut, remove after beta */}
             <button className="btn ghost tiny" onClick={() => { setMenuOpen(false); setHelpInitialView("support"); setOpenPane("help"); go("settings"); }}
               title="Feedback" aria-label="Feedback">Feedback</button>
+            {typeof creditBalance === "number" && (
+              <button className={`creditpill${creditBalance > 0 ? "" : " empty"}`}
+                onClick={() => window.open(PRICING_URL, "_blank", "noopener")}
+                title={creditsExpired ? "Your invoice credits have expired. Buy more credits" : "Invoice credits. Buy more credits"}
+                aria-label={creditsExpired ? "Invoice credits expired. Buy credits" : `${creditBalance} invoice credits. Buy credits`}>
+                <span className="coin" aria-hidden="true" />
+                {creditsExpired ? "Expired" : <>{creditBalance}<span className="lbl">{creditBalance === 1 ? " credit" : " credits"}</span></>}
+              </button>
+            )}
             <div style={{ position: "relative" }}>
               <button className="helpbtn" onClick={() => { setMenuOpen(false); setHelpMenuOpen(!helpMenuOpen); }}
                 title="Help and SupportFlow Assistant" aria-label="Help and SupportFlow Assistant" aria-expanded={helpMenuOpen}>?</button>
@@ -2330,6 +2372,12 @@ function App() {
                     </div>
                     <div style={{ fontSize: 10.5, color: "var(--tx-3)", marginTop: 6 }}>Version {APP_VERSION}</div>
                   </div>
+                  <button className="buycredits" onClick={() => { setMenuOpen(false); window.open(PRICING_URL, "_blank", "noopener"); }}>
+                    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <ellipse cx="12" cy="7" rx="7" ry="3" /><path d="M5 7v5c0 1.7 3.1 3 7 3s7-1.3 7-3V7" /><path d="M5 12v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5" />
+                    </svg>
+                    <span>Buy credits{typeof creditBalance === "number" ? <span style={{ color: "var(--tx-3)", fontWeight: 500 }}> · {creditsExpired ? "expired" : `${creditBalance} left`}</span> : null}</span>
+                  </button>
                   <button onClick={() => { setMenuOpen(false); setOpenPane(null); go("settings"); }}>Settings</button>
                   <button onClick={() => { setMenuOpen(false); setOpenPane("privacy-security"); go("settings"); }}>Privacy &amp; security</button>
                   <button onClick={() => { setMenuOpen(false); flip(); }}>
@@ -3471,15 +3519,88 @@ function Editor({ inv, setInv, onSave, onCancel, onDelete, profile, data, go }) 
 }
 
 
+/* ---------------- invoice credits ---------------- */
+// 1 credit is charged server-side (charge-invoice.mjs) the FIRST time a new
+// invoice number is previewed or shared; re-previews of that number are free.
+const PRICING_URL = "https://supportflow.work/pricing";
+const CHARGED_KEY = "ndis:chargedInvoices";
+
+function getDeviceRef() {
+  let ref = null;
+  try { ref = localStorage.getItem("ndis:deviceRef"); } catch (e) { }
+  if (!ref) {
+    ref = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : `dev-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    try { localStorage.setItem("ndis:deviceRef", ref); } catch (e) { }
+  }
+  return ref;
+}
+function readCharged() {
+  try { return JSON.parse(localStorage.getItem(CHARGED_KEY) || "[]"); } catch (e) { return []; }
+}
+function rememberCharged(num) {
+  try {
+    const list = readCharged();
+    if (!list.includes(num)) { list.push(num); localStorage.setItem(CHARGED_KEY, JSON.stringify(list.slice(-2000))); }
+  } catch (e) { }
+}
+// Tells the App shell to update the header credit pill.
+function announceCredits(detail) {
+  try { window.dispatchEvent(new CustomEvent("sf:credits", { detail })); } catch (e) { }
+}
+
+// Resolves to "ok" (go ahead), "no_credits" (402: block, show buy link) or
+// "error" (couldn't confirm: block, ask to retry).
+async function chargeInvoiceCredit(invoiceNumber) {
+  const num = String(invoiceNumber || "").trim();
+  if (!num) return "ok";
+  if (readCharged().includes(num)) return "ok"; // already paid for: free, works offline
+  let resp;
+  try {
+    resp = await fetch("/.netlify/functions/charge-invoice", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientReferenceId: getDeviceRef(), invoiceNumber: num }),
+    });
+  } catch (e) {
+    return "error";
+  }
+  // Billing not wired up on this deployment (dev / local): never block.
+  if (resp.status === 503 || resp.status === 404) return "ok";
+  if (resp.status === 402) { announceCredits({ balance: 0 }); return "no_credits"; }
+  if (!resp.ok) return "error";
+  const d = await resp.json().catch(() => ({}));
+  if (d.charged === true) {
+    rememberCharged(num);
+    announceCredits(typeof d.creditsRemaining === "number" ? { balance: d.creditsRemaining } : { delta: -1 });
+    return "ok";
+  }
+  if (d.reason === "already_charged") { rememberCharged(num); return "ok"; }
+  return "error";
+}
+
+function CreditNotice({ kind }) {
+  if (kind === "no_credits") return <div className="creditnotice">
+    You're out of invoice credits. <a href={PRICING_URL} target="_blank" rel="noopener noreferrer">Buy credits →</a>
+  </div>;
+  if (kind === "error") return <div className="creditnotice">
+    Couldn't check your invoice credits. Check your connection and try again.
+  </div>;
+  return null;
+}
+
 function SendPanel({ inv, profile, r, onSent }) {
   const [pdf, setPdf] = useState(null);
   const [previewing, setPreviewing] = useState(false);
+  const [creditBlock, setCreditBlock] = useState(null); // null | "no_credits" | "error"
   const ready = inv.participantId && invTotal(inv) > 0;
 
   // Share the real PDF through the device's own share sheet, so Gmail,
   // Outlook, Messages and the rest receive it as a genuine attachment.
   const share = async () => {
     setPdf("working");
+    setCreditBlock(null);
+    const gate = await chargeInvoiceCredit(inv.number);
+    if (gate !== "ok") { setCreditBlock(gate); setPdf(null); return; }
     try {
       const file = await makeInvoicePDF(inv, profile, r, true);
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -3516,13 +3637,25 @@ function SendPanel({ inv, profile, r, onSent }) {
   // the new tab to have loaded it.
   const preview = async () => {
     setPreviewing(true);
+    setCreditBlock(null);
+    // Open the tab synchronously (inside the click) so pop-up blockers allow
+    // it, then fill it once the credit check passes.
+    const tab = window.open("", "_blank");
+    const gate = await chargeInvoiceCredit(inv.number);
+    if (gate !== "ok") {
+      if (tab) tab.close();
+      setCreditBlock(gate);
+      setPreviewing(false);
+      return;
+    }
     try {
       const file = await makeInvoicePDF(inv, profile, r, true);
       const url = URL.createObjectURL(file);
-      window.open(url, "_blank");
+      if (tab) tab.location.href = url; else window.open(url, "_blank");
       setTimeout(() => URL.revokeObjectURL(url), 30000);
     } catch (e) {
       console.error(e);
+      if (tab) tab.close();
       setPdf("fail");
     } finally {
       setPreviewing(false);
@@ -3548,6 +3681,7 @@ function SendPanel({ inv, profile, r, onSent }) {
             Sharing isn't supported on this device. The invoice PDF has been downloaded instead, and you can attach it to your email from Downloads.
           </div>}
           {pdf === "fail" && <div style={{ fontSize: 12.5, color: "var(--warn)", marginTop: 9 }}>Couldn't build the PDF. Try again in a moment.</div>}
+          <CreditNotice kind={creditBlock} />
           <div style={{ fontSize: 11.5, color: "var(--tx-3)", marginTop: 12, lineHeight: 1.6 }}>
             Share invoice lets you send the PDF using Gmail, Outlook, Messages or any compatible app on your device.
           </div>
