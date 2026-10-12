@@ -127,6 +127,14 @@ html,body{overscroll-behavior-y:none;background:#14150F;height:100%;overflow-x:h
 .creditnotice{margin-top:10px;padding:11px 13px;border-radius:11px;border:1px solid rgba(200,145,58,.45);background:rgba(200,145,58,.09);font-size:12.5px;line-height:1.55;color:var(--tx-2)}
 .creditnotice a{color:var(--brass-lift);font-weight:700;text-decoration:none;white-space:nowrap}
 .creditnotice a:hover{text-decoration:underline}
+.checkout-toast{position:fixed;bottom:84px;left:50%;transform:translateX(-50%);z-index:300;max-width:360px;width:calc(100% - 32px);padding:13px 16px;border-radius:14px;display:flex;align-items:flex-start;gap:11px;font-size:13.5px;box-shadow:0 4px 28px rgba(0,0,0,.45);animation:toastIn .22s ease}
+.checkout-toast[data-type=success]{background:#192517;border:1px solid rgba(78,160,106,.45);color:#8BD5A6}
+.checkout-toast[data-type=cancelled]{background:#261E14;border:1px solid rgba(194,112,59,.35);color:var(--tx-2)}
+.checkout-toast .ti{font-size:18px;line-height:1;flex-shrink:0;margin-top:1px}
+.checkout-toast .tm{flex:1;line-height:1.45}
+.checkout-toast .tc{background:none;border:none;color:inherit;opacity:.6;cursor:pointer;font-size:18px;line-height:1;padding:0;flex-shrink:0;margin-top:1px}
+.checkout-toast .tc:hover{opacity:1}
+@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(12px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 @media(max-width:420px){.creditpill .lbl{display:none}}
 .lockwrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;
   justify-content:center;padding:40px 26px;text-align:center;background:var(--bg)}
@@ -454,7 +462,7 @@ async function askModel(prompt, opts) {
 // Verified against the NDIS Pricing Schedule 2026-27 (v1.2, 22 July 2026),
 // Schedule 1 — Disability Support Workers. National column, effective 1 July 2026.
 // https://www.ndis.gov.au/providers/pricing-arrangements
-const APP_VERSION = "8";
+const APP_VERSION = "9";
 
 const PRICE_SOURCE = {
   doc: "NDIS Pricing Schedule 2026-27",
@@ -1839,6 +1847,8 @@ function App() {
   const [creditBalance, setCreditBalance] = useState(null);
   const [creditsExpired, setCreditsExpired] = useState(false);
   const [creditExpiresIn, setCreditExpiresIn] = useState(null); // days remaining
+  const [checkoutResult, setCheckoutResult] = useState(null);   // "success" | "cancelled"
+  const [checkoutToastOpen, setCheckoutToastOpen] = useState(false);
 
   useEffect(() => {
     const onCredits = (e) => {
@@ -1848,6 +1858,46 @@ function App() {
     };
     window.addEventListener("sf:credits", onCredits);
     return () => window.removeEventListener("sf:credits", onCredits);
+  }, []);
+
+  useEffect(() => {
+    // Show a toast when Stripe redirects back with ?checkout=success or =cancelled.
+    const params = new URLSearchParams(location.search);
+    const result = params.get("checkout");
+    if (result === "success" || result === "cancelled") {
+      setCheckoutResult(result);
+      setCheckoutToastOpen(true);
+      const remaining = [...params.entries()].filter(([k]) => k !== "checkout");
+      const newSearch = remaining.length
+        ? "?" + remaining.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join("&")
+        : "";
+      history.replaceState(null, "", location.pathname + newSearch + location.hash);
+      const dismiss = setTimeout(() => setCheckoutToastOpen(false), 9000);
+      if (result === "success") {
+        const refresh = setTimeout(() => {
+          const ref = getDeviceRef();
+          fetch(`/.netlify/functions/check-status?ref=${encodeURIComponent(ref)}`)
+            .then((r) => r.json())
+            .then((d) => {
+              if (d.status === "ok" || d.status === "none") {
+                setCreditBalance(Number(d.credits) || 0);
+                setCreditsExpired(!!d.expired);
+                if (d.expiresAt) {
+                  const exp = new Date(d.expiresAt).getTime();
+                  const now = Date.now();
+                  const daysLeft = Math.ceil((exp - now) / 86400000);
+                  setCreditExpiresIn(daysLeft > 0 ? daysLeft : null);
+                } else {
+                  setCreditExpiresIn(null);
+                }
+              }
+            })
+            .catch(() => {});
+        }, 4000);
+        return () => { clearTimeout(dismiss); clearTimeout(refresh); };
+      }
+      return () => clearTimeout(dismiss);
+    }
   }, []);
 
   useEffect(() => {
@@ -2313,6 +2363,18 @@ function App() {
   );
 
   return (
+    <>
+    {checkoutToastOpen && checkoutResult && (
+      <div className="checkout-toast" data-type={checkoutResult} role="status" aria-live="polite">
+        <span className="ti">{checkoutResult === "success" ? "✓" : "✕"}</span>
+        <span className="tm">
+          {checkoutResult === "success"
+            ? "Payment confirmed! Your credits are being added — they'll appear in the menu above within a few seconds."
+            : "Purchase cancelled — you haven't been charged."}
+        </span>
+        <button className="tc" onClick={() => setCheckoutToastOpen(false)} aria-label="Dismiss">×</button>
+      </div>
+    )}
     <div className="sl" data-theme={theme}>
       <div className="top">
         <div className="topin">
@@ -2685,7 +2747,8 @@ function App() {
         );
       })()}
     </div>
-  );
+  </>
+);
 }
 
 /* ---------------- Summary ---------------- */

@@ -102,7 +102,10 @@ async function deletePurchase(sessionId) {
 }
 
 // Atomic increment via the add_credits RPC. Falls back to read-then-write
-// only if the RPC hasn't been created yet (PostgREST answers 404).
+// if the RPC hasn't been created yet (PostgREST answers 404), or if the RPC
+// returned 200 but the balance wasn't actually updated (can happen when an
+// older version of the function exists in Supabase that only sets
+// credits_expire_at without incrementing credit_balance).
 async function addCredits(accountId, credits) {
   const base = process.env.SUPABASE_URL;
   const rpc = await fetch(`${base}/rest/v1/rpc/add_credits`, {
@@ -110,13 +113,32 @@ async function addCredits(accountId, credits) {
     headers: supaHeaders(),
     body: JSON.stringify({ p_account_id: accountId, p_credits: credits }),
   });
-  if (rpc.ok) return;
-  if (rpc.status !== 404) {
+  if (rpc.ok) {
+    // Verify the RPC actually updated credit_balance. An older version of the
+    // function may exist in Supabase that only sets credits_expire_at without
+    // touching credit_balance — in that case the webhook was silently treating
+    // a no-credit update as success. Read back the balance and fall through to
+    // the direct PATCH if it wasn't updated.
+    const checkResp = await fetch(
+      `${base}/rest/v1/accounts?id=eq.${encodeURIComponent(accountId)}&select=credit_balance`,
+      { headers: supaHeaders() }
+    );
+    if (checkResp.ok) {
+      const rows = await checkResp.json().catch(() => []);
+      const balance = Number(rows?.[0]?.credit_balance) || 0;
+      if (balance >= credits) return; // RPC updated the balance correctly
+      // Balance is still 0 (or less than expected) — RPC ran but didn't help.
+      console.warn(`stripe-webhook: add_credits RPC returned OK but credit_balance is ${balance} (expected >= ${credits}); using PATCH fallback`);
+    } else {
+      // Verification fetch failed — trust the RPC rather than risk double-credit.
+      return;
+    }
+  } else if (rpc.status !== 404) {
     const text = await rpc.text().catch(() => "");
     throw new Error(`add_credits RPC failed: ${rpc.status} ${text}`);
   }
 
-  console.warn("stripe-webhook: add_credits RPC missing, using non-atomic fallback");
+  console.warn("stripe-webhook: using non-atomic PATCH fallback to add credits");
   const cur = await fetch(
     `${base}/rest/v1/accounts?id=eq.${encodeURIComponent(accountId)}&select=credit_balance,credits_expire_at,free_credits_remaining`,
     { headers: supaHeaders() }
