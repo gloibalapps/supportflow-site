@@ -462,7 +462,7 @@ async function askModel(prompt, opts) {
 // Verified against the NDIS Pricing Schedule 2026-27 (v1.2, 22 July 2026),
 // Schedule 1 — Disability Support Workers. National column, effective 1 July 2026.
 // https://www.ndis.gov.au/providers/pricing-arrangements
-const APP_VERSION = "10";
+const APP_VERSION = "11";
 
 const PRICE_SOURCE = {
   doc: "NDIS Pricing Schedule 2026-27",
@@ -1500,7 +1500,7 @@ function SectionReturnHeader({ section, title, onBack }) {
   return <div className="pinhead featurepin">
     <div className="disp featuretitle">{title}</div>
     <button className="sectionback" onClick={onBack} aria-label={`Back to ${section} shortcuts`} style={{ marginLeft: "auto" }}>
-      <span className="arr" aria-hidden="true">←</span><span>{"Back to " + section}</span>
+      <span className="arr" aria-hidden="true">←</span><span>Back</span>
     </button>
   </div>;
 }
@@ -2526,7 +2526,7 @@ function App() {
         {tab === "participantshub" && (
           <div className="hubpage">
             <div className="hubfixed">
-              <div className="hubhead"><div className="disp">Participants</div><p>Choose what you want to manage. Participant details only appear after you open a section.</p></div>
+              <div className="hubhead"><div className="disp">People</div><p>Choose what you want to manage. Participant details only appear after you open a section.</p></div>
             </div>
             <div className="hubscroll">
               <div className="shortgrid">
@@ -4607,7 +4607,7 @@ function Directory({ data, save, view, setView, openId, clearOpen, canCreate, on
     return (
       <>
         <div className="bandhead" style={{ marginBottom: 16 }}>
-          <div className="disp" style={{ fontSize: 22 }}>{r.id ? r.name || "Edit" : isP ? "New participant" : "New plan manager"}</div>
+          <div className="disp" style={{ fontSize: 27 }}>{r.id ? r.name || "Edit" : isP ? "New participant" : "New plan manager"}</div>
           <div style={{ display: "flex", gap: 8 }}>
             <button className="btn ghost" onClick={() => setEdit(null)}>Cancel</button>
             <button className="btn"
@@ -5170,7 +5170,7 @@ function Incidents({ data, save }) {
       <>
         <div className="bandhead" style={{ marginBottom: 16 }}>
           <div>
-            <div className="disp" style={{ fontSize: 22 }}>{r.id ? "Edit incident" : "New incident"}</div>
+            <div className="disp" style={{ fontSize: 27 }}>{r.id ? "Edit incident" : "New incident"}</div>
             <div style={{ fontSize: 12, color: "var(--tx-3)", marginTop: 3 }}>Record facts, immediate safety action and follow-up.</div>
           </div>
           <button className="btn ghost" onClick={() => setEdit(null)}>Cancel</button>
@@ -5402,7 +5402,7 @@ function Shifts({ data, save, fy, newInvoice, canCreate, onBlocked, onShiftSaved
     return (
       <>
         <div className="bandhead" style={{ marginBottom: 16 }}>
-          <div className="disp" style={{ fontSize: 22 }}>{f.id ? "Edit shift" : "Add a shift"}</div>
+          <div className="disp" style={{ fontSize: 27 }}>{f.id ? "Edit shift" : "Add a shift"}</div>
           <div style={{ display: "flex", gap: 8 }}>
             <button className="btn ghost" onClick={() => setF(null)}>Cancel</button>
             <button className="btn" onClick={put} disabled={!f.participantId || !f.start || !f.end || !!billed || !!timingConflict}>Save</button>
