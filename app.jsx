@@ -462,7 +462,7 @@ async function askModel(prompt, opts) {
 // Verified against the NDIS Pricing Schedule 2026-27 (v1.2, 22 July 2026),
 // Schedule 1 — Disability Support Workers. National column, effective 1 July 2026.
 // https://www.ndis.gov.au/providers/pricing-arrangements
-const APP_VERSION = "9";
+const APP_VERSION = "10";
 
 const PRICE_SOURCE = {
   doc: "NDIS Pricing Schedule 2026-27",
@@ -1497,12 +1497,11 @@ function ShortcutCard({ icon, tone, title, sub, onClick, wide }) {
 }
 
 function SectionReturnHeader({ section, title, onBack }) {
-  const compactBack = section === "Participants";
   return <div className="pinhead featurepin">
-    <button className="sectionback" onClick={onBack} aria-label={`Back to ${section} shortcuts`}>
-      <span className="arr" aria-hidden="true">←</span><span>{compactBack ? section : `Back to ${section}`}</span>
-    </button>
     <div className="disp featuretitle">{title}</div>
+    <button className="sectionback" onClick={onBack} aria-label={`Back to ${section} shortcuts`} style={{ marginLeft: "auto" }}>
+      <span className="arr" aria-hidden="true">←</span><span>{"Back to " + section}</span>
+    </button>
   </div>;
 }
 
@@ -2532,7 +2531,6 @@ function App() {
             <div className="hubscroll">
               <div className="shortgrid">
                 <ShortcutCard icon="people" tone="violet" title="Participants" sub="View and manage participants." onClick={() => go("people", "participants")}/>
-                <ShortcutCard icon="personAdd" tone="teal" title="Add participant" sub="Open the existing participant area to add one." onClick={() => go("people", "participants")}/>
                 <ShortcutCard icon="document" tone="blue" title="Plan managers" sub="Manage plan manager details." onClick={() => go("people", "managers")}/>
                 <ShortcutCard icon="agreement" tone="pink" title="Service agreements" sub="Manage participant agreements." onClick={() => go("people", "agreements")}/>
               </div>
