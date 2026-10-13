@@ -8,8 +8,6 @@
 - [Pricing](https://supportflow.work/pricing.html): plans and prices
 - [Invoice template](https://supportflow.work/ndis-support-worker-invoice-template): NDIS invoice template for support workers
 - [Progress notes template](https://supportflow.work/ndis-support-worker-progress-notes): NDIS progress notes template
-- [About SupportFlow](https://supportflow.work/about-supportflow.md): full product description
-- [User manual](https://supportflow.work/user-manual.md): how the app works
 - [Privacy policy](https://supportflow.work/privacy): how data is handled
 - [Terms of use](https://supportflow.work/terms): terms of use
 
