@@ -48,6 +48,117 @@
   [headers.values]
     Cache-Control = "no-store"
 
+# Old domain -> canonical domain (301). Marketing pages only: /app is deliberately NOT
+# redirected, because the app stores data in the browser per-origin and an installed
+# copy on ndissupportflow.com would otherwise lose access to its records.
+[[redirects]]
+  from = "https://ndissupportflow.com/"
+  to = "https://supportflow.work/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://ndissupportflow.com/ndis-support-worker-invoice-template"
+  to = "https://supportflow.work/ndis-support-worker-invoice-template"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://ndissupportflow.com/ndis-support-worker-progress-notes"
+  to = "https://supportflow.work/ndis-support-worker-progress-notes"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://ndissupportflow.com/pricing"
+  to = "https://supportflow.work/pricing"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://ndissupportflow.com/pricing.html"
+  to = "https://supportflow.work/pricing.html"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://ndissupportflow.com/privacy"
+  to = "https://supportflow.work/privacy"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://ndissupportflow.com/terms"
+  to = "https://supportflow.work/terms"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://ndissupportflow.com/blog"
+  to = "https://supportflow.work/blog"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://ndissupportflow.com/blog/*"
+  to = "https://supportflow.work/blog/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://www.ndissupportflow.com/"
+  to = "https://supportflow.work/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://www.ndissupportflow.com/ndis-support-worker-invoice-template"
+  to = "https://supportflow.work/ndis-support-worker-invoice-template"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://www.ndissupportflow.com/ndis-support-worker-progress-notes"
+  to = "https://supportflow.work/ndis-support-worker-progress-notes"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://www.ndissupportflow.com/pricing"
+  to = "https://supportflow.work/pricing"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://www.ndissupportflow.com/pricing.html"
+  to = "https://supportflow.work/pricing.html"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://www.ndissupportflow.com/privacy"
+  to = "https://supportflow.work/privacy"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://www.ndissupportflow.com/terms"
+  to = "https://supportflow.work/terms"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://www.ndissupportflow.com/blog"
+  to = "https://supportflow.work/blog"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://www.ndissupportflow.com/blog/*"
+  to = "https://supportflow.work/blog/:splat"
+  status = 301
+  force = true
+
 # Serves app.html at /app as well as /app.html, regardless of whether
 # Pretty URLs is on for this site -- Stripe's post-checkout redirect and
 # anything else that links to "/app" shouldn't depend on that setting.
