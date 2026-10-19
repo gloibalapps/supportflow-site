@@ -183,6 +183,17 @@
   to = "/admin.html"
   status = 200
 
+# Owner-only dashboards (password protected, noindex).
+[[redirects]]
+  from = "/signups"
+  to = "/signups.html"
+  status = 200
+
+[[redirects]]
+  from = "/market"
+  to = "/market.html"
+  status = 200
+
 # Clean public URL for the privacy policy, matching its canonical URL.
 [[redirects]]
   from = "/privacy"
