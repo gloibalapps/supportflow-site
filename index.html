@@ -64,6 +64,16 @@
       "mainEntity": [
         {
           "@type": "Question",
+          "name": "What happens after the three free months?",
+          "acceptedAnswer": {"@type": "Answer", "text": "You choose: pay 99 cents per invoice you create, or $19.99 a month for unlimited invoices. Your records stay accessible either way."}
+        },
+        {
+          "@type": "Question",
+          "name": "Do I need a credit card to start?",
+          "acceptedAnswer": {"@type": "Answer", "text": "No. Founding members get three months of full, unlimited access with no card required."}
+        },
+        {
+          "@type": "Question",
           "name": "Is my participant information private?",
           "acceptedAnswer": {
             "@type": "Answer",
@@ -339,6 +349,25 @@
     transform:translateY(-50%);color:var(--brass);font-size:17px;opacity:.55}
 
   /* ============ trust ============ */
+
+  /* founding members offer */
+  .offer-wrap{max-width:1120px;margin:0 auto;padding:clamp(56px,7vw,96px) clamp(20px,3.6vw,40px)}
+  .offer-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:clamp(18px,2.4vw,28px);align-items:start}
+  .offer-card{background:var(--ink-2);border:1px solid var(--line);border-radius:16px;padding:clamp(20px,2.6vw,30px)}
+  .offer-card h3{font-family:'Fraunces',Georgia,serif;font-weight:400;font-size:clamp(20px,2.4vw,26px);margin:0 0 6px}
+  .offer-card p{color:var(--muted);font-size:14.5px;line-height:1.7;margin:0 0 14px}
+  .offer-list{list-style:none;margin:0;padding:0}
+  .offer-list li{display:flex;justify-content:space-between;gap:16px;padding:11px 0;border-top:1px solid var(--line);font-size:14.5px}
+  .offer-list li span:first-child{color:var(--muted)}
+  .offer-list li span:last-child{font-weight:600;text-align:right}
+  .scroll-x{overflow-x:auto}
+  .price-table{width:100%;border-collapse:collapse;font-size:14.5px}
+  .price-table th,.price-table td{padding:11px 10px;border-top:1px solid var(--line);text-align:right}
+  .price-table th:first-child,.price-table td:first-child{text-align:left}
+  .price-table th{color:var(--muted);font-weight:600;font-size:12px;letter-spacing:.08em;text-transform:uppercase;border-top:0}
+  .fineprint{color:var(--muted-2);font-size:12.5px;line-height:1.7;margin:14px 0 0}
+  .offer-badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--brass-lift);border:1px solid var(--brass);border-radius:999px;padding:5px 12px;margin-bottom:14px}
+  .hero-offer{display:inline-block;margin:0 0 6px}
   .trust{background:var(--ink-2);border-top:1px solid var(--line)}
   .trust-in{max-width:1120px;margin:0 auto;padding:clamp(56px,7vw,96px) clamp(20px,3.6vw,40px)}
   .trust-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
@@ -427,10 +456,10 @@
   <main id="main-content" class="block">
     <div class="kicker rise">For independent support workers</div>
     <h1 id="title" class="rise" aria-label="NDIS SupportFlow"><span class="line">NDIS</span><span class="line">Support<span class="flow">Flow</span></span></h1>
-    <p class="tag rise">Your support work, organised in one place.</p>
+    <p class="tag rise">Three months completely free for the first 500 independent NDIS support workers.</p>
     <div class="hero-features rise">Invoices &bull; Shifts &bull; Notes &bull; Kilometres &bull; Expenses &bull; Tax</div>
     <div class="hero-trust rise">Private by design &bull; Works offline</div>
-    <div class="actions rise"><a class="btn" href="./app">Open SupportFlow</a></div>
+    <div class="actions rise"><a class="btn" href="./app">Claim a founding place</a><a class="btn quiet" href="#founding">See the offer</a></div>
   </main>
 </section>
 
@@ -539,11 +568,84 @@
   </div>
 </section>
 
+<!-- ============ FOUNDING MEMBERS ============ -->
+<section class="sec" id="founding" style="padding-bottom:0">
+  <div class="sec-head">
+    <span class="offer-badge">Founding members</span>
+    <h2>Three months free. No limits. No card.</h2>
+    <p>We want every independent support worker to try SupportFlow properly, with real shifts, real notes and real invoices, before paying anything.</p>
+  </div>
+  <div class="offer-grid">
+    <div class="offer-card">
+      <h3>The founding member offer</h3>
+      <p>Open to the first 500 support workers to activate. Your three months start when you activate, not when you sign up.</p>
+      <ul class="offer-list">
+        <li><span>Places</span><span>First 500 users</span></li>
+        <li><span>Free access</span><span>3 months from activation</span></li>
+        <li><span>Invoices</span><span>Unlimited</span></li>
+        <li><span>Participants</span><span>Unlimited</span></li>
+        <li><span>Features</span><span>Full access</span></li>
+        <li><span>Credit card</span><span>Not required</span></li>
+        <li><span>Referral invitations</span><span>Included</span></li>
+      </ul>
+      <p class="fineprint">Your records stay accessible after the free period, even if you don't pay straight away.</p>
+      <div class="actions" style="margin-top:18px"><a class="btn" href="./app">Claim a founding place</a></div>
+    </div>
+
+    <div class="offer-card" id="after-free">
+      <h3>After the free period</h3>
+      <p><b style="color:var(--paper)">No expensive subscriptions. No paying for invoices you don't create.</b> Pay 99 cents per invoice, or $19.99 a month for unlimited invoicing.</p>
+      <div class="scroll-x">
+        <table class="price-table">
+          <thead><tr><th>Invoices a month</th><th>Pay per invoice</th><th>Unlimited</th></tr></thead>
+          <tbody>
+            <tr><td>2</td><td>$1.98</td><td>$19.99</td></tr>
+            <tr><td>5</td><td>$4.95</td><td>$19.99</td></tr>
+            <tr><td>10</td><td>$9.90</td><td>$19.99</td></tr>
+            <tr><td>20</td><td>$19.80</td><td>$19.99</td></tr>
+            <tr><td>30</td><td>$29.70</td><td>$19.99</td></tr>
+            <tr><td>40</td><td>$39.60</td><td>$19.99</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="fineprint">If you regularly create 21 or more invoices a month, the unlimited plan costs less.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ REFERRALS ============ -->
+<section class="sec" id="invite" style="padding-bottom:0">
+  <div class="sec-head">
+    <h2>Invite a support worker</h2>
+    <p>Love SupportFlow? Share it with another independent support worker. You'll both receive five free invoices.</p>
+  </div>
+  <div class="trust-grid" style="max-width:1120px;margin:0 auto">
+    <div class="tcard"><b>Your own invite link</b><span>Every founding member gets a personal link to share by Messenger, WhatsApp, SMS or email.</span></div>
+    <div class="tcard"><b>Five credits each</b><span>When someone joins through your link and activates, you and the new member each receive five free invoice credits.</span></div>
+    <div class="tcard"><b>Applied after the free period</b><span>Credits are applied once your three free months end, so none are wasted while everything is already unlimited.</span></div>
+    <div class="tcard"><b>Track who joined</b><span>See how many people you've invited and how many credits you've earned.</span></div>
+  </div>
+</section>
+
+<!-- ============ THE STORY ============ -->
+<section class="sec" id="story" style="padding-bottom:0">
+  <div class="sec-head">
+    <h2>Made because support workers deserve easier paperwork</h2>
+    <p>SupportFlow was developed around the real administrative problems of a full-time NDIS support worker.</p>
+  </div>
+  <div class="trust-grid" style="max-width:1120px;margin:0 auto">
+    <div class="tcard"><b>1. Finish the shift</b><span>Log it once, with the participant and support item.</span></div>
+    <div class="tcard"><b>2. Record the travel</b><span>Kilometres kept alongside the shift they belong to.</span></div>
+    <div class="tcard"><b>3. Dictate your notes</b><span>Turn rough notes into clearer progress notes. You stay responsible for checking they are accurate.</span></div>
+    <div class="tcard"><b>4. Create the invoice</b><span>Everything is already in one place, so the invoice is mostly done.</span></div>
+  </div>
+</section>
+
 <!-- ============ GET STARTED ============ -->
 <section class="big" id="get-started"><div class="big-in">
-<h2>Your support work, organised.</h2>
-<p class="lede">Manage shifts, notes, travel and invoices on your phone or computer.</p>
-<div class="actions"><a class="btn" href="./app">Open SupportFlow</a></div>
+<h2>Three months free for the first 500.</h2>
+<p class="lede">No invoice limits, no participant limits, no credit card. Your records stay yours.</p>
+<div class="actions"><a class="btn" href="./app">Claim a founding place</a></div>
 </div></section>
 
 <!-- ============ FAQ ============ -->
@@ -573,6 +675,18 @@
     <div class="tcard">
       <b>How do I get started?</b>
       <span>Open SupportFlow and complete the setup for your business, passcode and encrypted backup.</span>
+    </div>
+    <div class="tcard">
+      <b>What happens after the three free months?</b>
+      <span>You choose: pay 99 cents per invoice you create, or $19.99 a month for unlimited invoices. Your records stay accessible either way.</span>
+    </div>
+    <div class="tcard">
+      <b>Do I need a credit card to start?</b>
+      <span>No. Founding members get three months of full, unlimited access with no card required.</span>
+    </div>
+    <div class="tcard">
+      <b>How does the referral reward work?</b>
+      <span>When someone joins through your link and activates, you both receive five free invoice credits, applied after your free period.</span>
     </div>
   </div>
 </section>
