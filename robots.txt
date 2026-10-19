@@ -1,4 +1,5 @@
 User-agent: *
 Allow: /
+Disallow: /signups
 
 Sitemap: https://supportflow.work/sitemap.xml
