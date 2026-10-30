@@ -13,7 +13,7 @@
 <meta name="twitter:image" content="https://supportflow.work/og-image.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet"><style>body{margin:0;font:16px/1.5 'Instrument Sans',system-ui,sans-serif;background:#12140E;color:#F2EFE4}.w{max-width:1000px;margin:auto;padding:52px 18px 80px}h1{text-align:center;font-family:'Fraunces',Georgia,serif;font-weight:300;font-size:clamp(30px,4vw,46px);letter-spacing:-.02em;color:#F2EFE4}.lead{text-align:center;max-width:720px;margin:0 auto 32px;color:#8B8E82}.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.p{background:#1A1D15;border:1px solid #2A2D23;border-radius:18px;padding:22px}.pop{border:2px solid rgba(200,145,58,.55);background:linear-gradient(168deg,rgba(200,145,58,.08),#1A1D15 46%)}.tag{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#C8913A}.price{font-family:'Fraunces',serif;font-size:42px;font-weight:400;letter-spacing:-.02em;color:#F2EFE4}.btn{display:block;text-align:center;background:#C8913A;color:#14150F;text-decoration:none;padding:12px;border-radius:999px;font-weight:700;margin-top:18px;font-size:14px;transition:background .16s}.btn:hover{background:#E0A83F}.fine{margin-top:26px;background:#1A1D15;border-radius:14px;padding:18px;border:1px solid #2A2D23;color:#8B8E82;font-size:13px;line-height:1.7}.fine b{color:#F2EFE4}@media(max-width:700px){.plans{grid-template-columns:1fr}}
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet"><style>body{margin:0;font:16px/1.5 'Instrument Sans',system-ui,sans-serif;background:#12140E;color:#F2EFE4}.w{max-width:1000px;margin:auto;padding:52px 18px 80px}h1{text-align:center;font-family:'Fraunces',Georgia,serif;font-weight:300;font-size:clamp(30px,4vw,46px);letter-spacing:-.02em;color:#F2EFE4}.lead{text-align:center;max-width:720px;margin:0 auto 32px;color:#8B8E82}.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.p{background:#1A1D15;border:1px solid #2A2D23;border-radius:18px;padding:22px}.pop{border:2px solid rgba(200,145,58,.55);background:linear-gradient(168deg,rgba(200,145,58,.08),#1A1D15 46%)}.tag{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#C8913A}.price{font-family:'Fraunces',serif;font-size:42px;font-weight:400;letter-spacing:-.02em;color:#F2EFE4}.btn{display:block;text-align:center;background:#C8913A;color:#14150F;text-decoration:none;padding:12px;border-radius:999px;font-weight:700;margin-top:18px;font-size:14px;transition:background .16s}.btn:hover{background:#E0A83F}.fine{margin-top:26px;background:#1A1D15;border-radius:14px;padding:18px;border:1px solid #2A2D23;color:#8B8E82;font-size:13px;line-height:1.7}.fine b{color:#F2EFE4}.promo{max-width:340px;margin:0 auto 24px;text-align:left}.promo label{display:block;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#C8913A;margin-bottom:8px}.promo input{box-sizing:border-box;width:100%;background:#1A1D15;border:1px solid #2A2D23;border-radius:999px;padding:11px 18px;color:#F2EFE4;font:600 15px 'Instrument Sans',system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;outline:none;transition:border-color .16s}.promo input::placeholder{color:#6B6E62;text-transform:none;letter-spacing:0;font-weight:400}.promo input:focus{border-color:#C8913A}@media(max-width:700px){.plans{grid-template-columns:1fr}}
   :root{--brass:#C8913A;--brass-lift:#E0A83F;--muted:#8B8E82;--line:#2A2D23;--bg:#12140E;--ink:#F2EFE4}
   /* ── page header ── */
   .page-header{background:rgba(18,20,14,.92);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
@@ -56,7 +56,7 @@
     <a class="hide-mobile" href="/pricing">Pricing</a>
     <a class="page-navcta" href="/app">Open App</a>
   </nav>
-</header><main class="w"><h1>Simple pricing. No monthly subscription.</h1><p class="lead">Start with <b>5 invoice credits free</b>. Buy more when you need them. Credits are valid for 30 days from purchase. Buy more within your window and the balance compounds — your 30 days resets from the new purchase date.</p><div class="plans">
+</header><main class="w"><h1>Simple pricing. No monthly subscription.</h1><p class="lead">Start with <b>5 invoice credits free</b>. Buy more when you need them. Credits are valid for 30 days from purchase. Buy more within your window and the balance compounds — your 30 days resets from the new purchase date.</p><div class="promo"><label for="promo-code">Promo code (optional)</label><input id="promo-code" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="40" placeholder="Enter code"></div><div class="plans">
   <section class="p">
     <div class="tag">CASUAL</div>
     <h2>10 invoices</h2>
@@ -104,7 +104,9 @@
 <script>
 function startCheckout(plan) {
   var msg = document.getElementById('checkout-msg');
-  msg.textContent = 'Starting checkout…';
+  var promoEl = document.getElementById('promo-code');
+  var promoCode = promoEl ? promoEl.value.trim() : '';
+  msg.textContent = promoCode ? 'Checking promo code…' : 'Starting checkout…';
   var ref = localStorage.getItem('ndis:deviceRef');
   if (!ref) {
     ref = typeof crypto !== 'undefined' && crypto.randomUUID
@@ -117,7 +119,7 @@ function startCheckout(plan) {
   fetch('/.netlify/functions/create-checkout', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({plan: plan, clientReferenceId: ref})
+    body: JSON.stringify({plan: plan, clientReferenceId: ref, promoCode: promoCode})
   })
   .then(function(r){ return r.json().then(function(d){ return {ok:r.ok, d:d}; }); })
   .then(function(res){

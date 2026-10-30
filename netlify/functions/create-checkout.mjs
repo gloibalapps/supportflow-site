@@ -73,9 +73,10 @@ export default async (req) => {
     return json({ error: "Missing device reference." }, 400);
   }
 
-  // An optional promotion code the user typed in. Stripe validates it
-  // itself, including any redemption cap.
+  // An optional promotion code typed on our pricing page. Stripe's own
+  // "Add code" box is never shown; a valid code is pre-applied instead.
   const promoCode = typeof body?.promoCode === "string" ? body.promoCode.trim() : "";
+  const INVALID_PROMO = "That promo code isn't valid or has expired.";
 
   const params = {
     mode: "payment",
@@ -90,30 +91,33 @@ export default async (req) => {
     "payment_intent_data[metadata][pack]": packName,
     success_url: `${site}/app?checkout=success`,
     cancel_url: `${site}/app?checkout=cancelled`,
-    allow_promotion_codes: promoCode ? "false" : "true", // manual code below takes precedence
+    // allow_promotion_codes is deliberately omitted so Stripe never shows its
+    // own "Add code" box (Stripe also rejects it alongside `discounts`).
   };
 
-  // If the user typed a specific code, look it up and apply it directly so
-  // it's pre-filled rather than making them re-type it on Stripe's page.
   if (promoCode) {
+    // Try the code as typed, then upper-cased, so "freecredit" matches
+    // "FREECREDIT" regardless of how Stripe compares codes.
+    const candidates = [...new Set([promoCode, promoCode.toUpperCase()])];
+    let match = null;
     try {
-      const lookup = await fetch(
-        `${STRIPE_API}/promotion_codes?code=${encodeURIComponent(promoCode)}&active=true&limit=1`,
-        { headers: { Authorization: `Bearer ${key}` } }
-      );
-      const found = await lookup.json();
-      const match = found?.data?.[0];
-      if (match) {
-        params["discounts[0][promotion_code]"] = match.id;
-        delete params.allow_promotion_codes; // Stripe rejects both together
-      } else {
-        // Invalid or exhausted code: let Stripe's own checkout page prompt
-        // for one, rather than failing the whole request.
-        params.allow_promotion_codes = "true";
+      for (const code of candidates) {
+        const lookup = await fetch(
+          `${STRIPE_API}/promotion_codes?code=${encodeURIComponent(code)}&active=true&limit=1`,
+          { headers: { Authorization: `Bearer ${key}` } }
+        );
+        if (!lookup.ok) continue;
+        const found = await lookup.json();
+        const m = found?.data?.[0];
+        const exhausted = m?.max_redemptions != null && m.times_redeemed >= m.max_redemptions;
+        const expired = m?.expires_at && m.expires_at * 1000 <= Date.now();
+        if (m && m.active && !exhausted && !expired) { match = m; break; }
       }
     } catch {
-      params.allow_promotion_codes = "true";
+      return json({ error: "Couldn't check that promo code. Try again in a moment." }, 502);
     }
+    if (!match) return json({ error: INVALID_PROMO }, 400);
+    params["discounts[0][promotion_code]"] = match.id;
   }
 
   try {
