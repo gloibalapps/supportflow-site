@@ -462,7 +462,7 @@ async function askModel(prompt, opts) {
 // Verified against the NDIS Pricing Schedule 2026-27 (v1.2, 22 July 2026),
 // Schedule 1 — Disability Support Workers. National column, effective 1 July 2026.
 // https://www.ndis.gov.au/providers/pricing-arrangements
-const APP_VERSION = "15";
+const APP_VERSION = "16";
 
 const PRICE_SOURCE = {
   doc: "NDIS Pricing Schedule 2026-27",
@@ -1870,6 +1870,8 @@ function App() {
   // (billing unconfigured), so nothing is shown and nothing is blocked.
   const [creditBalance, setCreditBalance] = useState(null);
   const [creditsExpired, setCreditsExpired] = useState(false);
+  // Lifetime licence (A$49 once): check-status returns lifetime:true. Never expires, never needs a top-up.
+  const [isLifetime, setLifetime] = useState(false);
   const [creditExpiresIn, setCreditExpiresIn] = useState(null); // days remaining
   const [checkoutResult, setCheckoutResult] = useState(null);   // "success" | "cancelled"
   const [checkoutToastOpen, setCheckoutToastOpen] = useState(false);
@@ -1905,7 +1907,8 @@ function App() {
             .then((d) => {
               if (d.status === "ok" || d.status === "none") {
                 setCreditBalance(Number(d.credits) || 0);
-                setCreditsExpired(!!d.expired);
+                setLifetime(!!d.lifetime);
+                setCreditsExpired(!d.lifetime && !!d.expired);
                 if (d.expiresAt) {
                   const exp = new Date(d.expiresAt).getTime();
                   const now = Date.now();
@@ -1944,7 +1947,8 @@ function App() {
           setTrialEnd(d.trialEnd || null);
           if (d.status === "ok" || d.status === "none") {
             setCreditBalance(Number(d.credits) || 0);
-            setCreditsExpired(!!d.expired);
+            setLifetime(!!d.lifetime);
+            setCreditsExpired(!d.lifetime && !!d.expired);
             if (d.expiresAt) {
               const exp = new Date(d.expiresAt).getTime();
               const now = Date.now();
@@ -2465,18 +2469,27 @@ function App() {
                     </div>
                     <div style={{ fontSize: 10.5, color: "var(--tx-3)", marginTop: 6 }}>Version {APP_VERSION}</div>
                   </div>
-                  <button className="buycredits" onClick={() => { setMenuOpen(false); window.location.href = PRICING_URL; }}>
-                    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <ellipse cx="12" cy="7" rx="7" ry="3" /><path d="M5 7v5c0 1.7 3.1 3 7 3s7-1.3 7-3V7" /><path d="M5 12v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5" />
-                    </svg>
-                    <span>
-                      {creditsExpired
-                        ? <><b style={{ color: "var(--warn)" }}>Credits expired</b><br/><span style={{ fontSize: 11, color: "var(--tx-3)" }}>Buy more to keep invoicing</span></>
-                        : typeof creditBalance === "number"
-                          ? <><span style={{ fontSize: 16, fontWeight: 700, color: "var(--ink)", lineHeight: 1.2, display: "block" }}>{creditBalance} credits</span><span style={{ fontSize: 11, color: creditExpiresIn !== null && creditExpiresIn <= 3 ? "var(--warn)" : "var(--tx-3)" }}>{creditExpiresIn !== null ? `Expires in ${creditExpiresIn} day${creditExpiresIn === 1 ? "" : "s"}` : "Buy credits"}</span></>
-                          : <b>Buy credits</b>}
-                    </span>
-                  </button>
+                  {isLifetime ? (
+                    <div className="buycredits" style={{ display: "flex", alignItems: "center", gap: 9, padding: "10px 16px", cursor: "default" }} aria-label="Lifetime licence">
+                      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ color: "var(--brass)" }}>
+                        <path d="M18.2 8.6c-1.9 0-3.4 1.6-6.2 3.4-2.8 1.8-4.3 3.4-6.2 3.4a3.4 3.4 0 0 1 0-6.8c1.9 0 3.4 1.6 6.2 3.4 2.8 1.8 4.3 3.4 6.2 3.4a3.4 3.4 0 0 0 0-6.8z" />
+                      </svg>
+                      <span style={{ fontSize: 16, fontWeight: 700, color: "var(--brass-lift)", lineHeight: 1.2 }}>Lifetime</span>
+                    </div>
+                  ) : (
+                    <button className="buycredits" onClick={() => { setMenuOpen(false); window.location.href = PRICING_URL; }}>
+                      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <ellipse cx="12" cy="7" rx="7" ry="3" /><path d="M5 7v5c0 1.7 3.1 3 7 3s7-1.3 7-3V7" /><path d="M5 12v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5" />
+                      </svg>
+                      <span>
+                        {creditsExpired
+                          ? <><b style={{ color: "var(--warn)" }}>Credits expired</b><br/><span style={{ fontSize: 11, color: "var(--tx-3)" }}>Buy more to keep invoicing</span></>
+                          : typeof creditBalance === "number"
+                            ? <><span style={{ fontSize: 16, fontWeight: 700, color: "var(--ink)", lineHeight: 1.2, display: "block" }}>{creditBalance} credits</span><span style={{ fontSize: 11, color: creditExpiresIn !== null && creditExpiresIn <= 3 ? "var(--warn)" : "var(--tx-3)" }}>{creditExpiresIn !== null ? `Expires in ${creditExpiresIn} day${creditExpiresIn === 1 ? "" : "s"}` : "Buy credits"}</span></>
+                            : <b>Buy credits</b>}
+                      </span>
+                    </button>
+                  )}
                   <button onClick={() => { setMenuOpen(false); setHelpInitialView("support"); setOpenPane("help"); go("settings"); }}>
                     Feedback &amp; support
                   </button>
@@ -3682,7 +3695,7 @@ async function chargeInvoiceCredit(invoiceNumber) {
 
 function CreditNotice({ kind }) {
   if (kind === "no_credits") return <div className="creditnotice">
-    You're out of invoice credits. <a href={PRICING_URL}>Buy credits →</a>
+    You've used your free invoices. <a href={PRICING_URL}>Get SupportFlow for life — A$49 →</a>
   </div>;
   if (kind === "error") return <div className="creditnotice">
     Couldn't check your invoice credits. Check your connection and try again.
@@ -6652,6 +6665,8 @@ const MANUAL = [
     q: [
       ["What this app does, and doesn't",
        "It handles the paperwork around support work: invoices with the right NDIS codes, a running figure for the tax you'll owe, your kilometres, and your service agreements. It is not a rostering system, it records shifts you have done, it does not arrange them. It does not lodge anything with the ATO, prepare a BAS, or replace an accountant."],
+      ["What SupportFlow costs",
+       "SupportFlow costs A$49 once \u2014 no subscription. New accounts start with 5 free invoice credits for 30 days to try the app; one credit is used the first time you preview a new invoice. After the free credits, buy the lifetime licence from the pricing page (profile menu \u2192 Buy credits). Once you own it, the menu shows Lifetime and invoicing has no limit. Moving to a new phone or PC is covered under Backups and troubleshooting."],
       ["The first thing you see",
        "A welcome screen, once, explaining the app in three lines. You can start setup or read the manual first. Before normal use, onboarding requires a backup password; that backup-security step cannot be skipped."],
       ["Finding your way around",
@@ -6798,7 +6813,7 @@ const MANUAL = [
       ["Moving to a new phone or PC",
        "Before switching devices, open Settings \u2192 Backup \u2192 Back up now and wait until the upload confirms. That backup must complete successfully \u2014 it is the only copy of your records. On the new device, open supportflow.work/app in Chrome, install it, and complete onboarding. When asked to restore, choose the file from your Google Drive and enter your backup passphrase. Your participants, shifts, invoices, incidents, expenses and settings will appear exactly as they were. Once you have confirmed the new device has everything, stop using the old installation \u2014 do not keep working on it, or the two copies will diverge."],
       ["What transfers and what does not",
-       "Everything in your encrypted backup transfers: participants, shifts, invoices, service agreements, plan managers, incidents, expenses, trips and settings. Your purchase is tied to your device reference, which is also in the backup, so the new device will recognise you as a paid user after restoring. What does not transfer automatically: your backup passphrase (you must know it \u2014 nobody can recover it), your Google Drive connection (reconnect it during onboarding on the new device), and any unsaved draft open at the time of the last backup."],
+       "Everything in your encrypted backup transfers: participants, shifts, invoices, service agreements, plan managers, incidents, expenses, trips and settings. Your lifetime licence is linked to your purchase, not to the backup file: if the new device doesn't show Lifetime in the profile menu after restoring, contact support through Manual & help \u2192 Support with the email you paid with and we'll re-link it. What does not transfer automatically: your backup passphrase (you must know it \u2014 nobody can recover it), your Google Drive connection (reconnect it during onboarding on the new device), and any unsaved draft open at the time of the last backup."],
       ["Automatic Google Drive backups",
        "Google Drive is connected during required onboarding and the first encrypted backup must succeed before setup continues. After meaningful changes, SupportFlow waits about five minutes and uploads one encrypted backup while the app is active. If you are offline, the backup remains pending and retries when SupportFlow is next opened online. A PWA cannot reliably run while completely closed."],
       ["Back up now, change account or disconnect",

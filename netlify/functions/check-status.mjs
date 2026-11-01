@@ -58,6 +58,13 @@ export default async (req) => {
 
     // Unexpired free starter credits count alongside purchased ones.
     const credits = (Number(account.credit_balance) || 0) + (Number(account.free_credits_remaining) || 0);
+    // Lifetime licence: the webhook sets credit_balance to 99999 and the
+    // expiry to 2099. Each invoice preview still decrements the balance, so
+    // the 2099 expiry (or a balance near 99999) identifies it, not an exact 99999.
+    const balance = Number(account.credit_balance) || 0;
+    if (balance >= 99999 || (balance >= 90000 && expiresAt.getUTCFullYear() >= 2090)) {
+      return json({ status: "ok", credits, expired: false, lifetime: true, expiresAt: null });
+    }
     return json({ status: "ok", credits, expired: false, expiresAt: expiresAt.toISOString() });
   } catch {
     // A failed check should never brick the app. The caller treats "error"

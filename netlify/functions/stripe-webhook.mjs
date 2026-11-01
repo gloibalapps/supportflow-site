@@ -23,11 +23,11 @@ import crypto from "node:crypto";
 const TOLERANCE_SECONDS = 300; // reject anything claiming to be older than 5 minutes
 
 // Kept in step with CREDIT_PACKS in invoice-credit-rules.js.
-const PACK_CREDITS = Object.freeze({ casual: 10, popular: 30, value: 100 });
+const PACK_CREDITS = Object.freeze({ casual: 10, popular: 30, value: 100, lifetime: 99999 });
 // Fallback only, for sessions created without metadata: full-price amounts
 // in cents. A discounted session without metadata won't match, and is
 // retried/logged rather than guessed at.
-const AMOUNT_TO_PACK = Object.freeze({ 799: "casual", 1999: "popular", 3999: "value" });
+const AMOUNT_TO_PACK = Object.freeze({ 799: "casual", 1999: "popular", 3999: "value", 4900: "lifetime" });
 
 function verifyStripeSignature(payload, header, secret) {
   if (!header) return false;
@@ -167,6 +167,26 @@ async function addCredits(accountId, credits) {
   }
 }
 
+// Lifetime licence: no schema change, just a balance that can't realistically
+// run out and an expiry far in the future. check-status reports it as lifetime.
+async function grantLifetime(accountId) {
+  const base = process.env.SUPABASE_URL;
+  const patch = await fetch(`${base}/rest/v1/accounts?id=eq.${encodeURIComponent(accountId)}`, {
+    method: "PATCH",
+    headers: supaHeaders({ Prefer: "return=minimal" }),
+    body: JSON.stringify({
+      credit_balance: 99999,
+      credits_expire_at: "2099-01-01T00:00:00.000Z",
+      last_seen_at: new Date().toISOString(),
+      free_credits_remaining: 0,
+    }),
+  });
+  if (!patch.ok) {
+    const text = await patch.text().catch(() => "");
+    throw new Error(`Couldn't grant lifetime licence: ${patch.status} ${text}`);
+  }
+}
+
 async function handlePaidSession(session) {
   if (session.mode !== "payment") return; // nothing else is sold
   if (session.payment_status !== "paid" && session.payment_status !== "no_payment_required") {
@@ -197,8 +217,10 @@ async function handlePaidSession(session) {
   const isNew = await recordPurchaseOnce({
     account_id: accountId,
     // credit_purchases.pack only allows casual/popular/value; the hidden test
-    // pack is recorded as casual (its 1 credit / A$0.50 tells it apart).
-    pack: packName === "test" ? "casual" : packName,
+    // pack is recorded as casual (its 1 credit / A$0.50 tells it apart), and
+    // the lifetime licence as value (its 99999 credits / A$49 tell it apart),
+    // so no schema change is needed.
+    pack: packName === "test" ? "casual" : packName === "lifetime" ? "value" : packName,
     credits,
     amount_aud: (Number(session.amount_total) || 0) / 100,
     stripe_session_id: session.id,
@@ -210,7 +232,8 @@ async function handlePaidSession(session) {
   }
 
   try {
-    await addCredits(accountId, credits);
+    if (packName === "lifetime") await grantLifetime(accountId);
+    else await addCredits(accountId, credits);
   } catch (e) {
     // Undo the purchase record so Stripe's retry can credit it properly,
     // instead of the retry seeing a "done" row and skipping.
