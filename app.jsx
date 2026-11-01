@@ -113,7 +113,7 @@ html,body{overscroll-behavior-y:none;background:#14150F;height:100%;overflow-x:h
   border-radius:9px;background:none;cursor:pointer;font-family:inherit;font-size:13.5px;
   font-weight:500;color:var(--tx-2);transition:background .15s,color .15s}
 .menu button:hover{background:var(--bg-3);color:var(--tx)}
-/* Invoice credit balance pill (header) + Buy credits menu item + out-of-credits notice. */
+/* Invoice credit balance pill (header) + Lifetime/Buy-Lifetime menu item + out-of-credits notice. */
 .creditpill{height:26px;padding:0 10px;border-radius:99px;border:1px solid rgba(200,145,58,.45);background:rgba(200,145,58,.10);color:var(--brass-lift);font-family:inherit;font-size:11.5px;font-weight:600;letter-spacing:.01em;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;transition:border-color .15s,background .15s}
 .creditpill:hover{border-color:var(--brass);background:rgba(200,145,58,.16)}
 .creditpill .coin{width:8px;height:8px;border-radius:50%;background:var(--brass)}
@@ -462,7 +462,7 @@ async function askModel(prompt, opts) {
 // Verified against the NDIS Pricing Schedule 2026-27 (v1.2, 22 July 2026),
 // Schedule 1 — Disability Support Workers. National column, effective 1 July 2026.
 // https://www.ndis.gov.au/providers/pricing-arrangements
-const APP_VERSION = "18";
+const APP_VERSION = "19";
 
 const PRICE_SOURCE = {
   doc: "NDIS Pricing Schedule 2026-27",
@@ -1638,9 +1638,8 @@ function TrialEndedNotice({ onClose, startInRestore = false }) {
       .catch((e) => { setErr(e.message || "Something went wrong."); setBusy(false); });
   };
 
-  // Reconnects this device to a subscription that already exists, rather
-  // than letting someone accidentally start (and pay for) a second one
-  // after reinstalling or switching phones. Adopts the original device's
+  // Reconnects this device to a licence that already exists, rather
+  // than letting someone accidentally pay again after reinstalling or switching phones. Adopts the original device's
   // id locally, then reloads so the normal status check picks it straight
   // up -- no separate code path needed for "how does the app now know".
   const restore = () => {
@@ -1720,9 +1719,9 @@ function TrialEndingBanner({ daysLeft, onSubscribe }) {
     <div className="band">
       <div className="callout" style={{ borderColor: "var(--brass)" }}>
         <b>{daysLeft === 0 ? "Your trial ends today." : `Your trial ends in ${daysLeft} day${daysLeft === 1 ? "" : "s"}.`}</b>{" "}
-        Add a plan to keep creating new invoices, shifts and records without a break.
+        Buy Lifetime (A$49 once) to keep creating new invoices, shifts and records without limit.
         <div style={{ marginTop: 10 }}>
-          <button className="btn tiny" onClick={onSubscribe}>Choose a plan</button>
+          <button className="btn tiny" onClick={onSubscribe}>Buy Lifetime — A$49</button>
         </div>
       </div>
     </div>
@@ -2484,8 +2483,8 @@ function App() {
                         {creditsExpired
                           ? <><b style={{ color: "var(--warn)" }}>Credits expired</b><br/><span style={{ fontSize: 11, color: "var(--tx-3)" }}>Buy Lifetime to keep invoicing</span></>
                           : typeof creditBalance === "number"
-                            ? <><span style={{ fontSize: 16, fontWeight: 700, color: "var(--ink)", lineHeight: 1.2, display: "block" }}>{creditBalance} credits</span><span style={{ fontSize: 11, color: creditExpiresIn !== null && creditExpiresIn <= 3 ? "var(--warn)" : "var(--tx-3)" }}>{creditExpiresIn !== null ? `Expires in ${creditExpiresIn} day${creditExpiresIn === 1 ? "" : "s"}` : "Buy credits"}</span></>
-                            : <b>Buy credits</b>}
+                            ? <><span style={{ fontSize: 16, fontWeight: 700, color: "var(--ink)", lineHeight: 1.2, display: "block" }}>{creditBalance} credits</span><span style={{ fontSize: 11, color: creditExpiresIn !== null && creditExpiresIn <= 3 ? "var(--warn)" : "var(--tx-3)" }}>{creditExpiresIn !== null ? `Expires in ${creditExpiresIn} day${creditExpiresIn === 1 ? "" : "s"}` : `Buy Lifetime — A$49`}</span></>
+                            : <b>Buy Lifetime — A$49</b>}
                       </span>
                     </button>
                   )}
@@ -6670,11 +6669,11 @@ const MANUAL = [
       ["What this app does, and doesn't",
        "It handles the paperwork around support work: invoices with the right NDIS codes, a running figure for the tax you'll owe, your kilometres, and your service agreements. It is not a rostering system, it records shifts you have done, it does not arrange them. It does not lodge anything with the ATO, prepare a BAS, or replace an accountant."],
       ["What SupportFlow costs",
-       "SupportFlow costs A$49 once \u2014 no subscription. New accounts start with 5 free invoice credits for 30 days to try the app; one credit is used the first time you preview a new invoice. After the free credits, buy the lifetime licence from the pricing page (profile menu \u2192 Buy credits). Once you own it, the menu shows Lifetime and invoicing has no limit. Moving to a new phone or PC is covered under Backups and troubleshooting."],
+       "SupportFlow costs A$49 once \u2014 no subscription. New accounts start with 5 free invoice credits for 30 days to try the app; one credit is used the first time you preview a new invoice. After the free credits, buy the lifetime licence from the pricing page or via the profile menu. Once you own it, the menu shows Lifetime and invoicing has no limit. Moving to a new phone or PC is covered under Backups and troubleshooting."],
       ["The first thing you see",
        "A welcome screen, once, explaining the app in three lines. You can start setup or read the manual first. Before normal use, onboarding requires a backup password; that backup-security step cannot be skipped."],
       ["Finding your way around",
-       "Four fixed bottom navigation areas: Home, Work, Money and People. Work, Money and People open clean shortcut pages first; choose the feature you need, then use Back to Work, Back to Money or Back to Participants to return to those shortcuts. Home gives you quick-start shortcuts. Settings and Help stay in the fixed top header."],
+       "Four fixed bottom navigation areas: Home, Work, Money and People. Work, Money and People open clean shortcut pages first; choose the feature you need, then use Back near the top to return to those shortcuts. Home gives you quick-start shortcuts. Settings and Help stay in the fixed top header."],
       ["Installing on Android",
        "Open supportflow.work/app in Chrome, open Chrome's menu, then choose Install app or Add to Home screen and confirm. SupportFlow will open from its own Home screen icon. Installing it does not create a SupportFlow cloud account; your working records remain on that app/browser installation and your encrypted backup is stored in the Google Drive account you connect."],
       ["Installing on iPhone or iPad",
@@ -6690,7 +6689,7 @@ const MANUAL = [
       ["Step 3 – Participants",
        "For each person: name, NDIS number, and how their plan is managed. Plan managed means their manager is billed, so link them. Self managed and NDIA managed are billed directly, so they need their own payment terms. Set the item you usually bill them for, so new invoices open on the right code. Set their area, which decides your travel time cap."],
       ["Home and section shortcuts",
-       "Home gives you four Quick Start cards for common actions. Work, Money and Participants each open a clean shortcut page first. Tap a shortcut to open the existing feature, then use Back to Work, Back to Money or Back to Participants near the top to return. The fixed top header and bottom navigation stay available while the middle content scrolls."],
+       "Home gives you four Quick Start cards for common actions. Work, Money and People each open a clean shortcut page first. Tap a shortcut to open the existing feature, then use Back near the top to return. The fixed top header and bottom navigation stay available while the middle content scrolls."],
       ["Red means it still needs you",
        "Anything outlined in red is required and not yet done. It turns green with a tick once complete. The Summary screen keeps a numbered checklist of whatever is outstanding until it is all finished."],
     ],
