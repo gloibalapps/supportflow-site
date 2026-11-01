@@ -462,7 +462,7 @@ async function askModel(prompt, opts) {
 // Verified against the NDIS Pricing Schedule 2026-27 (v1.2, 22 July 2026),
 // Schedule 1 — Disability Support Workers. National column, effective 1 July 2026.
 // https://www.ndis.gov.au/providers/pricing-arrangements
-const APP_VERSION = "19";
+const APP_VERSION = "20";
 
 const PRICE_SOURCE = {
   doc: "NDIS Pricing Schedule 2026-27",
