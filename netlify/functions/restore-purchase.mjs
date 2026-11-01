@@ -12,7 +12,7 @@
 // ndis:deviceRef, so the next status check (check-status.mjs) resolves to
 // the same balance.
 //
-// Response: { deviceRef, credits }
+// Response: { deviceRef, credits, lifetime }
 //
 // Known trade-off, worth revisiting once email sending is wired up: this
 // trusts whatever email is typed in, with no confirmation step. Someone
@@ -30,6 +30,7 @@
 //   SUPABASE_SERVICE_KEY  same as the other billing functions
 
 const STRIPE_API = "https://api.stripe.com/v1";
+const json = (obj, s = 200) => new Response(JSON.stringify(obj), { status: s, headers: { "Content-Type": "application/json" } });
 
 export default async (req) => {
   if (req.method !== "POST") {
@@ -102,10 +103,9 @@ export default async (req) => {
       });
     }
 
-    return new Response(JSON.stringify({ deviceRef: account.id, credits: Number(account.credit_balance) || 0 }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    const credits = Number(account.credit_balance) || 0;
+    const lifetime = credits >= 99999;
+    return json({ deviceRef: account.id, credits, lifetime });
   } catch (e) {
     return new Response(JSON.stringify({ error: "Couldn't reach Stripe. Try again in a moment." }), {
       status: 502,

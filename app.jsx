@@ -462,7 +462,7 @@ async function askModel(prompt, opts) {
 // Verified against the NDIS Pricing Schedule 2026-27 (v1.2, 22 July 2026),
 // Schedule 1 — Disability Support Workers. National column, effective 1 July 2026.
 // https://www.ndis.gov.au/providers/pricing-arrangements
-const APP_VERSION = "17";
+const APP_VERSION = "18";
 
 const PRICE_SOURCE = {
   doc: "NDIS Pricing Schedule 2026-27",
@@ -1608,10 +1608,10 @@ async function verifyBiometric(idB64) {
 
 
 /* ---------------- trial ended notice ---------------- */
-function TrialEndedNotice({ onClose }) {
+function TrialEndedNotice({ onClose, startInRestore = false }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
-  const [showRestore, setShowRestore] = useState(false);
+  const [showRestore, setShowRestore] = useState(startInRestore);
   const [restoreEmail, setRestoreEmail] = useState("");
   const [restoreBusy, setRestoreBusy] = useState(false);
   const [restoreErr, setRestoreErr] = useState("");
@@ -1656,7 +1656,7 @@ function TrialEndedNotice({ onClose }) {
       .then(({ ok, data }) => {
         if (ok && data && data.deviceRef) {
           try { localStorage.setItem("ndis:deviceRef", data.deviceRef); } catch (e) { }
-          setRestoreDone(true);
+          setRestoreDone(data.lifetime ? "lifetime" : true);
           setTimeout(() => window.location.reload(), 900);
           return;
         }
@@ -1687,16 +1687,16 @@ function TrialEndedNotice({ onClose }) {
 
         {!showRestore ? (
           <button className="btn ghost tiny" style={{ marginBottom: 4 }} onClick={() => setShowRestore(true)}>
-            Already subscribed on another device?
+            Already have a licence on another device?
           </button>
         ) : restoreDone ? (
           <div style={{ fontSize: 12.5, color: "var(--good, #3F7B57)", marginBottom: 10 }}>
-            Found it, reconnecting this device…
+            {restoreDone === "lifetime" ? "Lifetime licence found \u2014 reconnecting this device..." : "Found it, reconnecting this device..."}
           </div>
         ) : (
           <div style={{ marginTop: 4, marginBottom: 10, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
             <div style={{ fontSize: 12, color: "var(--tx-3)", marginBottom: 8 }}>
-              Enter the email you subscribed with, this device will pick up where that subscription left off.
+              Enter the email you used at checkout. This device will pick up your existing credits or Lifetime licence.
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <input type="email" value={restoreEmail} onChange={(e) => setRestoreEmail(e.target.value)}
@@ -1982,6 +1982,7 @@ function App() {
   // The one shared guard. Every "create a new record" action calls this
   // first; every edit, view, backup and export path never touches it at all.
   const [showTrialNotice, setShowTrialNotice] = useState(false);
+  const [trialNoticeRestore, setTrialNoticeRestore] = useState(false); // open straight into "Restore licence"
   const guardCreate = (fn) => (...args) => {
     if (!canCreate) { setShowTrialNotice(true); return; }
     fn(...args);
@@ -2490,6 +2491,11 @@ function App() {
                       </span>
                     </button>
                   )}
+                  {!isLifetime && subStatus !== "active" && (
+                    <button className="btn ghost tiny" style={{ fontSize: 11, marginTop: -4 }} onClick={() => { setMenuOpen(false); setTrialNoticeRestore(true); setShowTrialNotice(true); }}>
+                      Restore licence
+                    </button>
+                  )}
                   <button onClick={() => { setMenuOpen(false); setHelpInitialView("support"); setOpenPane("help"); go("settings"); }}>
                     Feedback &amp; support
                   </button>
@@ -2655,7 +2661,7 @@ function App() {
         ))}
       </div>
 
-      {showTrialNotice && <TrialEndedNotice onClose={() => setShowTrialNotice(false)} />}
+      {showTrialNotice && <TrialEndedNotice startInRestore={trialNoticeRestore} onClose={() => { setShowTrialNotice(false); setTrialNoticeRestore(false); }} />}
 
       {FEATURES.supportFlowAssistant && showAssistant && (
         <SupportFlowAssistant
@@ -6813,7 +6819,7 @@ const MANUAL = [
       ["Moving to a new phone or PC",
        "Before switching devices, open Settings \u2192 Backup \u2192 Back up now and wait until the upload confirms. That backup must complete successfully \u2014 it is the only copy of your records. On the new device, open supportflow.work/app in Chrome, install it, and complete onboarding. When asked to restore, choose the file from your Google Drive and enter your backup passphrase. Your participants, shifts, invoices, incidents, expenses and settings will appear exactly as they were. Once you have confirmed the new device has everything, stop using the old installation \u2014 do not keep working on it, or the two copies will diverge."],
       ["What transfers and what does not",
-       "Everything in your encrypted backup transfers: participants, shifts, invoices, service agreements, plan managers, incidents, expenses, trips and settings. Your lifetime licence is linked to your purchase, not to the backup file: if the new device doesn't show Lifetime in the profile menu after restoring, contact support through Manual & help \u2192 Support with the email you paid with and we'll re-link it. What does not transfer automatically: your backup passphrase (you must know it \u2014 nobody can recover it), your Google Drive connection (reconnect it during onboarding on the new device), and any unsaved draft open at the time of the last backup."],
+       "Everything in your encrypted backup transfers: participants, shifts, invoices, service agreements, plan managers, incidents, expenses, trips and settings. Your lifetime licence is linked to your purchase email. After restoring your backup on the new device, if the Lifetime badge doesn't appear, go to Settings \u2192 Backup, tap Restore licence, and enter the email you used at checkout. What does not transfer automatically: your backup passphrase (you must know it \u2014 nobody can recover it), your Google Drive connection (reconnect it during onboarding on the new device), and any unsaved draft open at the time of the last backup."],
       ["Automatic Google Drive backups",
        "Google Drive is connected during required onboarding and the first encrypted backup must succeed before setup continues. After meaningful changes, SupportFlow waits about five minutes and uploads one encrypted backup while the app is active. If you are offline, the backup remains pending and retries when SupportFlow is next opened online. A PWA cannot reliably run while completely closed."],
       ["Back up now, change account or disconnect",
