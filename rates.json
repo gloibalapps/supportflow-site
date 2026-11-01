@@ -1,0 +1,7 @@
+{
+  "fy": "2026-27",
+  "car": { "rate": 0.91, "cap": 5000, "year": "2026-27" },
+  "travel_item": { "code": "01_799_0107_1_1", "name": "Provider travel, non-labour costs", "rate": 0.99, "unit": "km" },
+  "ndis_schedule": "2026-27 v1.2",
+  "updated": "2026-07-22"
+}

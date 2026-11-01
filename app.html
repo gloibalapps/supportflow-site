@@ -416,131 +416,13 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 
 `;
 
-/* ---------------- AI configuration ---------------- */
-// Two optional features use a language model: the deduction checker and the
-// shift-note tidier. Point these at whichever provider you use. Leave endpoint
-// empty and both features hide themselves — everything else works unchanged.
-const AI = {
-  // Served by netlify/functions/assist.js, which holds the API key server-side.
-  // Empty this string to switch both AI features off cleanly.
-  endpoint: "/.netlify/functions/assist",
-  model: "",             // chosen by the function, not the browser
-  enabled: function () { return !!this.endpoint; },
-};
-
-// Daily caps. Two purposes: stop a runaway loop costing real money, and stop a
-// stranger who finds the URL spending the API budget. Client-side is the polite
-// layer; the function enforces its own limit as well.
-const AI_CAPS = { check: 15, tidy: 30, assistant: 20 };
-
-// Simple, honest config switch -- no feature-flag infrastructure exists in
-// this app, so this is that infrastructure: one constant, one place to
-// flip if the SupportFlow Assistant ever needs to be pulled without
-// touching anything else.
-const FEATURES = { supportFlowAssistant: true };
-
-// Best-effort only, checked before a message ever leaves the device.
-// Never claimed as complete -- the warning it drives says "may contain",
-// not "contains", on purpose.
-function looksLikeSensitiveInfo(text) {
-  const patterns = [
-    /\b\d{9}\b/,                                    // NDIS number, 9 digits
-    /\b\d{11}\b/,                                    // ABN, 11 digits
-    /[\w.+-]+@[\w-]+\.[a-z.-]+/i,                     // email address
-    /\b(?:\+?61[ -]?|0)[2-478](?:[ -]?\d){8}\b/,      // AU phone number
-  ];
-  return patterns.some((re) => re.test(text));
-}
-
-// Reuses MANUAL and FAQ as the single source of truth -- the same content
-// the in-app search and the manual itself already show. Only the handful
-// of entries that actually match go to the model, never the whole thing.
-function pickManualContext(question) {
-  const words = [...new Set(question.toLowerCase().match(/[a-z]{4,}/g) || [])];
-  if (!words.length) return "";
-  const hits = [];
-  [...MANUAL, ...FAQ].forEach((sec) => {
-    (sec.q || []).forEach(([q, a]) => {
-      const hay = (q + " " + a).toLowerCase();
-      const score = words.reduce((n, w) => n + (hay.includes(w) ? 1 : 0), 0);
-      if (score > 0) hits.push({ q, a, score });
-    });
-  });
-  hits.sort((a, b) => b.score - a.score);
-  return hits.slice(0, 4).map((h) => `Q: ${h.q}\nA: ${h.a}`).join("\n\n");
-}
-
-// The assistant can only ever navigate, never act -- this is the entire
-// set of places it's allowed to send someone, each mapped to the real
-// tab/sub-tab this app actually uses internally.
-function openAssistantTarget(key, go) {
-  const map = {
-    invoices: () => go("summary", "invoices"),
-    shifts: () => go("invoices", "shifts"),
-    travel: () => go("invoices", "travel"),
-    notes: () => go("invoices", "notes"),
-    people: () => go("people", "participants"),
-    settings: () => go("settings"),
-    expenses: () => go("summary", "expenses"),
-    tax: () => go("summary", "position"),
-    backup: () => go("settings"),
-  };
-  (map[key] || (() => {}))();
-}
-
-function aiUsed(kind) {
-  try {
-    const raw = JSON.parse(localStorage.getItem("ndis:aiuse") || "{}");
-    return raw.d === today() ? (raw[kind] || 0) : 0;
-  } catch (e) { return 0; }
-}
-function aiBump(kind) {
-  try {
-    const raw = JSON.parse(localStorage.getItem("ndis:aiuse") || "{}");
-    const next = raw.d === today() ? raw : { d: today() };
-    next[kind] = (next[kind] || 0) + 1;
-    localStorage.setItem("ndis:aiuse", JSON.stringify(next));
-  } catch (e) { }
-}
-const aiLeft = (kind) => Math.max(0, AI_CAPS[kind] - aiUsed(kind));
-
-async function askModel(prompt, opts) {
-  if (!AI.enabled()) throw new Error("not-configured");
-  const kind = (opts && opts.kind) || "check";
-  if (aiLeft(kind) <= 0) throw new Error("daily-cap");
-  if (aiLeft() === 0) throw new Error("daily-cap");
-  aiBump();
-  // The endpoint takes a prompt and a search flag. It chooses the model, holds
-  // the key, and restricts any search to the ATO — none of that belongs here.
-  const body = { prompt: prompt, search: !!(opts && opts.search) };
-  const res = await fetch(AI.endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (res.status === 503) throw new Error("not-configured");
-  if (res.status === 429) throw new Error("busy");
-  if (!res.ok) {
-    let why = "";
-    try { const e = await res.json(); why = e.error === "upstream" ? `, the model returned ${e.status}` : ""; } catch (x) { }
-    throw new Error(`Lookup failed (${res.status})${why}`);
-  }
-  aiBump(kind);
-  const d = await res.json();
-  const blocks = d.content || d.messages || [];
-  const text = (Array.isArray(blocks) ? blocks : [])
-    .filter((c) => c.type === "text").map((c) => c.text).join("\n").trim();
-  // sources come from the server, which takes them from the search layer
-  return { text, sources: Array.isArray(d.sources) ? d.sources : [] };
-}
-
 /* ---------------- reference data ---------------- */
 // Indicative national (non-remote) price limits — verify against the current
 // NDIS Pricing Arrangements. Every rate is editable per line.
 // Verified against the NDIS Pricing Schedule 2026-27 (v1.2, 22 July 2026),
 // Schedule 1 — Disability Support Workers. National column, effective 1 July 2026.
 // https://www.ndis.gov.au/providers/pricing-arrangements
-const APP_VERSION = "13";
+const APP_VERSION = "14";
 
 const PRICE_SOURCE = {
   doc: "NDIS Pricing Schedule 2026-27",
@@ -736,6 +618,29 @@ const gstCreditFor = (expense, gstRegistered) => {
 };
 
 const CAR = { rate: 0.91, cap: 5000, year: "2026-27" };
+
+// Live rates: /rates.json is fetched on app load and, if valid, updates CAR
+// and TRAVEL_ITEM in place so every reader picks up the new values. The
+// hardcoded values above remain the offline / error fallback.
+function applyLiveRates(j) {
+  if (!j || typeof j !== "object") return false;
+  const num = (v) => typeof v === "number" && isFinite(v) && v > 0;
+  const str = (v) => typeof v === "string" && v.trim() !== "";
+  let changed = false;
+  const c = j.car, t = j.travel_item;
+  if (c && typeof c === "object") {
+    if (num(c.rate)) { CAR.rate = c.rate; changed = true; }
+    if (num(c.cap)) { CAR.cap = c.cap; changed = true; }
+    if (str(c.year)) { CAR.year = c.year; changed = true; }
+  }
+  if (t && typeof t === "object") {
+    if (str(t.code)) { TRAVEL_ITEM.code = t.code; changed = true; }
+    if (str(t.name)) { TRAVEL_ITEM.name = t.name; changed = true; }
+    if (num(t.rate)) { TRAVEL_ITEM.rate = t.rate; changed = true; }
+    if (str(t.unit)) { TRAVEL_ITEM.unit = t.unit; changed = true; }
+  }
+  return changed;
+}
 const carDeduction = (km, rate = CAR.rate) => Math.min(km, CAR.cap) * rate;
 
 // Each category carries which group it belongs to (vehicle vs general work
@@ -1891,10 +1796,9 @@ function App() {
   const [openPane, setOpenPane] = useState(null); // null | "help" | "privacy"
   const [helpInitialView, setHelpInitialView] = useState("manual"); // manual | support
   const [menuOpen, setMenuOpen] = useState(false);
-  const [helpMenuOpen, setHelpMenuOpen] = useState(false);
-  const [showAssistant, setShowAssistant] = useState(false);
+  // Bumped when /rates.json loads so screens re-render with live CAR / TRAVEL_ITEM.
+  const [liveRates, setLiveRates] = useState(null);
   const [locked, setLocked] = useState(() => shouldLockNow());
-  const [claimSeed, setClaimSeed] = useState("");
   const [editing, setEditing] = useState(null);
   const [data, setData] = useState(BLANK);
 
@@ -1978,6 +1882,11 @@ function App() {
     const ref = getDeviceRef();
 
     let cancelled = false;
+    // Silent on failure: offline or error keeps the built-in rates.
+    fetch("/rates.json", { cache: "no-cache" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (!cancelled && applyLiveRates(j)) setLiveRates(j); })
+      .catch(() => {});
     const check = () => {
       fetch(`/.netlify/functions/check-status?ref=${encodeURIComponent(ref)}`)
         .then((r) => r.json())
@@ -2210,7 +2119,7 @@ function App() {
       taxableIncome, deductions, taxable, setAside, eff: taxable > 0 ? (setAside / taxable) * 100 : 0,
       logbookEstimate, centsEstimate, vehicleExpenseFY, logbookPct, vehicleGstFY, vehicleGstCredit,
       gstDetectedFY, potentialCreditsFY, hypotheticalGstCredits };
-  }, [data, fy]);
+  }, [data, fy, liveRates]);
 
   // Re-lock if the app has been in the background a while. Not on every
   // blur — that would be maddening when switching to the mail app to send
@@ -2235,7 +2144,7 @@ function App() {
     setTab(t); setEditing(null); if (t !== "settings") setOpenPane(null);
     if (sub) { if (t === "summary") setSumTab(sub); if (t === "invoices") setInvTab(sub); if (t === "people") setPplTab(sub); }
   };
-  const goHub = (t) => { setTab(t); setEditing(null); setOpenPane(null); setMenuOpen(false); setHelpMenuOpen(false); };
+  const goHub = (t) => { setTab(t); setEditing(null); setOpenPane(null); setMenuOpen(false); };
   const navActive = (k) => k === "home" ? tab === "home"
     : k === "workhub" ? (tab === "workhub" || tab === "invoices")
     : k === "moneyhub" ? (tab === "moneyhub" || tab === "summary")
@@ -2255,7 +2164,7 @@ function App() {
       : data.participants.some((x) => x.agreement && x.agreementReview && x.agreementReview <= addDays(today(), 30)) ? "on" : null,
   };
 
-  const askClaim = (term) => { setClaimSeed(term || ""); setTab("summary"); setSumTab("position"); };
+  const askClaim = () => { setTab("summary"); setSumTab("position"); };
 
   const wipeAll = () => save({ ...data, managers: [], participants: [], invoices: [], expenses: [], trips: [], notes: [], clients: [], shifts: [], priorTotals: null });
 
@@ -2465,27 +2374,10 @@ function App() {
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
 
 
+            <button className="helpbtn" onClick={() => { setMenuOpen(false); setHelpInitialView("manual"); setOpenPane("help"); go("settings"); }}
+              title="Help" aria-label="Help">?</button>
             <div style={{ position: "relative" }}>
-              <button className="helpbtn" onClick={() => { setMenuOpen(false); setHelpMenuOpen(!helpMenuOpen); }}
-                title="Help and SupportFlow Assistant" aria-label="Help and SupportFlow Assistant" aria-expanded={helpMenuOpen}>?</button>
-              {helpMenuOpen && (
-                <>
-                  <div className="menuveil" onClick={() => setHelpMenuOpen(false)} />
-                  <div className="menu" style={{ minWidth: 250 }}>
-                    {FEATURES.supportFlowAssistant && (
-                      <button onClick={() => { setHelpMenuOpen(false); setShowAssistant(true); }}>
-                        <b>Ask SupportFlow</b><br/><span style={{ fontSize: 11, color: "var(--tx-3)" }}>Ask a question and get help using SupportFlow.</span>
-                      </button>
-                    )}
-                    <button onClick={() => { setHelpMenuOpen(false); setHelpInitialView("manual"); setOpenPane("help"); go("settings"); }}>
-                      <b>Manual &amp; Help</b><br/><span style={{ fontSize: 11, color: "var(--tx-3)" }}>Browse the SupportFlow user guide.</span>
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-            <div style={{ position: "relative" }}>
-              <button className="avatar" data-on={menuOpen ? 1 : 0} onClick={() => { setHelpMenuOpen(false); setMenuOpen(!menuOpen); }}
+              <button className="avatar" data-on={menuOpen ? 1 : 0} onClick={() => setMenuOpen(!menuOpen)}
                 title="Menu" aria-label="Menu" aria-expanded={menuOpen}>
                 {(data.profile.name || "").trim()
                   ? (data.profile.name || "").trim().charAt(0).toUpperCase()
@@ -2589,7 +2481,7 @@ function App() {
               <div className="shortgrid">
                 <ShortcutCard icon="invoice" tone="blue" title="Invoices" sub="Open your existing invoice screen." onClick={() => go("summary", "invoices")}/>
                 <ShortcutCard icon="expense" tone="pink" title="Expenses" sub="Open your existing expenses screen." onClick={() => go("summary", "expenses")}/>
-                <ShortcutCard icon="tax" tone="yellow" title="Tax" sub="Income, tax estimate and Claimable checker." onClick={() => { setClaimSeed(""); go("summary", "position"); }} wide={!data.profile.gstRegistered}/>
+                <ShortcutCard icon="tax" tone="yellow" title="Tax" sub="Income, tax estimate and ATO deduction guides." onClick={() => go("summary", "position")} wide={!data.profile.gstRegistered}/>
                 {data.profile.gstRegistered && <ShortcutCard icon="tax" tone="yellow" title="BAS" sub="Open the existing BAS worksheet." onClick={() => go("summary", "bas")}/>}
               </div>
             </div>
@@ -2618,13 +2510,13 @@ function App() {
               <SectionReturnHeader
                 section="Money"
                 title={({ invoices: "Invoices", expenses: "Expenses", position: "Tax", bas: "BAS" })[sumTab] || "Money"}
-                onBack={() => { setClaimSeed(""); goHub("moneyhub"); }}
+                onBack={() => goHub("moneyhub")}
               />
               {sumTab === "invoices" && <InvoiceList data={data} m={m} fy={fy} save={save} newInvoice={newInvoice} open={setEditing} go={go} billTick={billTick} setBillTick={setBillTick} />}
               {sumTab === "bas" && <BAS data={data} fy={fy} />}
               {sumTab === "position" && <Summary data={data} save={save} m={m} go={go} newInvoice={newInvoice} resume={() => setTab("setup")}              snoozeBackup={() => save({ ...data, profile: { ...data.profile, remindedOn: today() } })}
                 dismissBackupNotice={() => save({ ...data, profile: { ...data.profile, backupNoticeSeen: true } })}
-                daysUntilTrialEnd={daysUntilTrialEnd} onSubscribe={() => setShowTrialNotice(true)} claimSeed={claimSeed} />}
+                daysUntilTrialEnd={daysUntilTrialEnd} onSubscribe={() => setShowTrialNotice(true)} />}
               {sumTab === "expenses" && <Expenses data={data} save={save} m={m} fy={fy} askClaim={askClaim} canCreate={canCreate} onBlocked={() => setShowTrialNotice(true)} />}
             </>
           ))}
@@ -2686,25 +2578,6 @@ function App() {
       </div>
 
       {showTrialNotice && <TrialEndedNotice onClose={() => setShowTrialNotice(false)} />}
-
-      {FEATURES.supportFlowAssistant && showAssistant && (
-        <SupportFlowAssistant
-          onClose={() => setShowAssistant(false)}
-          go={go}
-          currentScreen={
-            tab === "settings" ? "Settings"
-              : tab === "home" ? "Home"
-              : tab === "workhub" ? "Work"
-              : tab === "moneyhub" ? "Money"
-              : tab === "participantshub" ? "Participants"
-              : tab === "summary" ? { invoices: "Invoices", bas: "BAS", position: "Tax", expenses: "Expenses" }[sumTab] || "Money"
-              : tab === "invoices" ? { shifts: "Shifts", travel: "Trips", notes: "Notes", incidents: "Incidents" }[invTab] || "Work"
-              : tab === "people" ? "Participants"
-              : ""
-          }
-          openHelp={() => { setHelpInitialView("manual"); setOpenPane("help"); go("settings"); }}
-        />
-      )}
 
       {invoiceError && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", zIndex: 90,
@@ -2823,7 +2696,7 @@ function App() {
 }
 
 /* ---------------- Summary ---------------- */
-function Summary({ data, save, m, go, newInvoice, resume, snoozeBackup, dismissBackupNotice, daysUntilTrialEnd, onSubscribe, claimSeed }) {
+function Summary({ data, save, m, go, newInvoice, resume, snoozeBackup, dismissBackupNotice, daysUntilTrialEnd, onSubscribe }) {
   // taxableIncome, not income: once a prior total exists it includes both,
   // so "what's genuinely yours" reflects the whole year, not just the part
   // tracked here, and doesn't silently understate itself.
@@ -3209,7 +3082,7 @@ function Summary({ data, save, m, go, newInvoice, resume, snoozeBackup, dismissB
       )}
 
       <div className="eyebrow" style={{ margin: "18px 0 14px" }}>Deductions</div>
-      <Claimable data={data} save={save} seed={claimSeed} />
+      <AtoLinks />
 
       <div className="callout" style={{ marginTop: 16 }}>Estimates use 2025–26 resident rates and ignore other income, HELP debt and PAYG instalments. Confirm with a registered tax agent.</div>
     </>
@@ -4278,207 +4151,29 @@ function Onboarding({ data, save, close, help, openPrivacy, startStep }) {
   );
 }
 
-/* ---------------- claimable check (live ATO lookup) ---------------- */
-const CLAIM_SUGGESTIONS = [
-  "NDIS worker screening check", "First aid and CPR course", "Car travel between participants",
-  "Home to first participant travel", "Uniform and branded shirts", "Gloves, masks and sanitiser",
-  "Mobile phone bill", "Working with children check", "Professional indemnity insurance",
-  "Laundering work clothing", "Parking and tolls on shift", "Study for a Cert IV in disability",
+/* ---------------- Check with the ATO ---------------- */
+// Plain links to the ATO's own guidance. SupportFlow doesn't decide what is
+// claimable; these pages (and a registered tax agent) do.
+const ATO_LINKS = [
+  ["Deductions you can claim", "https://www.ato.gov.au/individuals-and-families/income-deductions-offsets-and-records/deductions-you-can-claim"],
+  ["Working from home expenses", "https://www.ato.gov.au/individuals-and-families/income-deductions-offsets-and-records/deductions-you-can-claim/home-office-expenses"],
+  ["Vehicle and travel expenses", "https://www.ato.gov.au/individuals-and-families/income-deductions-offsets-and-records/deductions-you-can-claim/vehicle-and-travel-expenses"],
 ];
 
-const VERDICTS = {
-  yes: { label: "Claimable", color: "var(--good)" },
-  partial: { label: "Partly claimable", color: "var(--brass)" },
-  no: { label: "Not claimable", color: "var(--warn)" },
-  unclear: { label: "Depends", color: "var(--tx-3)" },
-};
-
-async function checkClaimable(item) {
-  const { text, sources } = await askModel(
-    `You are answering a work-expense question for an Australian NDIS disability support ` +
-    `worker who is a sole trader with an ABN and is not registered for GST.\n\n` +
-    `Search the ATO website for the current rules on whether this expense is deductible: "${item}".\n\n` +
-    `Your search is restricted to ato.gov.au. Use the occupation guide for community support and ` +
-    `care workers where it applies. Pay attention to the difference between travel between ` +
-    `workplaces and ordinary home-to-work travel, to conventional clothing versus compulsory or ` +
-    `protective uniforms, and to apportioning private use.\n\n` +
-    `Answer ONLY from what the ATO pages actually say. If the ATO pages do not cover it, say so ` +
-    `rather than reasoning it out yourself.\n\n` +
-    `Reply with ONLY a JSON object, no preamble and no markdown fences:\n` +
-    `{"verdict":"yes|partial|no|unclear","short":"one plain sentence answer",` +
-    `"rule":"2-3 sentences on why, in plain English, no jargon",` +
-    `"apportion":"how to split work vs private use, or empty string if not relevant",` +
-    `"records":"what evidence to keep"}`,
-    { search: true, kind: "check" }
-  );
-  const raw = text.replace(/```json|```/g, "").trim();
-  const start = raw.indexOf("{"), end = raw.lastIndexOf("}");
-  if (start === -1 || end === -1) throw new Error("Could not read the answer");
-  const out = JSON.parse(raw.slice(start, end + 1));
-  // The model no longer supplies its own links. These are the ATO pages the
-  // search actually retrieved, so a citation can't be invented.
-  out.sources = sources;
-  if (sources.length === 0) out.verdict = "unclear";
-  return out;
-}
-
-
-
-function Claimable({ data, save, seed }) {
-  const [q, setQ] = useState(seed || "");
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
-  const [ans, setAns] = useState(null);
-  const cache = data.claimCache || {};
-  useEffect(() => { if (seed) setQ(seed); }, [seed]);
-
-  const run = async (term) => {
-    const item = (term ?? q).trim();
-    if (!item) return;
-    setQ(item); setErr(""); setAns(null);
-    const hit = cache[item.toLowerCase()];
-    if (hit) { setAns(hit); return; }          // instant on anything asked before
-    setBusy(true);
-    try {
-      const out = await checkClaimable(item);
-      out.item = item; out.checked = today();
-      setAns(out);
-      save({ ...data, claimCache: { ...cache, [item.toLowerCase()]: out } });
-    } catch (e) {
-      setErr(
-        e.message === "not-configured" ? "The checker isn't switched on for this site yet. Everything else works as normal."
-        : e.message === "daily-cap" ? `That's ${AI_CAPS.check} checks today, the daily limit. Anything you've already asked still opens instantly, and it resets tomorrow.`
-        : e.message === "busy" ? "Too many checks at once. Give it a minute and try again."
-        : (e.message || "Something went wrong. Try again in a moment."));
-    } finally { setBusy(false); }
-  };
-
-  const recent = Object.values(cache).sort((a, b) => (a.checked < b.checked ? 1 : -1)).slice(0, 8);
-  const v = ans ? VERDICTS[ans.verdict] || VERDICTS.unclear : null;
-
+function AtoLinks() {
   return (
-    <>
-      <div className="panel">
-        <div className="eyebrow" style={{ marginBottom: 8 }}>Can I claim this?</div>
-        {!AI.enabled() ? (
-          <>
-            <div style={{ fontSize: 13, color: "var(--tx-2)", lineHeight: 1.7, marginBottom: 14 }}>
-              The automatic checker isn't connected in this build. The common ones for support work are
-              covered in the guide, and the ATO publishes an occupation guide for community support and
-              care workers with the current rules.
-            </div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <a className="btn ghost tiny" href="https://www.ato.gov.au/individuals-and-families/income-deductions-offsets-and-records/deductions-you-can-claim/occupation-and-industry-specific-guides" target="_blank" rel="noreferrer">ATO occupation guides ↗</a>
-            </div>
-          </>
-        ) : (
-          <>
-        <div style={{ fontSize: 13, color: "var(--tx-2)", lineHeight: 1.6, marginBottom: 14 }}>
-          Reads the ATO site, and only the ATO site, then shows you the pages the answer came from.
-        </div>
-        <div style={{ fontSize: 11.5, color: "var(--warn)", lineHeight: 1.6, marginBottom: 12,
-                      background: "var(--req-soft)", border: "1px solid var(--req)", borderRadius: 9, padding: "9px 11px" }}>
-          Do not enter participant names, NDIS numbers, health information or other personal
-          information. Ask about the expense in general terms.
-        </div>
-        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-          <input style={{ flex: 1 }} value={q} placeholder="Steel cap boots, phone bill, travel between clients…"
-            onChange={(e) => setQ(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") run(); }} />
-          <button className="btn" onClick={() => run()} disabled={busy || !q.trim()}>{busy ? "Checking…" : "Check"}</button>
-        </div>
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {CLAIM_SUGGESTIONS.slice(0, 6).map((c) => (
-            <button key={c} className="btn ghost tiny" onClick={() => run(c)} disabled={busy}>{c}</button>
-          ))}
-        </div>
-        {aiLeft("check") <= 5 && (
-          <div style={{ fontSize: 11.5, color: aiLeft("check") === 0 ? "var(--warn)" : "var(--tx-3)", marginTop: 12, lineHeight: 1.6 }}>
-            {aiLeft("check") === 0
-              ? "You've used today's checks. Anything asked before still opens instantly, and it resets tomorrow."
-              : `${aiLeft("check")} check${aiLeft("check") === 1 ? "" : "s"} left today.`}
-          </div>
-        )}
-        {aiLeft() <= 5 && (
-          <div style={{ fontSize: 11.5, color: aiLeft() === 0 ? "var(--warn)" : "var(--tx-3)", marginTop: 12, lineHeight: 1.6 }}>
-            {aiLeft() === 0
-              ? `You've used today's ${AI_CAPS.check} checks. Ones you've asked before still open instantly.`
-              : `${aiLeft()} new check${aiLeft() === 1 ? "" : "s"} left today. Repeats don't count.`}
-          </div>
-        )}
-        </>
-        )}
+    <div className="panel">
+      <div className="eyebrow" style={{ marginBottom: 10 }}>Check with the ATO</div>
+      {ATO_LINKS.map(([label, href]) => (
+        <a key={href} href={href} target="_blank" rel="noopener noreferrer"
+          style={{ display: "block", fontSize: 13.5, fontWeight: 500, color: "var(--brass)", padding: "7px 0", textDecoration: "none" }}>
+          {label} ↗
+        </a>
+      ))}
+      <div style={{ fontSize: 11.5, color: "var(--tx-3)", lineHeight: 1.6, marginTop: 8 }}>
+        Opens the ATO website in a new tab. General information, not tax advice.
       </div>
-
-      {busy && <div className="panel"><div className="eyebrow">Searching the ATO…</div>
-        <div style={{ fontSize: 13, color: "var(--tx-3)", marginTop: 8 }}>Usually a few seconds.</div></div>}
-
-      {err && <div className="callout" style={{ borderColor: "var(--warn)" }}>{err}</div>}
-
-      {ans && !busy && (
-        <div className="panel" style={{ borderColor: v.color }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10 }}>
-            <span className="dot" style={{ background: v.color }} />
-            <span style={{ fontSize: 12.5, fontWeight: 600, color: v.color, letterSpacing: ".04em", textTransform: "uppercase" }}>{v.label}</span>
-          </div>
-          <div className="disp" style={{ fontSize: 19, lineHeight: 1.35, marginBottom: 12 }}>{ans.short}</div>
-          <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.7 }}>{ans.rule}</div>
-
-          {ans.apportion && (
-            <div style={{ marginTop: 14 }}>
-              <div className="eyebrow" style={{ marginBottom: 5 }}>Splitting work and private use</div>
-              <div style={{ fontSize: 13, color: "var(--tx-2)", lineHeight: 1.65 }}>{ans.apportion}</div>
-            </div>
-          )}
-          {ans.records && (
-            <div style={{ marginTop: 14 }}>
-              <div className="eyebrow" style={{ marginBottom: 5 }}>Keep this</div>
-              <div style={{ fontSize: 13, color: "var(--tx-2)", lineHeight: 1.65 }}>{ans.records}</div>
-            </div>
-          )}
-
-          <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--line)" }}>
-            <div className="eyebrow" style={{ marginBottom: 8 }}>
-              {ans.sources.length ? `Read from the ATO, ${ans.sources.length} page${ans.sources.length === 1 ? "" : "s"}` : "Where this came from"}
-            </div>
-            {ans.sources.length === 0 ? (
-              <div style={{ fontSize: 12.5, color: "var(--warn)", lineHeight: 1.7 }}>
-                Nothing on the ATO site answered this one. That doesn't mean you can't claim it. It means the answer isn't on a page this could find, so it's worth asking a
-                registered tax agent rather than guessing.
-              </div>
-            ) : ans.sources.map((sc, i) => (
-              <a key={i} href={sc.url} target="_blank" rel="noreferrer"
-                style={{ display: "block", fontSize: 12.5, color: "var(--brass)", marginBottom: 6, wordBreak: "break-word" }}>
-                {sc.title} ↗
-              </a>
-            ))}
-          </div>
-
-          <div style={{ marginTop: 14, fontSize: 11.5, color: "var(--tx-3)", lineHeight: 1.6 }}>
-            General information, not tax advice. Rules turn on your own circumstances, check the source pages,
-            or a registered tax agent, before you rely on it.
-          </div>
-        </div>
-      )}
-
-      {recent.length > 0 && (
-        <div className="band">
-          <div className="eyebrow" style={{ marginBottom: 10 }}>Checked before, these open instantly</div>
-          {recent.map((rr) => {
-            const rv = VERDICTS[rr.verdict] || VERDICTS.unclear;
-            return (
-              <div className="row tap" key={rr.item} onClick={() => { setQ(rr.item); setAns(rr); setErr(""); }}>
-                <span className="dot" style={{ background: rv.color }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 500 }}>{rr.item}</div>
-                  <div style={{ fontSize: 11, color: "var(--tx-3)", marginTop: 2 }}>{rv.label}</div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </>
+    </div>
   );
 }
 
@@ -6093,7 +5788,6 @@ function Notes({ data, save, prefill, onPrefillConsumed }) {
   const [busy, setBusy] = useState(false);
   const [filter, setFilter] = useState("all");
   const [sendFor, setSendFor] = useState(null);
-  const [tidyErr, setTidyErr] = useState("");
   const [idOn, setIdOn] = useState(true);
   const [editingId, setEditingId] = useState(null);
   const canShare = typeof navigator !== "undefined" && !!navigator.share;
@@ -6105,36 +5799,11 @@ function Notes({ data, save, prefill, onPrefillConsumed }) {
     // special-casing needed for a note written before this existed.
     setF({ ...blank(), date: n.date, participantId: n.participantId || "", shared: n.shared || false,
       rough: n.body || "" });
-    setTidyErr("");
     setSendFor(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const cancelEdit = () => { setEditingId(null); setF(blank()); setTidyErr(""); };
-
-  const tidy = async () => {
-    const source = f.tidied ? assembleBody(f) : f.rough;
-    if (!source.trim()) return;
-    setBusy(true);
-    try {
-      const { text: out } = await askModel(
-        `You are helping an Australian NDIS support worker write a case note. Sort the rough notes below into a clear, factual, professional note. Objective and observational only, no diagnosis or clinical judgement. Plain language, past tense, third person for the participant. Return the result using exactly these five headings, each on its own line followed by a colon, skip a heading entirely if there's genuinely nothing in the rough notes to say for it, don't invent content for a heading that isn't there: ${HEADINGS.join(", ")}.\n\nRough notes:\n${source}`
-      );
-      if (out) {
-        const next = { ...f, tidied: true };
-        FIELDS.forEach(([key, label]) => {
-          const re = new RegExp(`${label}:\\s*([\\s\\S]*?)(?=\\n(?:${HEADINGS.join("|")}):|$)`, "i");
-          const m = out.match(re);
-          next[key] = (m && m[1].trim()) ? m[1].trim() : "";
-        });
-        setF(next);
-      }
-    } catch (e) {
-      if (e && e.message === "daily-cap") setTidyErr(`That's today's ${AI_CAPS.tidy} tidy-ups. Your note is saved as written.`);
-      else console.error(e);
-    }
-    setBusy(false);
-  };
+  const cancelEdit = () => { setEditingId(null); setF(blank()); };
 
   const add = () => {
     const body = f.tidied ? assembleBody(f) : f.rough.trim();
@@ -6147,7 +5816,6 @@ function Notes({ data, save, prefill, onPrefillConsumed }) {
       save({ ...data, notes: [...data.notes, { ...record, id: uid() }] });
     }
     setF(blank());
-    setTidyErr("");
   };
 
   const rows = data.notes.filter((n) => filter === "all" || (filter === "shared" ? n.shared : !n.shared));
@@ -6230,7 +5898,7 @@ function Notes({ data, save, prefill, onPrefillConsumed }) {
         {!f.tidied ? (
           <label className="f"><span>What happened</span>
             <textarea style={{ minHeight: 130 }} value={f.rough} onChange={(e) => setF({ ...f, rough: e.target.value })}
-              placeholder="Talk about the shift in your own words, however it comes out. Tidy this up sorts it into the right sections for you." />
+              placeholder="Talk about the shift in your own words, however it comes out." />
           </label>
         ) : (
           <>
@@ -6258,13 +5926,9 @@ function Notes({ data, save, prefill, onPrefillConsumed }) {
           This is about how you've written it, not where it goes. Nothing is sent by ticking it. Notes stay on this device until you send one yourself.
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          {AI.enabled() && (
-            <button className="btn ghost" onClick={tidy} disabled={busy || !hasContent(f)}>{busy ? "Writing…" : "Tidy this up"}</button>
-          )}
           <button className="btn" onClick={add} disabled={!hasContent(f)}>{editingId ? "Save changes" : "Save note"}</button>
           {editingId && <button className="btn ghost" onClick={cancelEdit}>Cancel</button>}
         </div>
-        {tidyErr && <div style={{ fontSize: 12, color: "var(--warn)", marginTop: 10 }}>{tidyErr}</div>}
       </div>
 
       <div className="tabnav" style={{ marginTop: 20 }}>
@@ -6738,7 +6402,7 @@ const MANUAL = [
       ["Logging travel",
        "Work \u2192 Travel. Pick the participant and enter the distance, typed directly as kilometres or worked out from an odometer start and finish. Tick billable if it should go on their invoice. Those same kilometres do two jobs: billed to the participant, and counted as a tax deduction. You enter them once."],
       ["Logging an expense",
-       "Money \u2192 Expenses. Date, what it was, category, amount. Not sure whether it counts? Type the description and tap Can I claim this?"],
+       "Money \u2192 Expenses. Date, what it was, category, amount. Not sure whether it counts? Tap Can I claim this? to open the ATO deduction guides."],
     ],
   },
 
@@ -6792,8 +6456,8 @@ const MANUAL = [
        "The app tells you when this method stops counting. The logbook method has no cap and would probably be worth more, but it needs a twelve-week logbook and receipts for running costs. That is a conversation with an accountant, before year end."],
       ["Starting point for this year",
        "If you switched to SupportFlow partway through the financial year, Settings has a Starting point panel. Add a rough total for what you had already earned, spent and driven before you started, three numbers, not individual invoices. It joins your tax set-aside figure for the current year only, so the number covers the whole year rather than just the part tracked here. It never shows up as an invoice, an expense or a participant record, and it does not carry into next financial year on its own."],
-      ["The deduction checker",
-       "New checks are capped at 15 a day on each device. Anything you have asked before opens instantly and does not count. Money \u2192 Tax \u2192 Claim check: type anything, steel cap boots, phone bill, travel between clients, and it reads the ATO site and answers with a verdict, the reason in plain English, how to split work and private use, and what evidence to keep. It searches nowhere else: no blogs, no forums, no accounting firms. The links shown underneath are the ATO pages it actually opened, so a reference cannot be invented. If nothing on the ATO site answers your question it says so plainly, rather than guessing. Anything asked before opens instantly."],
+      ["Checking a deduction",
+       "Money \u2192 Tax \u2192 Check with the ATO links straight to the ATO's own pages: deductions you can claim, working from home expenses, and vehicle and travel expenses. They open in a new tab. SupportFlow does not decide what is claimable, the ATO and a registered tax agent do."],
     ],
   },
   {
@@ -6838,6 +6502,10 @@ const MANUAL = [
        "During required onboarding, you create one backup password. New backups use that password until you change it in Settings → Backup. The file is locked with it before it leaves the app, so wherever it ends up (your Drive, an email, a chat) it is unreadable without that passphrase. Nobody at SupportFlow ever sees it or stores it. That also means nobody can reset it. If you lose the passphrase, that backup cannot be recovered by anyone. Write it down somewhere separate from the device, or keep it in a password manager, and do not reuse a password from somewhere else."],
       ["Restoring a backup",
        "Choose Restore, pick the file, and enter the passphrase it was made with. Get the passphrase right and it shows you exactly what is in the file, how many participants, invoices and so on, and how many of your current records would be overwritten, before anything changes. Nothing is replaced until you confirm."],
+      ["Moving to a new phone or PC",
+       "Before switching devices, open Settings \u2192 Backup \u2192 Back up now and wait until the upload confirms. That backup must complete successfully \u2014 it is the only copy of your records. On the new device, open supportflow.work/app in Chrome, install it, and complete onboarding. When asked to restore, choose the file from your Google Drive and enter your backup passphrase. Your participants, shifts, invoices, incidents, expenses and settings will appear exactly as they were. Once you have confirmed the new device has everything, stop using the old installation \u2014 do not keep working on it, or the two copies will diverge."],
+      ["What transfers and what does not",
+       "Everything in your encrypted backup transfers: participants, shifts, invoices, service agreements, plan managers, incidents, expenses, trips and settings. Your purchase is tied to your device reference, which is also in the backup, so the new device will recognise you as a paid user after restoring. What does not transfer automatically: your backup passphrase (you must know it \u2014 nobody can recover it), your Google Drive connection (reconnect it during onboarding on the new device), and any unsaved draft open at the time of the last backup."],
       ["Automatic Google Drive backups",
        "Google Drive is connected during required onboarding and the first encrypted backup must succeed before setup continues. After meaningful changes, SupportFlow waits about five minutes and uploads one encrypted backup while the app is active. If you are offline, the backup remains pending and retries when SupportFlow is next opened online. A PWA cannot reliably run while completely closed."],
       ["Back up now, change account or disconnect",
@@ -6853,9 +6521,7 @@ const MANUAL = [
       ["Getting support",
        "Manual & help has a Support tab. Describe what happened, then Email support opens your mail app addressed to us with the subject already set to \u201cSupport NDIS\u201d and your message filled in. Nothing sends until you press send there. A few harmless details, app version, device, and how many records you have, are included automatically so we can help faster. Nothing about a participant is ever included."],
       ["Privacy and security",
-       "Settings \u2192 Privacy & security explains where your records are stored, how encrypted Google Drive backups work, and what limited information is shared when you deliberately use services such as Claimable or SupportFlow Assistant. The Legal documents section links to the full public Privacy Policy and Terms of Use."],
-      ["Daily limit on checks",
-       "The checker allows 15 questions a day, and the note tidier 30. That is far more than a normal day of work and exists to stop the cost running away, each check reads live pages from the ATO, which is not free. Anything you have already asked opens instantly and does not count against the limit, and it resets the next day."],
+       "Settings \u2192 Privacy & security explains where your records are stored, how encrypted Google Drive backups work. The Legal documents section links to the full public Privacy Policy and Terms of Use."],
       ["Checking things yourself",
        "Manual & help has an Official sources tab: the NDIS pricing updates page, the NDIA newsletters you can subscribe to, the NDIS Commission for worker screening and complaints, the ATO occupation guide for support workers, and the Australian Business Register. This app is a convenience, not an authority, when something matters, check the source."],
       ["When the rates go out of date",
@@ -6892,8 +6558,6 @@ const PRIVACY_SECTIONS = [
    "Locally on your device, using the app's local data storage. There's no SupportFlow account, no central participant database, and no routine upload of your records to the developer. Under normal use the developer cannot view your locally stored records. If an optional account or cloud-sync feature is ever introduced, this policy will be updated first, and that feature will be optional."],
   ["Hosting and Netlify",
    "SupportFlow is hosted on Netlify. Delivering the app to your device involves Netlify processing ordinary technical request information, such as IP address, browser and device details, and which pages or resources were requested. That's separate from the records you store inside the app. SupportFlow does not intentionally send participant names, NDIS numbers, shift notes or other stored records to Netlify simply because the app is hosted there."],
-  ["The deduction checker (Claim check)",
-   "When you type a claim-check question, that question is sent to the service used to process the request and check relevant ATO material. Do not include participant names, NDIS numbers, health information or other participant details. Claim check is for general tax guidance and is not a participant-record feature."],
   ["Backups",
    "Encrypted on your device with AES-256 and a passphrase you choose, before the file goes anywhere you decide, your own cloud storage, an email, or a local download. The developer never receives a copy and cannot decrypt it. If you lose the passphrase, nobody can recover it, including the developer."],
   ["Shift notes and records you choose to share",
@@ -6999,7 +6663,7 @@ const PRIVSEC_SECTIONS = [
     <p>Backup controls, status and the time of the last successful backup are available in Settings → Backup.</p>
   </>],
   ["Information shared with other services", <>
-    <p><strong>SupportFlow Assistant:</strong> sends the question you type and generic app/help context needed to answer it. It is designed not to send participant or business records.</p>
+    <p>SupportFlow has no AI features. Nothing you type is sent to an AI service.</p>
   </>],
   ["Your privacy", <>
     <p>The full Privacy Policy explains what SupportFlow handles, where information is stored, third-party services and your privacy choices.</p>
@@ -7145,153 +6809,6 @@ function Support({ data }) {
 
       {sent && <div style={{ marginTop: 12, fontSize: 12.5, color: "var(--good)" }}>{sent}</div>}
     </>
-  );
-}
-
-// Help-and-navigation only, deliberately: it can explain where a feature
-// lives and how it works, and it can send someone to a screen, but it
-// never creates, edits, deletes or sends anything itself, and it never
-// gives a definitive tax, legal, clinical or compliance answer -- see the
-// system prompt in netlify/functions/supportflow-assistant.mjs, which is
-// where those boundaries are actually enforced, not just stated here.
-const ASSISTANT_QUICK_STARTS = ["Create an invoice", "Log kilometres", "Add a participant", "Restore a backup"];
-const ASSISTANT_WELCOME = { role: "assistant",
-  text: "Hi, I'm the SupportFlow Assistant. Ask me how to use SupportFlow, and I'll help you find your way." };
-
-function SupportFlowAssistant({ onClose, go, currentScreen, openHelp }) {
-  const [messages, setMessages] = useState(() => {
-    try {
-      const raw = localStorage.getItem("ndis:assistantChat");
-      const saved = raw ? JSON.parse(raw) : null;
-      return Array.isArray(saved) && saved.length ? saved : [ASSISTANT_WELCOME];
-    } catch (e) { return [ASSISTANT_WELCOME]; }
-  });
-  const [input, setInput] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [warn, setWarn] = useState(false);
-  const [unavailable, setUnavailable] = useState(false);
-  const listRef = useRef(null);
-
-  useEffect(() => {
-    try { localStorage.setItem("ndis:assistantChat", JSON.stringify(messages)); } catch (e) { }
-    if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
-  }, [messages]);
-
-  const clearChat = () => {
-    setMessages([ASSISTANT_WELCOME]);
-    try { localStorage.removeItem("ndis:assistantChat"); } catch (e) { }
-  };
-
-  const send = async (rawText) => {
-    const text = (rawText != null ? rawText : input).trim();
-    if (!text || busy) return;
-    if (looksLikeSensitiveInfo(text)) { setWarn(true); return; }
-    setWarn(false);
-    setUnavailable(false);
-    const history = messages.filter((m) => m !== ASSISTANT_WELCOME).slice(-6)
-      .map((m) => ({ role: m.role, text: m.text }));
-    const next = [...messages, { role: "user", text }];
-    setMessages(next);
-    setInput("");
-    setBusy(true);
-    if (aiLeft("assistant") <= 0) {
-      setMessages([...next, { role: "assistant", text: `That's today's ${AI_CAPS.assistant} questions. The Help section still works normally.` }]);
-      setBusy(false);
-      return;
-    }
-    try {
-      aiBump("assistant");
-      const res = await fetch("/.netlify/functions/supportflow-assistant", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: text, screen: currentScreen || "",
-          manualContext: pickManualContext(text), history }),
-      });
-      const d = await res.json().catch(() => ({}));
-      if (!res.ok || !d.text) throw new Error("failed");
-      const m = d.text.match(/\[\[OPEN:([a-z]+)\]\]\s*$/i);
-      const clean = m ? d.text.slice(0, m.index).trim() : d.text;
-      setMessages((cur) => [...cur, { role: "assistant", text: clean, openKey: m ? m[1].toLowerCase() : null }]);
-    } catch (e) {
-      setUnavailable(true);
-      setMessages((cur) => cur.slice(0, -1));   // the question that couldn't be answered isn't kept as a dead end in the transcript
-      setInput(text);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 60, background: "var(--bg)", display: "flex", flexDirection: "column" }}
-      role="dialog" aria-label="SupportFlow Assistant">
-      <div className="topin" style={{ borderBottom: "1px solid var(--line)", flex: "0 0 auto" }}>
-        <div>
-          <div className="disp" style={{ fontSize: 19 }}>SupportFlow Assistant</div>
-          <div style={{ fontSize: 11.5, color: "var(--tx-3)" }}>Help using SupportFlow</div>
-        </div>
-        <button className="iconbtn" onClick={onClose} aria-label="Close assistant">✕</button>
-      </div>
-
-      <div style={{ padding: "10px 22px", borderBottom: "1px solid var(--line-2)", fontSize: 11, color: "var(--tx-3)", lineHeight: 1.6 }}>
-        SupportFlow Assistant provides help using the app. It does not provide legal, tax, accounting,
-        clinical or NDIS advice.
-      </div>
-
-      <div ref={listRef} style={{ flex: "1 1 auto", overflowY: "auto", padding: "16px 22px" }}>
-        {messages.map((m, i) => (
-          <div key={i} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start", marginBottom: 12 }}>
-            <div style={{ maxWidth: "80%", padding: "10px 14px", borderRadius: 12, fontSize: 13.5, lineHeight: 1.55,
-              background: m.role === "user" ? "var(--brass)" : "var(--bg-2)",
-              color: m.role === "user" ? "#14150F" : "var(--tx)",
-              border: m.role === "user" ? "none" : "1px solid var(--line)" }}>
-              {m.text}
-              {m.openKey && (
-                <div style={{ marginTop: 8 }}>
-                  <button className="btn tiny" onClick={() => { openAssistantTarget(m.openKey, go); onClose(); }}>
-                    Open {m.openKey.charAt(0).toUpperCase() + m.openKey.slice(1)}
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
-        {busy && <div aria-live="polite" style={{ fontSize: 12.5, color: "var(--tx-3)" }}>Thinking…</div>}
-        {unavailable && (
-          <div className="panel" style={{ marginTop: 8 }}>
-            <div style={{ fontSize: 13, marginBottom: 10 }}>SupportFlow Assistant is unavailable right now. You can still use the Help section.</div>
-            <button className="btn ghost tiny" onClick={() => { openHelp(); onClose(); }}>Open Help</button>
-          </div>
-        )}
-        {messages.length <= 1 && (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
-            {ASSISTANT_QUICK_STARTS.map((q) => (
-              <button key={q} className="btn ghost tiny" onClick={() => send(q)}>{q}</button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div style={{ padding: "12px 22px", borderTop: "1px solid var(--line)", flex: "0 0 auto" }}>
-        {warn && (
-          <div style={{ fontSize: 12, color: "var(--warn)", marginBottom: 8, lineHeight: 1.6 }}>
-            This message may contain personal information. Remove participant-identifying details before sending.
-          </div>
-        )}
-        <div style={{ display: "flex", gap: 8 }}>
-          <input aria-label="Ask SupportFlow a question" value={input}
-            onChange={(e) => { setInput(e.target.value); setWarn(false); }}
-            onKeyDown={(e) => { if (e.key === "Enter") send(); }}
-            placeholder="Ask a question…" style={{ flex: 1 }} />
-          <button className="btn" onClick={() => send()} disabled={busy || !input.trim()} aria-label="Send">Send</button>
-        </div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
-          <div style={{ fontSize: 10.5, color: "var(--tx-3)" }}>
-            Don't include participant names, NDIS numbers or other personal information.
-          </div>
-          <button className="btn ghost tiny" onClick={clearChat}>Clear conversation</button>
-        </div>
-      </div>
-    </div>
   );
 }
 
