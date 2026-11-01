@@ -292,7 +292,19 @@
 
 # Block raw SQL migration files (database schema).
 [[redirects]]
-  from = "/*.sql"
+  from = "/CREDIT-PACKS-MIGRATION.sql"
+  to = "/404.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/EARLY-ACCESS-TESTER-MIGRATION.sql"
+  to = "/404.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/SUPABASE-TESTER-ACTIVITY.sql"
   to = "/404.html"
   status = 404
   force = true
