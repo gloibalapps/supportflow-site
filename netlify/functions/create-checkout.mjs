@@ -60,11 +60,11 @@ export default async (req) => {
   const packName = String(body?.pack ?? body?.plan ?? "").trim().toLowerCase();
   const pack = PACKS[packName];
   if (!pack) {
-    return json({ error: "Choose a credit pack: casual, popular or value." }, 400);
+    return json({ error: "Unknown product. Please choose the Lifetime licence." }, 400);
   }
   const price = process.env[pack.env];
   if (!price) {
-    return json({ error: "That credit pack isn't available yet." }, 500);
+    return json({ error: "That product isn't available yet." }, 500);
   }
 
   // The device reference the app generated, so the webhook knows whose

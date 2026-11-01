@@ -69,7 +69,7 @@
   </div>
   <div class="wrap">
 <h1>Privacy Policy: SupportFlow™</h1>
-<p class="italic">Last updated: 11 October 2026</p>
+<p class="italic">Last updated: 2 November 2026</p>
 <h2>The short version</h2>
 <p>Your SupportFlow records stay on your device by default. There is no SupportFlow user account and no central database operated by the developer that stores your participant records, shift notes, invoices or other work records.</p>
 <p>SupportFlow™ is hosted using Netlify. When you access the app, Netlify may process ordinary technical information required to deliver and secure the app, such as your IP address, browser or device information and web requests. Your participant records are not intentionally sent to Netlify as part of storing or managing them in SupportFlow.</p>
@@ -85,9 +85,6 @@
 <p>Because SupportFlow may be used to record sensitive and health-related information, the app has been designed with the standards of the Australian Privacy Principles (APPs) under the <em>Privacy Act 1988</em> (Cth) in mind.</p>
 <p>SupportFlow is designed and marketed for use in Australia. It is not intentionally directed at users in the European Economic Area, the United Kingdom or other territories subject to the EU General Data Protection Regulation (GDPR) or equivalent frameworks. If you are located in one of those jurisdictions, you use the app subject to your own assessment of applicable obligations.</p>
 <p>The privacy obligations applying to an individual support worker or business depend on their particular circumstances.</p>
-<!-- BETA TESTING NOTICE: REMOVE WHEN BETA TESTING ENDS -->
-<div class="callout"><strong>Beta testing privacy rule</strong><br>During beta testing, use fictional or dummy participant details when you are testing SupportFlow. Real participant information is not required to participate in the beta.<br><br>If you choose to use SupportFlow as part of your normal support work with real participant information, you remain responsible for ensuring you have the appropriate authority or consent to collect, record, store, use and disclose that information.</div>
-<!-- END BETA TESTING NOTICE -->
 <h2>2. Information you may store in SupportFlow</h2>
 <h3>About you</h3>
 <p>Information you enter about yourself may include:</p>
@@ -136,7 +133,7 @@
 <p>There is:</p>
 <ul>
 <li>No SupportFlow user account required to hold these records</li>
-<li>No central participant database operated by the developer (see section 4 for the limited credit-system records that are stored server-side)</li>
+<li>No central participant database operated by the developer (see section 4 for the limited licence records that are stored server-side)</li>
 <li>No routine upload of participant records to the developer</li>
 </ul>
 <p>Under normal operation, the developer cannot view your locally stored participant records, shifts, invoices, expenses or notes.</p>
@@ -166,16 +163,17 @@
 <h3>Public website analytics</h3>
 <p>The public SupportFlow website uses Google Analytics 4 to understand basic website usage, such as page visits, sessions, general device/browser information and how visitors move through the public website. This analytics tagging is not included in the private SupportFlow app workspace, admin area, market page or tester-management pages.</p>
 <p>SupportFlow configures Google Analytics for measurement only and disables Google Signals and advertising-personalisation signals in the website tag. Participant records, progress notes, invoice contents, NDIS numbers, locally stored app records and encrypted backup contents are not intentionally sent to Google Analytics.</p>
-<h3>Credit and billing records</h3>
-<p>SupportFlow uses a credit system to manage invoice usage. To operate this system, the following information is stored in a secure server-side database (Supabase, operated by Supabase Inc. and hosted on Amazon Web Services infrastructure):</p>
+<h3>Licence and billing records</h3>
+<p>To run the free trial and the Lifetime licence, the following information is stored in a secure server-side database (Supabase, operated by Supabase Inc. and hosted on Amazon Web Services infrastructure):</p>
 <ul>
-<li>An <strong>anonymous device identifier</strong> generated on your device (a random UUID stored in your browser's local storage). This identifier is not linked to your name, email or any other personal information unless you choose to purchase credits.</li>
-<li>Your <strong>current credit balance</strong> and the date your credits expire.</li>
-<li>A <strong>record of which invoice numbers have already been charged</strong> a credit, so that re-previewing the same invoice does not consume an additional credit.</li>
+<li>An <strong>anonymous device identifier</strong> generated on your device (a random UUID stored in your browser's local storage). This identifier is not linked to your name, email or any other personal information unless you buy a licence.</li>
+<li>Your <strong>free trial credit balance</strong> and its expiry date, or whether you hold a Lifetime licence.</li>
+<li>A <strong>record of which invoice numbers have already been counted</strong>, so that re-previewing the same invoice does not use another trial credit.</li>
 </ul>
-<p>This information is held only for the purpose of operating the credit system. The developer does not use it for profiling, advertising or any other purpose.</p>
-<p>When you purchase credits, your payment is processed by <strong>Stripe</strong> (Stripe, Inc.), a third-party payment service. Stripe receives your <strong>email address, payment card details and billing information</strong> as part of the checkout process. SupportFlow does not store your card number. Stripe handles payment data under its own privacy policy and applicable payment industry security standards. The device identifier used to connect your purchase to your credit balance is passed to Stripe as a reference; it does not identify you to SupportFlow by name.</p>
-<p>Credit purchase records (amount, date, pack type and the anonymous device identifier) are retained in the SupportFlow credit database for as long as reasonably necessary to operate the service, resolve disputes and comply with applicable law. You can request deletion of credit records associated with your device identifier by contacting <strong>support@supportflow.work</strong>.</p>
+<p>This information is held only to operate the trial and licence. The developer does not use it for profiling, advertising or any other purpose.</p>
+<p>When you buy a licence, your payment is processed by <strong>Stripe</strong> (Stripe, Inc.), a third-party payment service. Stripe receives your <strong>email address, payment card details and billing information</strong> as part of checkout. SupportFlow does not store your card number. Stripe handles payment data under its own privacy policy and applicable payment industry security standards. The device identifier is passed to Stripe as a reference so the purchase can be linked to your licence.</p>
+<p><strong>Restoring your licence:</strong> if you use <strong>Restore licence</strong> on a new device, the email you enter is sent to the SupportFlow server and checked against Stripe to find your purchase. If a match is found, your new device is linked to your existing licence. The email is used only for this lookup.</p>
+<p>Purchase records (amount, date, product and the anonymous device identifier) are retained for as long as reasonably necessary to operate the service, resolve disputes and comply with applicable law, including tax record-keeping. You can request deletion of licence records linked to your device identifier by contacting <strong>support@supportflow.work</strong>.</p>
 <h3>Website fonts</h3>
 <p>SupportFlow's public website and app shell load typefaces (Fraunces and Instrument Sans) from <strong>Google Fonts</strong> (fonts.googleapis.com / fonts.gstatic.com). When your browser downloads these font files, Google receives a standard network request that may include your IP address, browser type and the referring page. SupportFlow does not control how Google handles that connection data. Google's privacy policy applies to that request.</p>
 <p>No participant records, NDIS numbers, shift notes or other locally stored app data are transmitted to Google as part of font loading.</p>
@@ -200,6 +198,9 @@
 <p>Claimable is designed not to read participant records or automatically construct questions from those records.</p>
 <p><strong>Do not enter participant names, NDIS numbers, health information or other personal information into Claimable.</strong> Ask the deduction question in general terms.</p>
 <p>If Claimable is unavailable or disabled in a particular build, no Claimable API request is sent.</p>
+<h3>5.1a SupportFlow Assistant</h3>
+<p>The SupportFlow Assistant (the <strong>?</strong> button in the header) is an optional help chat. It explains how to use the app and can take you to a screen. When you send a question it sends: the question you type, the name of the screen you are on, short extracts from the built-in manual, and your last few messages in that chat. These go via the SupportFlow server to an external AI service (Anthropic's Claude API) to generate an answer.</p>
+<p>The Assistant does not read your participant records, invoices or notes. If a question looks like it contains personal details such as an NDIS number, the app warns you before anything is sent. <strong>Do not enter participant names, NDIS numbers, health information or other personal information into the Assistant.</strong></p>
 <h3>5.2 Backups</h3>
 <p>When you create a SupportFlow backup, the backup file is encrypted on your device using AES-256 and a passphrase you choose before the encrypted backup file is exported.</p>
 <p>You decide what happens to that file. For example, you may:</p>
@@ -232,7 +233,7 @@
 <h2>7. What SupportFlow does not do</h2>
 <p>Under the current version described by this policy, SupportFlow does not:</p>
 <ul>
-<li>Maintain a central developer-operated database of participant records (a limited credit-management record is kept server-side as described in section 4)</li>
+<li>Maintain a central developer-operated database of participant records (a limited licence record is kept server-side as described in section 4)</li>
 <li>Sell participant or support-worker information</li>
 <li>Rent or trade personal information</li>
 <li>Build advertising profiles from participant records</li>

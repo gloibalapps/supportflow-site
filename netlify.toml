@@ -290,6 +290,13 @@
   status = 404
   force = true
 
+# Block raw SQL migration files (database schema).
+[[redirects]]
+  from = "/*.sql"
+  to = "/404.html"
+  status = 404
+  force = true
+
 # Clean URL for pricing page.
 [[redirects]]
   from = "/pricing"

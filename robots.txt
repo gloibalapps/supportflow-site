@@ -1,5 +1,7 @@
 User-agent: *
 Allow: /
 Disallow: /signups
+Disallow: /admin
+Disallow: /market
 
 Sitemap: https://supportflow.work/sitemap.xml

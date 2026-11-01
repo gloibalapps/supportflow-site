@@ -1712,7 +1712,7 @@ function TrialEndedNotice({ onClose, startInRestore = false }) {
   // up -- no separate code path needed for "how does the app now know".
   const restore = () => {
     const email = restoreEmail.trim();
-    if (!email) { setRestoreErr("Enter the email you used to subscribe."); return; }
+    if (!email) { setRestoreErr("Enter the email you used at checkout."); return; }
     setRestoreBusy(true); setRestoreErr("");
     fetch("/.netlify/functions/restore-purchase", {
       method: "POST",
@@ -1727,7 +1727,7 @@ function TrialEndedNotice({ onClose, startInRestore = false }) {
           setTimeout(() => window.location.reload(), 900);
           return;
         }
-        throw new Error((data && data.error) || "Couldn't restore that subscription.");
+        throw new Error((data && data.error) || "Couldn't find a licence for that email.");
       })
       .catch((e) => { setRestoreErr(e.message || "Something went wrong."); setRestoreBusy(false); });
   };
@@ -1738,17 +1738,15 @@ function TrialEndedNotice({ onClose, startInRestore = false }) {
       onClick={onClose}>
       <div className="panel" style={{ maxWidth: 440, width: "100%", margin: 16,
         borderColor: "var(--brass)" }} onClick={(e) => e.stopPropagation()}>
-        <div className="disp" style={{ fontSize: 20, marginBottom: 8 }}>Your free trial has ended</div>
+        <div className="disp" style={{ fontSize: 20, marginBottom: 8 }}>{startInRestore ? "Restore your licence" : "SupportFlow Lifetime"}</div>
         <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.7, marginBottom: 16 }}>
-          Everything you've already entered is still here, you can view, edit, back up and export
-          all of it. Adding new invoices, shifts, trips, expenses, participants and plan managers
-          needs an active subscription.
+          A$49 once, yours for life. Unlimited invoices on any phone or PC. Everything you've
+          already entered stays here, you can view, edit, back up and export all of it.
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
-          <button className="btn" onClick={() => subscribe("monthly")} disabled={busy}>
-            {busy ? "One moment…" : "$19.99 a month"}
+          <button className="btn" onClick={() => subscribe("lifetime")} disabled={busy}>
+            {busy ? "One moment..." : "Buy Lifetime \u2014 A$49"}
           </button>
-          <button className="btn ghost" onClick={() => subscribe("yearly")} disabled={busy}>$219 a year</button>
         </div>
         {err && <div style={{ fontSize: 12.5, color: "var(--warn)", marginBottom: 10 }}>{err}</div>}
 
@@ -2476,7 +2474,7 @@ function App() {
         <span className="ti">{checkoutResult === "success" ? "✓" : "✕"}</span>
         <span className="tm">
           {checkoutResult === "success"
-            ? "Payment confirmed! Your credits are being added — they'll appear in the menu above within a few seconds."
+            ? "Payment confirmed! Your Lifetime licence is being activated — it'll show in the menu above within a few seconds."
             : "Purchase cancelled — you haven't been charged."}
         </span>
         <button className="tc" onClick={() => setCheckoutToastOpen(false)} aria-label="Dismiss">×</button>
@@ -2557,7 +2555,7 @@ function App() {
                       </svg>
                       <span>
                         {creditsExpired
-                          ? <><b style={{ color: "var(--warn)" }}>Credits expired</b><br/><span style={{ fontSize: 11, color: "var(--tx-3)" }}>Buy more to keep invoicing</span></>
+                          ? <><b style={{ color: "var(--warn)" }}>Credits expired</b><br/><span style={{ fontSize: 11, color: "var(--tx-3)" }}>Buy Lifetime to keep invoicing</span></>
                           : typeof creditBalance === "number"
                             ? <><span style={{ fontSize: 16, fontWeight: 700, color: "var(--ink)", lineHeight: 1.2, display: "block" }}>{creditBalance} credits</span><span style={{ fontSize: 11, color: creditExpiresIn !== null && creditExpiresIn <= 3 ? "var(--warn)" : "var(--tx-3)" }}>{creditExpiresIn !== null ? `Expires in ${creditExpiresIn} day${creditExpiresIn === 1 ? "" : "s"}` : "Buy credits"}</span></>
                             : <b>Buy credits</b>}
@@ -6749,7 +6747,7 @@ const MANUAL = [
       ["The first thing you see",
        "A welcome screen, once, explaining the app in three lines. You can start setup or read the manual first. Before normal use, onboarding requires a backup password; that backup-security step cannot be skipped."],
       ["Finding your way around",
-       "Four fixed bottom navigation areas: Home, Work, Money and Participants. Work, Money and Participants open clean shortcut pages first; choose the feature you need, then use Back to Work, Back to Money or Back to Participants to return to those shortcuts. Home gives you quick-start shortcuts. Settings and Help stay in the fixed top header."],
+       "Four fixed bottom navigation areas: Home, Work, Money and People. Work, Money and People open clean shortcut pages first; choose the feature you need, then use Back to Work, Back to Money or Back to Participants to return to those shortcuts. Home gives you quick-start shortcuts. Settings and Help stay in the fixed top header."],
       ["Installing on Android",
        "Open supportflow.work/app in Chrome, open Chrome's menu, then choose Install app or Add to Home screen and confirm. SupportFlow will open from its own Home screen icon. Installing it does not create a SupportFlow cloud account; your working records remain on that app/browser installation and your encrypted backup is stored in the Google Drive account you connect."],
       ["Installing on iPhone or iPad",
@@ -6937,10 +6935,6 @@ const PRIVACY_SECTIONS = [
    "Your SupportFlow working records stay on your device by default. There is no central SupportFlow participant database. Encrypted backups go to the Google Drive account you connect. Information leaves your device only when a feature needs it or you deliberately share, back up or submit something."],
   ["Who this policy covers",
    "This covers SupportFlow™, provided by its developer, contactable at support@supportflow.work, on a phone, tablet or desktop, on a production release or a testing build. As the support worker entering information, you remain responsible for being authorised to collect, store, use and disclose it, under whatever consent or service agreement you hold. This policy explains how the app handles information; it doesn't establish or replace your own authority to collect it. Because SupportFlow may record sensitive and health-related information, it's designed with the standards of the Australian Privacy Principles in mind, though the obligations that apply to any individual support worker depend on their own circumstances."],
-  // BETA TESTING NOTICE: REMOVE THIS SECTION WHEN BETA TESTING ENDS.
-  ["Beta testing privacy rule",
-   "During beta testing, use fictional or dummy participant details when you are testing SupportFlow. Real participant information is not required to participate in the beta. If you choose to use SupportFlow as part of your normal support work with real participant information, you remain responsible for ensuring you have the appropriate authority or consent to collect, record, store, use and disclose that information."],
-  // END BETA TESTING NOTICE
   ["What you may store",
    "About you: name, ABN, contact and bank details, GST and business settings. About participants: name, NDIS number, plan management type, contact details, support information, shift notes and service agreement information, which may include health-related detail. About plan managers: organisation, contact and billing details. Records of your work: shifts, timesheets, travel, invoices, expenses, agreements and notes."],
   ["Where records are stored",
