@@ -129,7 +129,7 @@ html,body{overscroll-behavior-y:none;background:#14150F;height:100%;overflow-x:h
 .creditnotice a:hover{text-decoration:underline}
 .checkout-toast{position:fixed;bottom:84px;left:50%;transform:translateX(-50%);z-index:300;max-width:360px;width:calc(100% - 32px);padding:13px 16px;border-radius:14px;display:flex;align-items:flex-start;gap:11px;font-size:13.5px;box-shadow:0 4px 28px rgba(0,0,0,.45);animation:toastIn .22s ease}
 .checkout-toast[data-type=success]{background:#192517;border:1px solid rgba(78,160,106,.45);color:#8BD5A6}
-.checkout-toast[data-type=cancelled]{background:#261E14;border:1px solid rgba(194,112,59,.35);color:var(--tx-2)}
+.checkout-toast[data-type=cancelled]{background:#261E14;border:1px solid rgba(194,112,59,.35);color:#F2EFE4}
 .checkout-toast .ti{font-size:18px;line-height:1;flex-shrink:0;margin-top:1px}
 .checkout-toast .tm{flex:1;line-height:1.45}
 .checkout-toast .tc{background:none;border:none;color:inherit;opacity:.6;cursor:pointer;font-size:18px;line-height:1;padding:0;flex-shrink:0;margin-top:1px}
@@ -462,7 +462,7 @@ async function askModel(prompt, opts) {
 // Verified against the NDIS Pricing Schedule 2026-27 (v1.2, 22 July 2026),
 // Schedule 1 — Disability Support Workers. National column, effective 1 July 2026.
 // https://www.ndis.gov.au/providers/pricing-arrangements
-const APP_VERSION = "16";
+const APP_VERSION = "17";
 
 const PRICE_SOURCE = {
   doc: "NDIS Pricing Schedule 2026-27",
@@ -7897,6 +7897,29 @@ async function ensureSupportFlowDriveFolder() {
   }
   localStorage.setItem(GOOGLE_DRIVE_FOLDER_KEY,id); return id;
 }
+// Newest encrypted backups in the SupportFlow Backups folder, for Restore from Drive.
+async function listDriveBackups() {
+  try {
+    const folderId = await ensureSupportFlowDriveFolder();
+    const q = encodeURIComponent(`'${folderId}' in parents and trashed=false`);
+    const r = await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&orderBy=createdTime desc&pageSize=10&fields=files(id,name,createdTime)&spaces=drive`);
+    if (!r.ok) return [];
+    const d = await r.json();
+    return d.files || [];
+  } catch (_) { return []; }
+}
+async function fetchDriveFile(fileId) {
+  const r = await driveFetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`);
+  if (!r.ok) throw new Error("drive-download-failed");
+  return r.text();
+}
+// "supportflow-backup-2026-11-02T10-15-30-123Z.json" -> "2 Nov 2026, 8:45 pm" (local time)
+function driveBackupLabel(f) {
+  const m = /(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})(?:-(\d+))?Z/.exec(f.name || "");
+  const d = m ? new Date(`${m[1]}T${m[2]}:${m[3]}:${m[4]}Z`) : new Date(f.createdTime);
+  if (isNaN(d.getTime())) return f.name || "Backup";
+  return d.toLocaleString("en-AU", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
+}
 async function uploadEncryptedBackupToDrive(encrypted) {
   const folderId = await ensureSupportFlowDriveFolder();
   const stamp = new Date().toISOString().replace(/[:.]/g,"-");
@@ -8005,6 +8028,24 @@ function BackupPanel({ data, save, open, onToggle }) {
   const [driveConnected, setDriveConnected] = useState(() => googleDriveConnected());
   const [backupFailed, setBackupFailed] = useState(false);
   const [driveBusy, setDriveBusy] = useState(false);
+  const [driveFiles, setDriveFiles] = useState(null);
+  const [driveFileBusy, setDriveFileBusy] = useState(false);
+  const [showDrivePicker, setShowDrivePicker] = useState(false);
+  const [driveFetchingId, setDriveFetchingId] = useState(null);
+  const openDrivePicker = async () => {
+    setErr(""); setMsg(""); setDriveFileBusy(true);
+    const files = await listDriveBackups();
+    setDriveFiles(files); setShowDrivePicker(true); setDriveFileBusy(false);
+  };
+  const useDriveFile = async (f) => {
+    setErr(""); setDriveFetchingId(f.id);
+    try {
+      const text = await fetchDriveFile(f.id);
+      setUnlockFile(text); setUnlockPass(""); setMode("unlock"); setShowDrivePicker(false);
+    } catch (_) {
+      setErr("Couldn't download that backup from Google Drive. Check your connection and try again.");
+    } finally { setDriveFetchingId(null); }
+  };
   const backupLockRef = useRef(false);
   const fileRef = useRef(null);
 
@@ -8190,7 +8231,26 @@ function BackupPanel({ data, save, open, onToggle }) {
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button className="btn" onClick={startBackup} disabled={total === 0 || busy}>{busy ? "Backing up…" : "Back up now"}</button>
             <button className="btn ghost" onClick={() => fileRef.current && fileRef.current.click()}>Restore</button>
+            {driveConnected && <button className="btn ghost" onClick={openDrivePicker} disabled={driveFileBusy}>{driveFileBusy ? "Loading..." : "Restore from Drive"}</button>}
           </div>
+          {showDrivePicker && (
+            <div style={{ marginTop: 12, background: "var(--bg-2)", border: "1px solid var(--line)", borderRadius: 12, padding: 12 }}>
+              <div className="eyebrow" style={{ marginBottom: 8, color: "var(--brass)" }}>Backups in Google Drive</div>
+              {driveFiles && driveFiles.length === 0 ? (
+                <div style={{ fontSize: 12.5, color: "var(--tx-3)", padding: "6px 0" }}>No backups found in this Google Drive account.</div>
+              ) : (driveFiles || []).map((f, i) => (
+                <div key={f.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "9px 0", borderTop: i ? "1px solid var(--line)" : "none" }}>
+                  <div style={{ fontSize: 13, minWidth: 0 }}>
+                    {driveBackupLabel(f)}{i === 0 && <span style={{ marginLeft: 8, fontSize: 10.5, fontWeight: 700, color: "var(--brass)" }}>LATEST</span>}
+                  </div>
+                  <button className="btn ghost tiny" style={{ flex: "0 0 auto", borderColor: "var(--brass)", color: "var(--brass-lift)" }} onClick={() => useDriveFile(f)} disabled={!!driveFetchingId}>
+                    {driveFetchingId === f.id ? "Fetching..." : "Use this file"}
+                  </button>
+                </div>
+              ))}
+              <button className="btn ghost tiny" style={{ marginTop: 10 }} onClick={() => setShowDrivePicker(false)} disabled={!!driveFetchingId}>Cancel</button>
+            </div>
+          )}
           <input ref={fileRef} type="file" accept="application/json,.json" onChange={pick} style={{ display: "none" }} />
           <div style={{marginTop:10,fontSize:11.5,color:"var(--tx-3)"}}>Backup password: {hasBackupMasterKey() ? "Set ✓" : "Not set — required for new encrypted backups"}</div>
           {hasBackupMasterKey() && <button className="btn ghost tiny" style={{marginTop:8}} onClick={() => { if (confirm("Change the backup password? Existing backup files will still need the password that created them.")) { clearBackupMaster(); setMode("setpass"); } }}>Change backup password</button>}
