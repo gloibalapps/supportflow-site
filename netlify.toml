@@ -309,6 +309,25 @@
   status = 404
   force = true
 
+[[redirects]]
+  from = "/LICENSING-MIGRATION.sql"
+  to = "/404.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/LICENSING.md"
+  to = "/404.html"
+  status = 404
+  force = true
+
+# Server-only licensing helpers (bundled into functions, never needed as static files).
+[[redirects]]
+  from = "/netlify/lib/*"
+  to = "/404.html"
+  status = 404
+  force = true
+
 # Clean URL for pricing page.
 [[redirects]]
   from = "/pricing"

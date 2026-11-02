@@ -19,6 +19,7 @@
 //   accounts.credit_balance, credit_purchases table, add_credits() RPC.
 
 import crypto from "node:crypto";
+import { supa, recomputeLicence, PRODUCTS } from "../lib/licence.mjs";
 
 const TOLERANCE_SECONDS = 300; // reject anything claiming to be older than 5 minutes
 
@@ -187,12 +188,69 @@ async function grantLifetime(accountId) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Device licences (One device A$49 / Phone and computer A$69 / A$20 upgrade).
+// Created by netlify/functions/licence.mjs with metadata.kind = "licence".
+// This webhook is the ONLY thing that marks a Google account as paid; the
+// browser's ?licence=success return never does. See LICENSING.md.
+// ---------------------------------------------------------------------------
+async function handleLicenceSession(session) {
+  const sub = session.metadata?.google_sub || session.client_reference_id;
+  const product = session.metadata?.product;
+  if (!sub || !PRODUCTS[product]) {
+    console.error(`stripe-webhook: licence session ${session.id} missing google_sub/product`);
+    return;
+  }
+  const email = session.customer_details?.email || session.customer_email || null;
+  // Make sure the licence row exists (unpaid) so the payment can reference it.
+  await supa("licences?on_conflict=google_sub", {
+    method: "POST",
+    body: { google_sub: sub, ...(email ? { email } : {}), updated_at: new Date().toISOString() },
+    prefer: "resolution=merge-duplicates,return=minimal",
+  });
+  const inserted = await supa("licence_payments?on_conflict=stripe_session_id", {
+    method: "POST",
+    body: {
+      stripe_session_id: session.id,
+      stripe_payment_intent_id: typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id || null,
+      google_sub: sub,
+      product,
+      amount_aud: (Number(session.amount_total) || 0) / 100,
+      status: "paid",
+    },
+    prefer: "resolution=ignore-duplicates,return=representation",
+  });
+  if (!Array.isArray(inserted) || !inserted.length) {
+    console.log(`stripe-webhook: licence session ${session.id} already recorded`);
+  }
+  // Recompute every time (idempotent): plan comes from what is still paid.
+  const lic = await recomputeLicence(sub);
+  console.log(`stripe-webhook: licence ${product} for ${sub} -> plan ${lic.plan} ${lic.status}`);
+}
+
+// Refunds and disputes: mark the payment and recompute. A refunded $49/$69
+// drops the account back to unpaid (it locks on the next server check); a
+// refunded $20 upgrade drops Phone and computer back to One device.
+async function handleLicenceReversal(paymentIntentId, status) {
+  if (!paymentIntentId) return;
+  const rows = await supa(`licence_payments?stripe_payment_intent_id=eq.${encodeURIComponent(paymentIntentId)}&select=google_sub,status`);
+  if (!rows?.length) return; // not a licence payment (credit pack / legacy)
+  await supa(`licence_payments?stripe_payment_intent_id=eq.${encodeURIComponent(paymentIntentId)}`, {
+    method: "PATCH", body: { status, updated_at: new Date().toISOString() }, prefer: "return=minimal",
+  });
+  for (const sub of new Set(rows.map((r) => r.google_sub))) {
+    const lic = await recomputeLicence(sub);
+    console.log(`stripe-webhook: payment ${paymentIntentId} ${status} -> ${sub} plan ${lic.plan} ${lic.status}`);
+  }
+}
+
 async function handlePaidSession(session) {
   if (session.mode !== "payment") return; // nothing else is sold
   if (session.payment_status !== "paid" && session.payment_status !== "no_payment_required") {
     // Delayed payment methods: wait for async_payment_succeeded.
     return;
   }
+  if (session.metadata?.kind === "licence") return handleLicenceSession(session);
 
   const accountId = session.client_reference_id;
   if (!accountId) {
@@ -276,6 +334,22 @@ export default async (req) => {
       case "checkout.session.completed":
       case "checkout.session.async_payment_succeeded":
         await handlePaidSession(event.data.object);
+        break;
+
+      // Licence reversals. Register these events on the webhook endpoint too.
+      case "charge.refunded": {
+        const charge = event.data.object;
+        // Only a full refund removes the licence; a partial goodwill refund doesn't.
+        if (charge.refunded === true || Number(charge.amount_refunded) >= Number(charge.amount)) {
+          await handleLicenceReversal(charge.payment_intent, "refunded");
+        }
+        break;
+      }
+      case "charge.dispute.created":
+        await handleLicenceReversal(event.data.object.payment_intent, "disputed");
+        break;
+      case "charge.dispute.closed":
+        if (event.data.object.status === "won") await handleLicenceReversal(event.data.object.payment_intent, "paid");
         break;
 
       default:

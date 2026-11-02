@@ -1,3 +1,4 @@
+import { checkRequestLicence } from "../lib/licence.mjs";
 const API = "https://api.anthropic.com/v1/messages";
 const MODEL = process.env.ASSISTANT_MODEL || process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001";
 
@@ -71,6 +72,13 @@ export default async (req) => {
   const host = req.headers.get("host");
   if (origin && host && !origin.includes(host)) {
     return json({ error: "forbidden" }, 403);
+  }
+
+  // Device licensing: once the owner switch is on, AI calls need a licensed,
+  // active device (checked server-side; see netlify/lib/licence.mjs).
+  {
+    const lic = await checkRequestLicence(req).catch(() => ({ enforced: false }));
+    if (lic.enforced && !lic.ok && !lic.error) return json({ error: "licence-required" }, 402);
   }
 
   const ip = req.headers.get("x-nf-client-connection-ip") || req.headers.get("x-forwarded-for") || "";
