@@ -30,29 +30,53 @@ const PACK_CREDITS = Object.freeze({ casual: 10, popular: 30, value: 100, lifeti
 // retried/logged rather than guessed at.
 const AMOUNT_TO_PACK = Object.freeze({ 799: "casual", 1999: "popular", 3999: "value", 4900: "lifetime" });
 
-function verifyStripeSignature(payload, header, secret) {
-  if (!header) return false;
-  const parts = Object.fromEntries(
-    header.split(",").map((p) => p.split("=").map((s) => s.trim()))
-  );
-  const timestamp = parts.t;
-  const signature = parts.v1;
-  if (!timestamp || !signature) return false;
+// STRIPE_WEBHOOK_SECRET may hold one whsec_ value, or several separated by
+// commas/spaces (e.g. the live and test-mode endpoint secrets, or old + new
+// while rolling). Surrounding quotes/whitespace from copy-paste are stripped:
+// a stray newline in the env value makes every HMAC miss.
+function webhookSecrets() {
+  return String(process.env.STRIPE_WEBHOOK_SECRET || "")
+    .split(/[\s,]+/)
+    .map((s) => s.trim().replace(/^['"]|['"]$/g, ""))
+    .filter(Boolean);
+}
+
+// Returns { ok: true } or { ok: false, reason } so the logs say WHY a
+// delivery was rejected (never the secret itself).
+function verifyStripeSignature(payload, header, secrets) {
+  if (!header) return { ok: false, reason: "no Stripe-Signature header" };
+  let timestamp = null;
+  const signatures = [];
+  // Stripe can send several v1 entries (e.g. while a signing secret is being
+  // rolled), so collect them all instead of keeping only the last one.
+  for (const part of header.split(",")) {
+    const i = part.indexOf("=");
+    if (i < 0) continue;
+    const k = part.slice(0, i).trim();
+    const v = part.slice(i + 1).trim();
+    if (k === "t") timestamp = v;
+    else if (k === "v1" && /^[0-9a-f]{64}$/i.test(v)) signatures.push(Buffer.from(v, "hex"));
+  }
+  if (!timestamp || !signatures.length) return { ok: false, reason: "header has no t / v1" };
 
   const age = Math.abs(Date.now() / 1000 - Number(timestamp));
-  if (!Number.isFinite(age) || age > TOLERANCE_SECONDS) return false;
+  if (!Number.isFinite(age) || age > TOLERANCE_SECONDS) return { ok: false, reason: `timestamp outside ${TOLERANCE_SECONDS}s tolerance` };
 
-  const expected = crypto
-    .createHmac("sha256", secret)
-    .update(`${timestamp}.${payload}`, "utf8")
-    .digest("hex");
-
-  // constant-time comparison, so a timing attack can't be used to guess the
-  // correct signature one byte at a time
-  const a = Buffer.from(expected, "hex");
-  const b = Buffer.from(signature, "hex");
-  if (a.length !== b.length) return false;
-  return crypto.timingSafeEqual(a, b);
+  for (const secret of secrets) {
+    const expected = crypto.createHmac("sha256", secret).update(`${timestamp}.${payload}`, "utf8").digest();
+    // constant-time comparison, so a timing attack can't be used to guess the
+    // correct signature one byte at a time
+    if (signatures.some((sig) => sig.length === expected.length && crypto.timingSafeEqual(sig, expected))) {
+      return { ok: true };
+    }
+  }
+  const badFormat = secrets.filter((s) => !s.startsWith("whsec_")).length;
+  return {
+    ok: false,
+    reason: badFormat
+      ? `STRIPE_WEBHOOK_SECRET doesn't look like a webhook signing secret (expected whsec_...; ${badFormat} of ${secrets.length} value(s) don't)`
+      : `signature mismatch against ${secrets.length} configured secret(s): STRIPE_WEBHOOK_SECRET isn't this endpoint's signing secret (check live vs test mode and that it was copied from this exact endpoint)`,
+  };
 }
 
 function supaHeaders(extra = {}) {
@@ -262,7 +286,12 @@ async function handlePaidSession(session) {
   const packName = session.metadata?.pack || AMOUNT_TO_PACK[session.amount_total];
   const credits = Number(session.metadata?.credits) || PACK_CREDITS[packName];
   if (!packName || !credits) {
-    throw new Error(`Couldn't work out the credit pack for session ${session.id} (amount ${session.amount_total})`);
+    // Not one of ours (e.g. a Payment Link or a price sold outside the app on
+    // the same Stripe account). Stripe would resend the identical payload, so
+    // a 500 can never succeed and only shows up as a failed delivery: log it
+    // for a manual look and acknowledge.
+    console.error(`stripe-webhook: session ${session.id} isn't a SupportFlow credit pack or licence (amount ${session.amount_total}, metadata ${JSON.stringify(session.metadata || {})}); acknowledged without changes`);
+    return;
   }
 
   // Make sure the account row exists before crediting it.
@@ -305,9 +334,9 @@ export default async (req) => {
     return new Response("Method not allowed", { status: 405 });
   }
 
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  const secrets = webhookSecrets();
   const supaConfigured = process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY;
-  if (!webhookSecret || !supaConfigured) {
+  if (!secrets.length || !supaConfigured) {
     // Fail loudly in the logs, but return 500 rather than 200 — a 200 tells
     // Stripe "handled", and a silently-dropped event is worse than a retry.
     console.error("stripe-webhook: missing STRIPE_WEBHOOK_SECRET or Supabase env vars");
@@ -317,9 +346,10 @@ export default async (req) => {
   const payload = await req.text();
   const sigHeader = req.headers.get("stripe-signature");
 
-  if (!verifyStripeSignature(payload, sigHeader, webhookSecret)) {
-    console.error("stripe-webhook: signature verification failed");
-    return new Response("Invalid signature", { status: 400 });
+  const sig = verifyStripeSignature(payload, sigHeader, secrets);
+  if (!sig.ok) {
+    console.error(`stripe-webhook: signature verification failed: ${sig.reason}`);
+    return new Response(`Invalid signature: ${sig.reason}`, { status: 400 });
   }
 
   let event;

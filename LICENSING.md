@@ -36,9 +36,9 @@ the existing credit packs / Lifetime flow keep working.
    | Variable | Value |
    |---|---|
    | `LICENCE_SECRET` | A long random string (at least 24 characters, e.g. the output of `openssl rand -base64 48`). Signs sign-in sessions and the 7-day offline leases. Changing it signs everyone out once and makes old leases invalid. |
-   | `STRIPE_PRICE_LICENCE_ONE` | Price ID of the A$49 price. (If unset, the existing `STRIPE_PRICE_LIFETIME` A$49 price is used.) |
-   | `STRIPE_PRICE_LICENCE_TWO` | Price ID of the A$69 price |
-   | `STRIPE_PRICE_LICENCE_UPGRADE` | Price ID of the A$20 price |
+   | `STRIPE_PRICE_49` | Price ID of the A$49 price. (Fallbacks: `STRIPE_PRICE_LICENCE_ONE`, then the existing `STRIPE_PRICE_LIFETIME`.) |
+   | `STRIPE_PRICE_69` | Price ID of the A$69 price (fallback name `STRIPE_PRICE_LICENCE_TWO`) |
+   | `STRIPE_PRICE_UPGRADE` | Price ID of the A$20 price (fallback name `STRIPE_PRICE_LICENCE_UPGRADE`) |
    | `LICENCE_EMAIL_FROM` | Optional. Sender for the "licence moved" email, e.g. `SupportFlow <no-reply@supportflow.work>` (must be a Resend-verified domain). |
    | `LICENSING_TEST_EMAILS` | Optional. Comma-separated Google addresses that get the licensing experience while the switch is still off, for testing. |
 
@@ -46,6 +46,16 @@ the existing credit packs / Lifetime flow keep working.
    (Google Drive backup; also used to verify Google sign-in), `SUPABASE_URL`,
    `SUPABASE_SERVICE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
    `SITE_URL`, `RESEND_API_KEY`.
+
+   `STRIPE_WEBHOOK_SECRET` must be the **signing secret of this exact
+   endpoint** (Stripe → Developers → Webhooks → the
+   `supportflow.work/.netlify/functions/stripe-webhook` endpoint → Signing
+   secret → Reveal, starts `whsec_`), from the same mode (live/test) as
+   `STRIPE_SECRET_KEY`. It is *not* the `sk_`/`rk_` API key. To accept both a
+   live and a test endpoint, put both values in it separated by a comma. If
+   deliveries fail, the Netlify function log for `stripe-webhook` now says
+   why (e.g. "signature mismatch" or "doesn't look like a webhook signing
+   secret").
 5. **Google Cloud console** → APIs & Services → Credentials → the OAuth client
    used by `GOOGLE_CLIENT_ID`:
    * Authorised JavaScript origins: your site origin (e.g. `https://supportflow.work`).

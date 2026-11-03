@@ -29,9 +29,11 @@ export const LEASE_DAYS = 7;
 export const SESSION_DAYS = 90;
 export const PLAN_NAMES = Object.freeze({ 1: "One device", 2: "Phone and computer" });
 export const PRODUCTS = Object.freeze({
-  one: { plan: 1, amount: 49, env: ["STRIPE_PRICE_LICENCE_ONE", "STRIPE_PRICE_LIFETIME"] },
-  two: { plan: 2, amount: 69, env: ["STRIPE_PRICE_LICENCE_TWO"] },
-  upgrade: { plan: 2, amount: 20, env: ["STRIPE_PRICE_LICENCE_UPGRADE"] },
+  // First set env var wins. STRIPE_PRICE_49 / _69 / _UPGRADE are the names
+  // configured in Netlify; the older names are kept as fallbacks.
+  one: { plan: 1, amount: 49, env: ["STRIPE_PRICE_49", "STRIPE_PRICE_LICENCE_ONE", "STRIPE_PRICE_LIFETIME"] },
+  two: { plan: 2, amount: 69, env: ["STRIPE_PRICE_69", "STRIPE_PRICE_LICENCE_TWO"] },
+  upgrade: { plan: 2, amount: 20, env: ["STRIPE_PRICE_UPGRADE", "STRIPE_PRICE_LICENCE_UPGRADE"] },
 });
 
 const DAY = 86400000;
