@@ -76,6 +76,29 @@ async function supabaseUpsert(table, row, onConflict) {
   }
 }
 
+// Device refs (client_reference_id) are crypto.randomUUID() values and
+// accounts.id is a uuid column; anything else can never be inserted.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Makes sure the account row exists and links the Stripe customer to it (used
+// by restore-purchase.mjs). checkout always creates a customer, so the link
+// is always sent — but accounts.stripe_customer_id isn't created by any of the
+// migrations in this repo. If the column is missing, PostgREST rejects the
+// whole upsert and every purchase used to fail with a 500. Now the purchase is
+// still credited and the missing column is logged.
+async function ensureAccount(accountId, customer) {
+  const row = { id: accountId, last_seen_at: new Date().toISOString() };
+  const customerId = typeof customer === "string" ? customer : customer?.id;
+  if (!customerId) return supabaseUpsert("accounts", row, "id");
+  try {
+    await supabaseUpsert("accounts", { ...row, stripe_customer_id: customerId }, "id");
+  } catch (e) {
+    if (!/stripe_customer_id/.test(String(e?.message))) throw e;
+    console.warn("stripe-webhook: accounts.stripe_customer_id column is missing (run CREDIT-PACKS-MIGRATION.sql); crediting without the Stripe customer link");
+    await supabaseUpsert("accounts", row, "id");
+  }
+}
+
 // Records the purchase, keyed on the Stripe session id. Returns true only
 // the first time a given session is seen — Stripe can deliver the same
 // event more than once, and credits must never be added twice.
@@ -201,18 +224,23 @@ async function handlePaidSession(session) {
     return;
   }
 
+  if (!UUID_RE.test(accountId)) {
+    // Stripe resends the identical payload, so this can never succeed on retry.
+    console.error(`stripe-webhook: session ${session.id} client_reference_id isn't a device ref (uuid); acknowledged without changes`);
+    return;
+  }
+
   const packName = session.metadata?.pack || AMOUNT_TO_PACK[session.amount_total];
   const credits = Number(session.metadata?.credits) || PACK_CREDITS[packName];
   if (!packName || !credits) {
-    throw new Error(`Couldn't work out the credit pack for session ${session.id} (amount ${session.amount_total})`);
+    // Not one of ours (e.g. a Payment Link on the same Stripe account). A 500
+    // can never succeed on retry, so log for a manual look and acknowledge.
+    console.error(`stripe-webhook: session ${session.id} isn't a SupportFlow credit pack (amount ${session.amount_total}, metadata ${JSON.stringify(session.metadata || {})}); acknowledged without changes`);
+    return;
   }
 
   // Make sure the account row exists before crediting it.
-  await supabaseUpsert("accounts", {
-    id: accountId,
-    ...(session.customer ? { stripe_customer_id: session.customer } : {}),
-    last_seen_at: new Date().toISOString(),
-  }, "id");
+  await ensureAccount(accountId, session.customer);
 
   const isNew = await recordPurchaseOnce({
     account_id: accountId,
@@ -287,7 +315,9 @@ export default async (req) => {
     console.error("stripe-webhook: handler error", e);
     // Return 500 so Stripe retries — a purchase we failed to credit should
     // not be silently dropped.
-    return new Response("Internal error", { status: 500 });
+    // The reason goes in the body too, so it shows in Stripe's delivery log
+    // (Developers → Webhooks → event → Response) without opening Netlify logs.
+    return new Response(`Internal error: ${String(e?.message || e).slice(0, 500)}`, { status: 500 });
   }
 
   return new Response(JSON.stringify({ received: true }), {

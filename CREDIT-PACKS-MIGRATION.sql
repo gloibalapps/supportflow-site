@@ -5,7 +5,10 @@ alter table public.accounts
   add column if not exists credit_balance integer not null default 0,
   add column if not exists free_credits_remaining integer not null default 5,
   add column if not exists last_seen_at timestamptz,
-  add column if not exists credits_expire_at timestamptz;
+  add column if not exists credits_expire_at timestamptz,
+  -- Written by stripe-webhook.mjs, read by restore-purchase.mjs.
+  add column if not exists stripe_customer_id text;
+create index if not exists accounts_stripe_customer_idx on public.accounts (stripe_customer_id);
 
 -- Credits (purchased and the 5 free starter credits) are valid for 30 days.
 -- New accounts get their 30-day window from creation; existing rows that
