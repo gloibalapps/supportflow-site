@@ -258,6 +258,36 @@ export async function claimLegacyLifetime(sub, email, legacyRef) {
   return getLicence(sub);
 }
 
+// Owner-granted licences. The owner can't know a buyer's Google `sub`, so a
+// grant is inserted by email with google_sub = 'email:<address>' and
+// stripe_payment_intent_id = 'manual:1' or 'manual:2'. The first time that
+// (Google-verified) address signs in, the grant moves onto the real sub.
+const manualPlan = (lic) => {
+  const m = /^manual:([12])$/.exec(lic?.stripe_payment_intent_id || "");
+  return m && lic.status === "active" ? Number(m[1]) : 0;
+};
+export async function claimEmailGrant(sub, email) {
+  const key = `email:${String(email || "").trim().toLowerCase()}`;
+  if (key === "email:") return null;
+  const grant = (await supa(`licences?google_sub=eq.${q(key)}&status=eq.active&select=*`))?.[0];
+  if (!grant || grant.plan < 1) return null;
+  const existing = await getLicence(sub);
+  const now = new Date().toISOString();
+  const plan = Math.max(grant.plan, existing?.status === "active" ? existing.plan : 0);
+  await supa("licences?on_conflict=google_sub", {
+    method: "POST",
+    body: {
+      google_sub: sub, email, plan, status: "active",
+      purchased_at: existing?.purchased_at || grant.purchased_at || now,
+      stripe_payment_intent_id: existing?.stripe_payment_intent_id || `manual:${plan}`,
+      updated_at: now,
+    },
+    prefer: "resolution=merge-duplicates,return=minimal",
+  });
+  await supa(`licences?google_sub=eq.${q(key)}`, { method: "DELETE", prefer: "return=minimal" });
+  return getLicence(sub);
+}
+
 /**
  * The heartbeat decision. Returns the payload the app acts on:
  *   active        -> lease issued, app unlocked
@@ -269,6 +299,9 @@ export async function evaluate({ sub, email, deviceId, label, legacyRef }) {
   let lic = await getLicence(sub);
   if ((!lic || lic.status !== "active") && legacyRef) {
     lic = (await claimLegacyLifetime(sub, email, legacyRef).catch((e) => { console.warn("legacy claim failed", e.message); return null; })) || lic;
+  }
+  if ((!lic || lic.status !== "active") && email) {
+    lic = (await claimEmailGrant(sub, email).catch((e) => { console.warn("email grant claim failed", e.message); return null; })) || lic;
   }
   if (lic && email && lic.email !== email) {
     supa(`licences?google_sub=eq.${q(sub)}`, { method: "PATCH", body: { email }, prefer: "return=minimal" }).catch(() => {});
@@ -309,7 +342,7 @@ export async function recomputeLicence(sub) {
   const lic = await getLicence(sub);
   const pays = (await supa(`licence_payments?google_sub=eq.${q(sub)}&select=*&order=created_at.asc`)) || [];
   const paid = pays.filter((p) => p.status === "paid");
-  let plan = lic?.legacy_account_id ? 1 : 0;
+  let plan = Math.max(lic?.legacy_account_id ? 1 : 0, manualPlan(lic));
   if (paid.some((p) => p.product === "one")) plan = Math.max(plan, 1);
   if (paid.some((p) => p.product === "two")) plan = 2;
   if (plan >= 1 && paid.some((p) => p.product === "upgrade")) plan = 2;
