@@ -27,6 +27,34 @@ create table if not exists public.credit_purchases (
 );
 -- In case an earlier partial run created this column as text.
 alter table public.credit_purchases alter column account_id type uuid using account_id::uuid;
+
+-- The live table was first created with an older shape (credits_granted,
+-- amount_cents, created_at), so "create table if not exists" above skipped it
+-- and every webhook insert failed (PGRST204 "amount_aud" not found). Add the
+-- columns the webhook writes, and keep the old columns filled for old readers.
+-- Applied to production on 4 Nov 2026; safe to re-run.
+alter table public.credit_purchases
+  add column if not exists credits integer,
+  add column if not exists amount_aud numeric(10,2) not null default 0,
+  add column if not exists purchased_at timestamptz not null default now();
+do $$ begin
+  if exists (select 1 from information_schema.columns where table_schema = 'public'
+             and table_name = 'credit_purchases' and column_name = 'credits_granted')
+     and exists (select 1 from information_schema.columns where table_schema = 'public'
+             and table_name = 'credit_purchases' and column_name = 'amount_cents') then
+    alter table public.credit_purchases alter column credits_granted drop not null;
+    create or replace function public.credit_purchases_fill_legacy() returns trigger
+      language plpgsql as $f$
+      begin
+        new.credits_granted := coalesce(new.credits_granted, new.credits);
+        new.amount_cents := coalesce(new.amount_cents, round(new.amount_aud * 100)::int);
+        return new;
+      end $f$;
+    drop trigger if exists credit_purchases_fill_legacy on public.credit_purchases;
+    create trigger credit_purchases_fill_legacy before insert on public.credit_purchases
+      for each row execute function public.credit_purchases_fill_legacy();
+  end if;
+end $$;
 create index if not exists credit_purchases_account_idx on public.credit_purchases (account_id);
 alter table public.credit_purchases enable row level security; -- service key only
 

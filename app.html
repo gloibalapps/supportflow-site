@@ -515,10 +515,11 @@ async function askModel(prompt, opts) {
   const body = { prompt: prompt, search: !!(opts && opts.search) };
   const res = await fetch(AI.endpoint, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...licenceHeaders() },
     body: JSON.stringify(body),
   });
   if (res.status === 503) throw new Error("not-configured");
+  if (res.status === 402) throw new Error("This device needs an active SupportFlow licence. Open Settings and check in.");
   if (res.status === 429) throw new Error("busy");
   if (!res.ok) {
     let why = "";
@@ -540,7 +541,563 @@ async function askModel(prompt, opts) {
 // Verified against the NDIS Pricing Schedule 2026-27 (v1.2, 22 July 2026),
 // Schedule 1 — Disability Support Workers. National column, effective 1 July 2026.
 // https://www.ndis.gov.au/providers/pricing-arrangements
-const APP_VERSION = "20";
+const APP_VERSION = "21";
+
+/* ---------------- device licensing ----------------
+   One-off licences owned by a Google account: "One device" (A$49) or
+   "Phone and computer" (A$69, or A$20 upgrade). Everything is decided by the
+   server (netlify/functions/licence.mjs); this side only stores a device id,
+   the sign-in session and a signed 7-day offline lease in IndexedDB.
+   Nothing here does anything until the owner switch is on -- while it's off
+   the config call says enabled:false and the app runs exactly as before.
+   See LICENSING.md. */
+const LICENCE_API = "/.netlify/functions/licence";
+const LICENCE_HEARTBEAT_MS = 30 * 60 * 1000;
+const LICENCE_ENFORCED_FLAG = "sf_licence_enforced_v1";   // last known: was licensing on?
+const LICENCE_PREVIEW_FLAG = "sf_licence_preview_v1";     // owner testing before the switch
+const LICENCE_PENDING_FLAG = "sf_licence_pending_v1";     // product sent to Stripe, awaiting webhook
+const LicenceContext = React.createContext(null);
+// Read by chargeInvoiceCredit / the AI calls so the server can see the licence.
+const LICENCE_CTX = { session: "", deviceId: "", active: false };
+function licenceHeaders() {
+  return LICENCE_CTX.active && LICENCE_CTX.session
+    ? { "X-SF-Licence": LICENCE_CTX.session, "X-SF-Device": LICENCE_CTX.deviceId } : {};
+}
+
+let licenceDbPromise = null;
+function licenceDb() {
+  if (licenceDbPromise) return licenceDbPromise;
+  licenceDbPromise = new Promise((resolve) => {
+    try {
+      const req = indexedDB.open("supportflow-licence", 1);
+      req.onupgradeneeded = () => req.result.createObjectStore("kv");
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => resolve(null);
+    } catch (e) { resolve(null); }
+  });
+  return licenceDbPromise;
+}
+async function licGet(key) {
+  const db = await licenceDb();
+  if (!db) { try { return JSON.parse(localStorage.getItem("sf_lic_" + key) || "null"); } catch (e) { return null; } }
+  return new Promise((resolve) => {
+    try { const r = db.transaction("kv").objectStore("kv").get(key); r.onsuccess = () => resolve(r.result ?? null); r.onerror = () => resolve(null); }
+    catch (e) { resolve(null); }
+  });
+}
+async function licSet(key, value) {
+  const db = await licenceDb();
+  if (!db) { try { localStorage.setItem("sf_lic_" + key, JSON.stringify(value)); } catch (e) { } return; }
+  return new Promise((resolve) => {
+    try { const tx = db.transaction("kv", "readwrite"); tx.objectStore("kv").put(value, key); tx.oncomplete = () => resolve(); tx.onerror = () => resolve(); }
+    catch (e) { resolve(); }
+  });
+}
+async function licDel(key) {
+  const db = await licenceDb();
+  if (!db) { try { localStorage.removeItem("sf_lic_" + key); } catch (e) { } return; }
+  return new Promise((resolve) => {
+    try { const tx = db.transaction("kv", "readwrite"); tx.objectStore("kv").delete(key); tx.oncomplete = () => resolve(); tx.onerror = () => resolve(); }
+    catch (e) { resolve(); }
+  });
+}
+// A random id made on first launch. Not a fingerprint: clearing site data
+// makes a new one, and signing in again simply registers this as a device.
+async function licenceDeviceId() {
+  let id = await licGet("deviceId");
+  if (!id) {
+    id = (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
+      : "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (c) => (Number(c) ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (Number(c) / 4)))).toString(16));
+    await licSet("deviceId", id);
+  }
+  return id;
+}
+function licenceDeviceLabel() {
+  const ua = navigator.userAgent || "";
+  const os = /iPhone/.test(ua) ? "iPhone"
+    : (/iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) ? "iPad"
+    : /Android/.test(ua) ? (/Mobile/.test(ua) ? "Android phone" : "Android tablet")
+    : /CrOS/.test(ua) ? "Chromebook" : /Windows/.test(ua) ? "Windows PC"
+    : /Macintosh|Mac OS X/.test(ua) ? "Mac" : /Linux/.test(ua) ? "Linux computer" : "device";
+  const br = /SamsungBrowser/.test(ua) ? "Samsung Internet" : /EdgA?\/|EdgiOS/.test(ua) ? "Edge"
+    : /Firefox|FxiOS/.test(ua) ? "Firefox" : /CriOS|Chrome/.test(ua) ? "Chrome" : /Safari/.test(ua) ? "Safari" : "Browser";
+  return `${br} on ${os}${licenceStandalone() ? " (app)" : ""}`;
+}
+function licenceStandalone() {
+  try { return window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true; } catch (e) { return false; }
+}
+// iPhone keeps the Safari tab and the Home Screen app in separate storage, so
+// they show up as two installs. Flag the likely duplicate instead of guessing.
+const licenceBaseLabel = (l) => String(l || "").replace(/\s*\(app\)$/, "");
+function licenceAgo(iso) {
+  const t = new Date(iso).getTime();
+  if (!t) return "";
+  const m = Math.max(0, Math.round((Date.now() - t) / 60000));
+  if (m < 2) return "just now";
+  if (m < 60) return `${m} minutes ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h} hour${h === 1 ? "" : "s"} ago`;
+  const d = Math.round(h / 24);
+  return `${d} day${d === 1 ? "" : "s"} ago`;
+}
+function licenceB64(s) {
+  const b = String(s).replace(/-/g, "+").replace(/_/g, "/");
+  return Uint8Array.from(atob(b + "=".repeat((4 - (b.length % 4)) % 4)), (c) => c.charCodeAt(0));
+}
+function licenceSessionInfo(token) {
+  try { const p = JSON.parse(new TextDecoder().decode(licenceB64(String(token).split(".")[0]))); return { token, sub: p.sub, email: p.email, name: p.name }; }
+  catch (e) { return null; }
+}
+// Offline check of the server-signed lease (ECDSA P-256). A copied or edited
+// lease fails the signature; an expired one (7 days) fails the date.
+async function licenceVerifyLease(lease, jwk, deviceId, sub) {
+  try {
+    if (!lease || !jwk || !window.crypto?.subtle) return null;
+    const [p, s] = String(lease).split(".");
+    const key = await crypto.subtle.importKey("jwk", { ...jwk, ext: true }, { name: "ECDSA", namedCurve: "P-256" }, false, ["verify"]);
+    const ok = await crypto.subtle.verify({ name: "ECDSA", hash: "SHA-256" }, key, licenceB64(s), new TextEncoder().encode(p));
+    if (!ok) return null;
+    const payload = JSON.parse(new TextDecoder().decode(licenceB64(p)));
+    if (payload.did !== deviceId || (sub && payload.sub !== sub)) return null;
+    if (!(payload.exp > Date.now()) || payload.iat > Date.now() + 10 * 60000) return null;
+    return payload;
+  } catch (e) { return null; }
+}
+async function licenceFetch(body, timeoutMs = 9000) {
+  const ctl = typeof AbortController !== "undefined" ? new AbortController() : null;
+  const timer = ctl ? setTimeout(() => ctl.abort(), timeoutMs) : null;
+  try {
+    const r = await fetch(LICENCE_API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: ctl?.signal });
+    const d = await r.json().catch(() => ({}));
+    return { status: r.status, data: d };
+  } finally { if (timer) clearTimeout(timer); }
+}
+
+/* phase: "off"      not enforced -> app exactly as before
+          "checking" enforced last time, first check still running
+          "ok"       licensed (online, or offline on a valid lease)
+          "locked"   show LicenceGate (state says why) */
+function useLicence() {
+  const [lic, setLic] = useState(() => {
+    let enforced = false;
+    try { enforced = localStorage.getItem(LICENCE_ENFORCED_FLAG) === "1"; } catch (e) { }
+    return { phase: enforced ? "checking" : "off", info: null, account: null };
+  });
+  const [notice, setNotice] = useState(null); // { type: "success"|"cancelled"|"waiting", text }
+  const ref = useRef({ cfg: null, session: null, deviceId: "", busy: false });
+
+  const setEnforced = (on) => { try { on ? localStorage.setItem(LICENCE_ENFORCED_FLAG, "1") : localStorage.removeItem(LICENCE_ENFORCED_FLAG); } catch (e) { } };
+  const legacyRef = () => { try { return localStorage.getItem("ndis:deviceRef") || null; } catch (e) { return null; } };
+
+  const offlineDecision = async () => {
+    const { cfg, session, deviceId } = ref.current;
+    const lease = await licGet("lease");
+    const ok = await licenceVerifyLease(lease, cfg?.publicKey, deviceId, session?.sub);
+    LICENCE_CTX.active = !!ok;
+    if (ok) setLic((cur) => ({ ...cur, phase: "ok", offline: true, leaseExp: ok.exp, info: cur.info || { state: "active", plan: ok.plan, planName: ok.plan === 2 ? "Phone and computer" : "One device", cap: ok.plan, devices: [] }, account: session }));
+    else setLic((cur) => ({ ...cur, phase: "locked", offline: true, info: { state: session ? "offline" : "signed_out" }, account: session }));
+  };
+
+  // Apply a server answer (heartbeat / signin / activate / remove).
+  const apply = async ({ status, data }) => {
+    if (data?.session) {
+      const s = licenceSessionInfo(data.session);
+      if (s) { ref.current.session = s; LICENCE_CTX.session = s.token; await licSet("session", s); }
+    }
+    const st = data?.state;
+    if (st === "disabled") {
+      LICENCE_CTX.active = false; setEnforced(false);
+      setLic({ phase: "off", info: null, account: ref.current.session });
+      return data;
+    }
+    if (status === 401 || st === "signed_out") {
+      ref.current.session = null; LICENCE_CTX.session = ""; LICENCE_CTX.active = false;
+      await licDel("session"); await licDel("lease");
+      setLic((cur) => ({ ...cur, phase: "locked", offline: false, info: { state: "signed_out" }, account: null }));
+      return data;
+    }
+    if (!st) { await offlineDecision(); return data; } // 5xx / unexpected: fall back to the lease
+    if (st === "active") {
+      if (data.lease) await licSet("lease", data.lease);
+      LICENCE_CTX.active = true;
+      setLic((cur) => ({ ...cur, phase: "ok", offline: false, info: data, account: ref.current.session, error: data.error || "" }));
+    } else {
+      await licDel("lease"); LICENCE_CTX.active = false;
+      setLic((cur) => ({ ...cur, phase: "locked", offline: false, info: data, account: ref.current.session, error: data.error || "" }));
+    }
+    return data;
+  };
+
+  const call = async (action, extra = {}) => {
+    const { session, deviceId } = ref.current;
+    try {
+      const res = await licenceFetch({ action, session: session?.token, deviceId, label: licenceDeviceLabel(), legacyRef: legacyRef(), ...extra });
+      if (res.status >= 500 && action === "heartbeat") { await offlineDecision(); return res.data; }
+      if (res.status >= 400 && res.status !== 401 && !res.data?.state) return { error: res.data?.error || "Something went wrong. Try again." };
+      return await apply(res);
+    } catch (e) {
+      if (action === "heartbeat") { await offlineDecision(); return null; }
+      return { error: "You're offline. Connect to the internet and try again." };
+    }
+  };
+
+  const check = async () => {
+    if (ref.current.busy) return;
+    ref.current.busy = true;
+    try {
+      const st = ref.current;
+      st.deviceId = await licenceDeviceId(); LICENCE_CTX.deviceId = st.deviceId;
+      st.session = await licGet("session"); LICENCE_CTX.session = st.session?.token || "";
+      let online = true;
+      try {
+        const ctl = typeof AbortController !== "undefined" ? new AbortController() : null;
+        const timer = ctl ? setTimeout(() => ctl.abort(), 8000) : null;
+        const r = await fetch(`${LICENCE_API}?action=config`, { cache: "no-store", signal: ctl?.signal }).finally(() => timer && clearTimeout(timer));
+        if (!r.ok) throw new Error("config " + r.status);
+        st.cfg = await r.json(); await licSet("config", st.cfg);
+      } catch (e) { online = false; st.cfg = (await licGet("config")) || st.cfg; }
+      let preview = false;
+      try { preview = localStorage.getItem(LICENCE_PREVIEW_FLAG) === "1"; } catch (e) { }
+      const cfg = st.cfg;
+      if (!cfg || !cfg.ready || (!cfg.enabled && !preview)) {
+        LICENCE_CTX.active = false; setEnforced(false);
+        setLic({ phase: "off", info: null, account: st.session });
+        return;
+      }
+      if (cfg.enabled) setEnforced(true);
+      if (!online) { await offlineDecision(); return; }
+      if (!st.session) { setLic((cur) => ({ ...cur, phase: "locked", offline: false, info: { state: "signed_out" }, account: null })); return; }
+      await call("heartbeat");
+    } finally { ref.current.busy = false; }
+  };
+
+  const signIn = async (idToken) => {
+    if (!ref.current.deviceId) { ref.current.deviceId = await licenceDeviceId(); LICENCE_CTX.deviceId = ref.current.deviceId; }
+    try {
+      const res = await licenceFetch({ action: "signin", idToken, deviceId: ref.current.deviceId, label: licenceDeviceLabel(), legacyRef: legacyRef() }, 15000);
+      if (res.status >= 400 && !res.data?.state) return { error: res.data?.error || "Google sign-in didn't work. Try again." };
+      return await apply(res);
+    } catch (e) { return { error: "You're offline. Connect to the internet and try again." }; }
+  };
+  const signOut = async () => {
+    await call("signout");
+    ref.current.session = null; LICENCE_CTX.session = ""; LICENCE_CTX.active = false;
+    await licDel("session"); await licDel("lease");
+    try { window.google?.accounts?.id?.disableAutoSelect?.(); } catch (e) { }
+    setLic((cur) => ({ ...cur, phase: ref.current.cfg?.enabled || localStorage.getItem(LICENCE_PREVIEW_FLAG) === "1" ? "locked" : "off", info: { state: "signed_out" }, account: null }));
+  };
+  const checkout = async (product) => {
+    const r = await call("checkout", { product });
+    if (r?.url) {
+      try { localStorage.setItem(LICENCE_PENDING_FLAG, product); } catch (e) { }
+      window.location.href = r.url;
+      return {};
+    }
+    return r || { error: "Couldn't start checkout." };
+  };
+
+  // Back from Stripe (?licence=success|cancelled). The webhook -- never this
+  // URL -- marks the account paid, so poll the server until it has.
+  const handleReturn = async () => {
+    let r = null;
+    try {
+      const sp = new URLSearchParams(location.search);
+      r = sp.get("licence");
+      if (r !== "success" && r !== "cancelled") return;
+      sp.delete("licence");
+      history.replaceState(null, "", location.pathname + (sp.toString() ? "?" + sp : "") + location.hash);
+    } catch (e) { return; }
+    let product = null;
+    try { product = localStorage.getItem(LICENCE_PENDING_FLAG); localStorage.removeItem(LICENCE_PENDING_FLAG); } catch (e) { }
+    if (r === "cancelled") { setNotice({ type: "cancelled", text: "Purchase cancelled \u2014 you haven't been charged." }); return; }
+    const wantTwo = product === "two" || product === "upgrade";
+    setNotice({ type: "waiting", text: wantTwo && product === "upgrade" ? "Payment received. Upgrading to Phone and computer..." : "Payment received. Activating this device..." });
+    for (let n = 0; n < 20; n++) {
+      await new Promise((res) => setTimeout(res, n === 0 ? 1500 : 3000));
+      const d = await call("heartbeat");
+      const done = wantTwo ? d?.plan === 2 && (d?.state === "active" || d?.state === "slots_full" || d?.state === "device_removed")
+        : d?.state === "active" || d?.state === "slots_full" || d?.state === "device_removed";
+      if (done) {
+        setNotice({ type: "success", text: d.state === "active"
+          ? (product === "upgrade" ? "You're on Phone and computer \u2014 two devices can be signed in together." : "Licence active on this device. Thanks for buying SupportFlow.")
+          : "Payment confirmed. Choose which device to use the licence on." });
+        return;
+      }
+      if (d?.state === "disabled") { setNotice(null); return; }
+    }
+    setNotice({ type: "cancelled", text: "Your payment is still being confirmed. This can take a minute \u2014 tap Try again shortly." });
+  };
+
+  useEffect(() => {
+    // Owner preview switch: /app?licence-preview=1 (or =0 to leave preview).
+    try {
+      const sp = new URLSearchParams(location.search);
+      const pv = sp.get("licence-preview");
+      if (pv === "1") localStorage.setItem(LICENCE_PREVIEW_FLAG, "1");
+      if (pv === "0") localStorage.removeItem(LICENCE_PREVIEW_FLAG);
+    } catch (e) { }
+    // iPhone Home Screen app signs in with Google's redirect flow; the ID
+    // token comes back in the URL fragment. Use it once, then clear it.
+    const m = (location.hash || "").match(/sf_idt=([^&]+)/);
+    (async () => {
+      if (m) {
+        history.replaceState(null, "", location.pathname + location.search);
+        await check();
+        await signIn(decodeURIComponent(m[1]));
+      } else {
+        await check();
+      }
+      await handleReturn();
+    })();
+    const iv = setInterval(check, LICENCE_HEARTBEAT_MS);
+    const onOnline = () => check();
+    window.addEventListener("online", onOnline);
+    return () => { clearInterval(iv); window.removeEventListener("online", onOnline); };
+  }, []);
+
+  return { ...lic, clientId: ref.current.cfg?.clientId || "", notice, dismissNotice: () => setNotice(null), check, call, signIn, signOut, checkout };
+}
+
+function LicenceGoogleButton({ clientId, onCredential }) {
+  const el = useRef(null);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    let gone = false;
+    (async () => {
+      for (let i = 0; i < 60 && !window.google?.accounts?.id; i++) await new Promise((r) => setTimeout(r, 100));
+      if (gone) return;
+      if (!window.google?.accounts?.id || !clientId) { setErr("Google sign-in couldn't load. Check your connection and try again."); return; }
+      const ios = /iPhone|iPad/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+      const redirect = ios && licenceStandalone();
+      google.accounts.id.initialize({
+        client_id: clientId,
+        callback: (resp) => resp?.credential && onCredential(resp.credential),
+        auto_select: false,
+        itp_support: true,
+        ux_mode: redirect ? "redirect" : "popup",
+        ...(redirect ? { login_uri: `${location.origin}${LICENCE_API}?action=google-redirect` } : {}),
+      });
+      if (el.current) google.accounts.id.renderButton(el.current, { theme: "outline", size: "large", text: "signin_with", shape: "pill", width: 260 });
+    })();
+    return () => { gone = true; };
+  }, [clientId]);
+  return <div>
+    <div ref={el} style={{ display: "flex", justifyContent: "center", minHeight: 44 }} />
+    {err && <div style={{ fontSize: 12.5, color: "var(--warn)", marginTop: 8 }}>{err}</div>}
+  </div>;
+}
+
+function LicencePlans({ onBuy, busy }) {
+  const tick = (t, no) => <div style={{ display: "flex", gap: 8, fontSize: 12.5, color: no ? "var(--tx-3)" : "var(--tx-2)", lineHeight: 1.5, marginTop: 5 }}>
+    <span style={{ color: no ? "var(--tx-3)" : "var(--good)", fontWeight: 700, flexShrink: 0 }}>{no ? "\u2715" : "\u2713"}</span><span>{t}</span></div>;
+  const card = (id, name, price, line, yes, no) => (
+    <div className="panel" style={{ textAlign: "left", borderColor: id === "two" ? "var(--brass)" : undefined }}>
+      <div className="eyebrow" style={{ color: "var(--brass)" }}>{name}</div>
+      <div className="disp" style={{ fontSize: 28, margin: "6px 0 2px" }}>A${price} <span style={{ fontSize: 13, color: "var(--tx-3)", fontFamily: "inherit" }}>once</span></div>
+      <div style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 8 }}>{line}</div>
+      {yes.map((t) => <React.Fragment key={t}>{tick(t)}</React.Fragment>)}
+      {no.map((t) => <React.Fragment key={t}>{tick(t, true)}</React.Fragment>)}
+      <button className="btn" style={{ marginTop: 14, width: "100%" }} disabled={!!busy} onClick={() => onBuy(id)}>
+        {busy === id ? "One moment..." : `Buy ${name} \u2014 A$${price}`}
+      </button>
+    </div>
+  );
+  return <div style={{ width: "100%", maxWidth: 420 }}>
+    {card("one", "One device", 49, "One device at a time.",
+      ["Use SupportFlow on one phone, tablet or computer", "Move it to a new device whenever you like", "Upgrade to Phone and computer later for $20", "No subscription, no monthly fees"],
+      ["Not signed in on two devices at the same time"])}
+    {card("two", "Phone and computer", 69, "Phone and computer signed in together.",
+      ["Two devices signed in at the same time", "Swap either device whenever you like", "No subscription, no monthly fees"],
+      ["Not for sharing with another person \u2014 one Google account, one licence"])}
+    <div style={{ fontSize: 11.5, color: "var(--tx-3)", lineHeight: 1.6, marginTop: 12, textAlign: "center" }}>
+      Prices in AUD. Your licence belongs to your Google account. Your records stay on your device and back up to your own Google Drive, as now.
+    </div>
+  </div>;
+}
+
+// Shown when a new install finds every slot in use, or this install was moved away.
+function LicenceDeviceChooser({ info, busy, onActivate, onUpgrade }) {
+  const devices = (info.devices || []).filter((d) => !d.current);
+  const me = licenceBaseLabel(licenceDeviceLabel());
+  const room = devices.length < (info.cap || 1);
+  const sameHint = (d) => licenceBaseLabel(d.label) === me
+    ? <div style={{ fontSize: 11.5, color: "var(--brass-lift)", marginTop: 3 }}>Same type of device as this one. If it's this phone's browser or an old install, replace it.</div> : null;
+  if (room) return <>
+    <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.65, marginBottom: 16 }}>
+      {info.reason === "replaced" ? "Your licence was moved to another device, so this one was signed out." : "This device was removed from your licence."} There's a free slot, so you can use it here again.
+    </div>
+    <button className="btn" disabled={busy} onClick={() => onActivate(null)}>{busy ? "One moment..." : "Use the licence on this device"}</button>
+  </>;
+  if ((info.cap || 1) === 1) {
+    const d = devices[0] || {};
+    return <>
+      <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.65, marginBottom: 14 }}>
+        {info.state === "device_removed" ? "Your licence was moved to another device. " : ""}Your One device licence is in use on:
+      </div>
+      <div className="panel" style={{ textAlign: "left", width: "100%", maxWidth: 380, marginBottom: 16 }}>
+        <div style={{ fontSize: 14, fontWeight: 600 }}>{d.label || "Another device"}</div>
+        <div style={{ fontSize: 12, color: "var(--tx-3)", marginTop: 3 }}>Last used {licenceAgo(d.lastSeen)}</div>
+        {sameHint(d)}
+      </div>
+      <div className="disp" style={{ fontSize: 19, marginBottom: 12 }}>Move the licence here?</div>
+      <button className="btn" disabled={busy} onClick={() => onActivate(d.id)}>{busy ? "Moving..." : "Move the licence here"}</button>
+      <div style={{ fontSize: 12, color: "var(--tx-3)", lineHeight: 1.6, marginTop: 12, maxWidth: 360 }}>
+        {d.label || "The other device"} will lock the next time it connects. We'll email your Google address to let you know.
+      </div>
+      <button className="btn ghost tiny" style={{ marginTop: 16 }} disabled={busy} onClick={onUpgrade}>Use both at once? Upgrade to Phone and computer &mdash; pay $20 more</button>
+    </>;
+  }
+  return <>
+    <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.65, marginBottom: 14 }}>
+      Both devices on your Phone and computer licence are in use. Choose one to replace with this device.
+    </div>
+    <div style={{ width: "100%", maxWidth: 380 }}>
+      {devices.map((d) => (
+        <div key={d.id} className="panel" style={{ textAlign: "left", display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>{d.label}</div>
+            <div style={{ fontSize: 12, color: "var(--tx-3)", marginTop: 3 }}>Last used {licenceAgo(d.lastSeen)}</div>
+            {sameHint(d)}
+          </div>
+          <button className="btn tiny" disabled={busy} onClick={() => onActivate(d.id)}>Replace</button>
+        </div>
+      ))}
+    </div>
+    <div style={{ fontSize: 12, color: "var(--tx-3)", lineHeight: 1.6, marginTop: 12, maxWidth: 360 }}>The device you replace locks the next time it connects.</div>
+  </>;
+}
+
+// The single locked screen: sign in, buy, or move the licence here.
+function LicenceGate({ licence, theme }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const info = licence.info || {};
+  const state = info.state;
+
+  const run = async (fn) => {
+    setBusy(true); setErr("");
+    try { const r = await fn(); if (r?.error) setErr(r.error); }
+    finally { setBusy(false); }
+  };
+  const activate = (replaceDeviceId) => run(async () => {
+    const r = await licence.call("activate", { replaceDeviceId });
+    if (r?.state === "active") licence.dismissNotice();
+    return r;
+  });
+  const buy = (product) => run(async () => { setBusy(product); return licence.checkout(product); });
+  const signIn = (cred) => run(() => licence.signIn(cred));
+
+  let body;
+  if (state === "signed_out") {
+    body = <>
+      <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.65, marginBottom: 20, maxWidth: 360 }}>
+        Sign in with Google to open SupportFlow. Your licence belongs to your Google account, so signing in on a new phone or after reinstalling brings it straight back.
+      </div>
+      <LicenceGoogleButton clientId={licence.clientId} onCredential={signIn} />
+      <div style={{ fontSize: 12, color: "var(--tx-3)", lineHeight: 1.6, marginTop: 16, maxWidth: 340 }}>New to SupportFlow? Sign in first, then choose a plan.</div>
+    </>;
+  } else if (state === "offline") {
+    body = <>
+      <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.65, marginBottom: 18, maxWidth: 360 }}>
+        This device needs to check in to confirm your licence. Connect to the internet, then try again. After each check-in SupportFlow keeps working offline for 7 days.
+      </div>
+      <button className="btn" disabled={busy} onClick={() => run(licence.check)}>Try again</button>
+    </>;
+  } else if (state === "unpaid") {
+    body = <>
+      <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.65, marginBottom: 18, maxWidth: 380 }}>
+        {info.revoked ? "The purchase on this Google account was refunded, so it no longer has a licence. " : ""}
+        Choose how you'll use SupportFlow. Pay once &mdash; no subscription.
+      </div>
+      <LicencePlans busy={busy} onBuy={buy} />
+    </>;
+  } else if (state === "slots_full" || state === "device_removed") {
+    body = <LicenceDeviceChooser info={info} busy={!!busy} onActivate={activate} onUpgrade={() => buy("upgrade")} />;
+  } else {
+    body = <button className="btn" disabled={busy} onClick={() => run(licence.check)}>Try again</button>;
+  }
+
+  return (
+    <div className="sl" data-theme={theme}>
+      <div className="lockwrap" style={{ justifyContent: "flex-start", paddingTop: 56 }}>
+        <div className="lockmark">
+          <svg viewBox="0 0 512 512" width="44" height="44" aria-hidden="true">
+            <path d="M344 118C344 118 300 90 232 90C152 90 100 132 100 190C100 244 142 272 214 284L298 298C350 306 380 328 380 366C380 412 336 442 264 442C190 442 148 414 148 414"
+              fill="none" stroke="#C8913A" strokeWidth="72" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </div>
+        <div className="disp" style={{ fontSize: 21, marginBottom: 14 }}>SupportFlow</div>
+        {licence.notice && <div className="callout" style={{ marginBottom: 18, textAlign: "left", maxWidth: 380, borderLeftColor: licence.notice.type === "cancelled" ? "var(--warn)" : "var(--good)" }}>{licence.notice.text}</div>}
+        {body}
+        {(err || licence.error) && <div style={{ fontSize: 12.5, color: "var(--warn)", marginTop: 14, maxWidth: 360 }}>{err || licence.error}</div>}
+        {licence.account && state !== "signed_out" && (
+          <div style={{ fontSize: 12, color: "var(--tx-3)", marginTop: 26 }}>
+            Signed in as {licence.account.email || "your Google account"}
+            <div><button className="btn ghost tiny" style={{ marginTop: 8 }} disabled={!!busy} onClick={() => run(licence.signOut)}>Use a different Google account</button></div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Settings -> Licence & devices.
+function LicencePanel({ licence, open, onToggle }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const info = licence.info || {};
+  const devices = info.devices || [];
+  const run = async (fn) => { setBusy(true); setErr(""); try { const r = await fn(); if (r?.error) setErr(r.error); } finally { setBusy(false); } };
+  const remove = (d) => {
+    const msg = d.current
+      ? "Remove this device? SupportFlow will lock here until you sign in and use the licence again."
+      : `Remove ${d.label}? It will lock the next time it connects, and its slot is freed straight away.`;
+    if (confirm(msg)) run(() => licence.call("remove", { targetDeviceId: d.id }));
+  };
+  return (
+    <div className="stepcard done" style={{ marginTop: 22 }}>
+      <span className="stepnum">✓</span>
+      <span className="stepcard-chev" data-open={open ? 1 : 0} onClick={onToggle} aria-hidden="true">›</span>
+      <div className="steplead stepcard-head" onClick={onToggle}>{info.planName || "Licensed"}</div>
+      <div className="eyebrow stepcard-head" style={{ marginBottom: open ? 10 : 0 }} onClick={onToggle}>Licence &amp; devices</div>
+      {open && <>
+        <div style={{ fontSize: 13, color: "var(--tx-2)", lineHeight: 1.65, marginBottom: 12 }}>
+          <b>{info.planName}</b> &middot; {info.cap === 2 ? "two devices signed in at the same time" : "one device at a time"}.
+          {licence.offline && <> Offline &mdash; last confirmed licence is valid until {new Date(licence.leaseExp).toLocaleDateString("en-AU")}.</>}
+        </div>
+        {devices.length > 0 && <div className="eyebrow" style={{ marginBottom: 4 }}>In use ({devices.length} of {info.cap})</div>}
+        {devices.map((d) => (
+          <div key={d.id} className="row">
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 600 }}>{d.label}{d.current ? " \u00b7 this device" : ""}</div>
+              <div style={{ fontSize: 11.5, color: "var(--tx-3)", marginTop: 3 }}>Last seen {licenceAgo(d.lastSeen)} &middot; first signed in {new Date(d.firstSeen).toLocaleDateString("en-AU")}</div>
+            </div>
+            <button className="btn ghost tiny" disabled={busy || licence.offline} onClick={() => remove(d)}>Remove</button>
+          </div>
+        ))}
+        <div style={{ fontSize: 11.5, color: "var(--tx-3)", lineHeight: 1.6, margin: "10px 0 14px" }}>
+          A device that hasn't been opened online for 21 days stops counting automatically. On iPhone, Safari and the Home Screen app count separately &mdash; remove whichever you don't use.
+        </div>
+        {info.plan === 1 && (
+          <button className="btn" style={{ marginBottom: 12 }} disabled={busy || licence.offline} onClick={() => run(() => licence.checkout("upgrade"))}>
+            Upgrade to Phone and computer &mdash; pay $20 more
+          </button>
+        )}
+        <div style={{ fontSize: 12, color: "var(--tx-3)" }}>
+          Signed in as {licence.account?.email || "your Google account"}
+          <button className="btn ghost tiny" style={{ marginLeft: 10 }} disabled={busy} onClick={() => { if (confirm("Sign out of SupportFlow on this device? Your records stay here; sign in again to unlock.")) run(licence.signOut); }}>Sign out</button>
+        </div>
+        {err && <div style={{ fontSize: 12.5, color: "var(--warn)", marginTop: 10 }}>{err}</div>}
+      </>}
+    </div>
+  );
+}
+
+
+// While the first check runs on a device that was licensed last time.
+function LicenceChecking({ theme }) {
+  return <div className="sl" data-theme={theme} style={{ padding: 60 }}><div className="eyebrow">Checking your licence{"\u2026"}</div></div>;
+}
 
 const PRICE_SOURCE = {
   doc: "NDIS Pricing Schedule 2026-27",
@@ -1886,6 +2443,8 @@ function LockScreen({ onUnlock, onForgot }) {
 
 
 function App() {
+  // Device licensing. phase "off" (switch off) leaves everything as before.
+  const licence = useLicence();
   const [theme, setTheme] = useState("dark");
   const [tab, setTab] = useState("home");
   const [sumTab, setSumTab] = useState("invoices");   // invoices | expenses | position | bas
@@ -2046,7 +2605,8 @@ function App() {
   // could not confirm ("unconfigured", "error", "none", still loading) is
   // treated as fully open -- a broken status check should never lock someone
   // out of their own records.
-  const canCreate = !(subStatus === "canceled" || subStatus === "past_due" ||
+  // A confirmed device licence (only once the owner switch is on) always may.
+  const canCreate = licence.phase === "ok" || !(subStatus === "canceled" || subStatus === "past_due" ||
     (subStatus === "trialing" && trialEnd && new Date(trialEnd) < new Date()));
 
   // The one shared guard. Every "create a new record" action calls this
@@ -2455,6 +3015,9 @@ function App() {
 
   if (!loaded) return <div className="sl" data-theme="dark" style={{ padding: 60 }}><div className="eyebrow">Loading…</div></div>;
 
+  if (licence.phase === "checking") return <LicenceChecking theme={theme} />;
+  if (licence.phase === "locked") return <LicenceGate licence={licence} theme={theme} />;
+
   if (locked) return (
     <LockScreen
       onUnlock={() => setLocked(false)}
@@ -2467,7 +3030,14 @@ function App() {
   );
 
   return (
-    <>
+    <LicenceContext.Provider value={licence}>
+    {licence.notice && (
+      <div className="checkout-toast" data-type={licence.notice.type === "cancelled" ? "cancelled" : "success"} role="status" aria-live="polite">
+        <span className="ti">{licence.notice.type === "cancelled" ? "\u2715" : "\u2713"}</span>
+        <span className="tm">{licence.notice.text}</span>
+        <button className="tc" onClick={licence.dismissNotice} aria-label="Dismiss">{"\u00d7"}</button>
+      </div>
+    )}
     {checkoutToastOpen && checkoutResult && (
       <div className="checkout-toast" data-type={checkoutResult} role="status" aria-live="polite">
         <span className="ti">{checkoutResult === "success" ? "✓" : "✕"}</span>
@@ -2540,7 +3110,11 @@ function App() {
                     </div>
                     <div style={{ fontSize: 10.5, color: "var(--tx-3)", marginTop: 6 }}>Version {APP_VERSION}</div>
                   </div>
-                  {isLifetime ? (
+                  {licence.phase === "ok" ? (
+                    <button className="buycredits" onClick={() => { setMenuOpen(false); setOpenPane("settings"); go("settings"); }} aria-label="Licence and devices">
+                      <span style={{ fontSize: 16, fontWeight: 700, color: "var(--brass-lift)", lineHeight: 1.2 }}>{licence.info?.planName || "Licensed"}</span>
+                    </button>
+                  ) : isLifetime ? (
                     <div className="buycredits" style={{ display: "flex", alignItems: "center", gap: 9, padding: "10px 16px", cursor: "default" }} aria-label="Lifetime licence">
                       <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ color: "var(--brass)" }}>
                         <path d="M18.2 8.6c-1.9 0-3.4 1.6-6.2 3.4-2.8 1.8-4.3 3.4-6.2 3.4a3.4 3.4 0 0 1 0-6.8c1.9 0 3.4 1.6 6.2 3.4 2.8 1.8 4.3 3.4 6.2 3.4a3.4 3.4 0 0 0 0-6.8z" />
@@ -2561,7 +3135,7 @@ function App() {
                       </span>
                     </button>
                   )}
-                  {!isLifetime && subStatus !== "active" && (
+                  {licence.phase !== "ok" && !isLifetime && subStatus !== "active" && (
                     <button className="btn ghost tiny" style={{ fontSize: 11, marginTop: -4 }} onClick={() => { setMenuOpen(false); setTrialNoticeRestore(true); setShowTrialNotice(true); }}>
                       Restore licence
                     </button>
@@ -2864,7 +3438,7 @@ function App() {
         );
       })()}
     </div>
-  </>
+  </LicenceContext.Provider>
 );
 }
 
@@ -3749,7 +4323,7 @@ async function chargeInvoiceCredit(invoiceNumber) {
   try {
     resp = await fetch("/.netlify/functions/charge-invoice", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...licenceHeaders() },
       body: JSON.stringify({ clientReferenceId: getDeviceRef(), invoiceNumber: num }),
     });
   } catch (e) {
@@ -3766,6 +4340,7 @@ async function chargeInvoiceCredit(invoiceNumber) {
     return "ok";
   }
   if (d.reason === "already_charged") { rememberCharged(num); return "ok"; }
+  if (d.reason === "licensed") return "ok"; // device licence: no credits needed
   return "error";
 }
 
@@ -7251,7 +7826,7 @@ function SupportFlowAssistant({ onClose, go, currentScreen, openHelp }) {
       aiBump("assistant");
       const res = await fetch("/.netlify/functions/supportflow-assistant", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...licenceHeaders() },
         body: JSON.stringify({ question: text, screen: currentScreen || "",
           manualContext: pickManualContext(text), history }),
       });
@@ -8477,6 +9052,7 @@ function PaymentDetailsFields({ p, setP }) {
 
 function Settings({ data, save, theme, flip, wipeAll, rerun, startPane, helpInitialView }) {
   const [pane, setPane] = useState(startPane || "settings");
+  const licence = React.useContext(LicenceContext);
   // The menu can ask for a different pane while Settings is already open.
   // useState's initial value is only read once on mount, so without this the
   // profile menu's Settings/Manual & help shortcuts would do nothing the
@@ -8595,6 +9171,10 @@ function Settings({ data, save, theme, flip, wipeAll, rerun, startPane, helpInit
       </div>
 
       <LockPanel open={openSection === "lock"} onToggle={() => toggleSection("lock")} />
+
+      {licence && licence.phase === "ok" && (
+        <LicencePanel licence={licence} open={openSection === "licence"} onToggle={() => toggleSection("licence")} />
+      )}
 
       <div className={"stepcard" + (profileOK ? " done" : "")}>
         <span className="stepnum">{profileOK ? "✓" : "1"}</span>

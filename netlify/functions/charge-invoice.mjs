@@ -13,6 +13,8 @@
 //   402 { error: "...", creditsRemaining: 0 }            block: don't generate/show
 //   400 / 405 / 500 / 503 { error }
 
+import { checkRequestLicence } from "../lib/licence.mjs";
+
 const json = (obj, status = 200) =>
   new Response(JSON.stringify(obj), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
 
@@ -33,6 +35,13 @@ export default async (req) => {
 
   const { SUPABASE_URL, SUPABASE_SERVICE_KEY } = process.env;
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return json({ error: "Billing not configured" }, 503);
+
+  // Device licence holders (One device / Phone and computer) invoice without
+  // credits. Checked server-side against the licence + active device list.
+  if (req.headers.get("x-sf-licence")) {
+    const lic = await checkRequestLicence(req, body).catch(() => null);
+    if (lic?.ok) return json({ charged: false, reason: "licensed" });
+  }
 
   try {
     const resp = await fetch(`${SUPABASE_URL}/rest/v1/rpc/charge_invoice_credit`, {

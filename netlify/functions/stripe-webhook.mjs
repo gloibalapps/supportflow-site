@@ -19,6 +19,7 @@
 //   accounts.credit_balance, credit_purchases table, add_credits() RPC.
 
 import crypto from "node:crypto";
+import { supa, recomputeLicence, PRODUCTS } from "../lib/licence.mjs";
 
 const TOLERANCE_SECONDS = 300; // reject anything claiming to be older than 5 minutes
 
@@ -29,29 +30,53 @@ const PACK_CREDITS = Object.freeze({ casual: 10, popular: 30, value: 100, lifeti
 // retried/logged rather than guessed at.
 const AMOUNT_TO_PACK = Object.freeze({ 799: "casual", 1999: "popular", 3999: "value", 4900: "lifetime" });
 
-function verifyStripeSignature(payload, header, secret) {
-  if (!header) return false;
-  const parts = Object.fromEntries(
-    header.split(",").map((p) => p.split("=").map((s) => s.trim()))
-  );
-  const timestamp = parts.t;
-  const signature = parts.v1;
-  if (!timestamp || !signature) return false;
+// STRIPE_WEBHOOK_SECRET may hold one whsec_ value, or several separated by
+// commas/spaces (e.g. the live and test-mode endpoint secrets, or old + new
+// while rolling). Surrounding quotes/whitespace from copy-paste are stripped:
+// a stray newline in the env value makes every HMAC miss.
+function webhookSecrets() {
+  return String(process.env.STRIPE_WEBHOOK_SECRET || "")
+    .split(/[\s,]+/)
+    .map((s) => s.trim().replace(/^['"]|['"]$/g, ""))
+    .filter(Boolean);
+}
+
+// Returns { ok: true } or { ok: false, reason } so the logs say WHY a
+// delivery was rejected (never the secret itself).
+function verifyStripeSignature(payload, header, secrets) {
+  if (!header) return { ok: false, reason: "no Stripe-Signature header" };
+  let timestamp = null;
+  const signatures = [];
+  // Stripe can send several v1 entries (e.g. while a signing secret is being
+  // rolled), so collect them all instead of keeping only the last one.
+  for (const part of header.split(",")) {
+    const i = part.indexOf("=");
+    if (i < 0) continue;
+    const k = part.slice(0, i).trim();
+    const v = part.slice(i + 1).trim();
+    if (k === "t") timestamp = v;
+    else if (k === "v1" && /^[0-9a-f]{64}$/i.test(v)) signatures.push(Buffer.from(v, "hex"));
+  }
+  if (!timestamp || !signatures.length) return { ok: false, reason: "header has no t / v1" };
 
   const age = Math.abs(Date.now() / 1000 - Number(timestamp));
-  if (!Number.isFinite(age) || age > TOLERANCE_SECONDS) return false;
+  if (!Number.isFinite(age) || age > TOLERANCE_SECONDS) return { ok: false, reason: `timestamp outside ${TOLERANCE_SECONDS}s tolerance` };
 
-  const expected = crypto
-    .createHmac("sha256", secret)
-    .update(`${timestamp}.${payload}`, "utf8")
-    .digest("hex");
-
-  // constant-time comparison, so a timing attack can't be used to guess the
-  // correct signature one byte at a time
-  const a = Buffer.from(expected, "hex");
-  const b = Buffer.from(signature, "hex");
-  if (a.length !== b.length) return false;
-  return crypto.timingSafeEqual(a, b);
+  for (const secret of secrets) {
+    const expected = crypto.createHmac("sha256", secret).update(`${timestamp}.${payload}`, "utf8").digest();
+    // constant-time comparison, so a timing attack can't be used to guess the
+    // correct signature one byte at a time
+    if (signatures.some((sig) => sig.length === expected.length && crypto.timingSafeEqual(sig, expected))) {
+      return { ok: true };
+    }
+  }
+  const badFormat = secrets.filter((s) => !s.startsWith("whsec_")).length;
+  return {
+    ok: false,
+    reason: badFormat
+      ? `STRIPE_WEBHOOK_SECRET doesn't look like a webhook signing secret (expected whsec_...; ${badFormat} of ${secrets.length} value(s) don't)`
+      : `signature mismatch against ${secrets.length} configured secret(s): STRIPE_WEBHOOK_SECRET isn't this endpoint's signing secret (check live vs test mode and that it was copied from this exact endpoint)`,
+  };
 }
 
 function supaHeaders(extra = {}) {
@@ -210,12 +235,69 @@ async function grantLifetime(accountId) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Device licences (One device A$49 / Phone and computer A$69 / A$20 upgrade).
+// Created by netlify/functions/licence.mjs with metadata.kind = "licence".
+// This webhook is the ONLY thing that marks a Google account as paid; the
+// browser's ?licence=success return never does. See LICENSING.md.
+// ---------------------------------------------------------------------------
+async function handleLicenceSession(session) {
+  const sub = session.metadata?.google_sub || session.client_reference_id;
+  const product = session.metadata?.product;
+  if (!sub || !PRODUCTS[product]) {
+    console.error(`stripe-webhook: licence session ${session.id} missing google_sub/product`);
+    return;
+  }
+  const email = session.customer_details?.email || session.customer_email || null;
+  // Make sure the licence row exists (unpaid) so the payment can reference it.
+  await supa("licences?on_conflict=google_sub", {
+    method: "POST",
+    body: { google_sub: sub, ...(email ? { email } : {}), updated_at: new Date().toISOString() },
+    prefer: "resolution=merge-duplicates,return=minimal",
+  });
+  const inserted = await supa("licence_payments?on_conflict=stripe_session_id", {
+    method: "POST",
+    body: {
+      stripe_session_id: session.id,
+      stripe_payment_intent_id: typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id || null,
+      google_sub: sub,
+      product,
+      amount_aud: (Number(session.amount_total) || 0) / 100,
+      status: "paid",
+    },
+    prefer: "resolution=ignore-duplicates,return=representation",
+  });
+  if (!Array.isArray(inserted) || !inserted.length) {
+    console.log(`stripe-webhook: licence session ${session.id} already recorded`);
+  }
+  // Recompute every time (idempotent): plan comes from what is still paid.
+  const lic = await recomputeLicence(sub);
+  console.log(`stripe-webhook: licence ${product} for ${sub} -> plan ${lic.plan} ${lic.status}`);
+}
+
+// Refunds and disputes: mark the payment and recompute. A refunded $49/$69
+// drops the account back to unpaid (it locks on the next server check); a
+// refunded $20 upgrade drops Phone and computer back to One device.
+async function handleLicenceReversal(paymentIntentId, status) {
+  if (!paymentIntentId) return;
+  const rows = await supa(`licence_payments?stripe_payment_intent_id=eq.${encodeURIComponent(paymentIntentId)}&select=google_sub,status`);
+  if (!rows?.length) return; // not a licence payment (credit pack / legacy)
+  await supa(`licence_payments?stripe_payment_intent_id=eq.${encodeURIComponent(paymentIntentId)}`, {
+    method: "PATCH", body: { status, updated_at: new Date().toISOString() }, prefer: "return=minimal",
+  });
+  for (const sub of new Set(rows.map((r) => r.google_sub))) {
+    const lic = await recomputeLicence(sub);
+    console.log(`stripe-webhook: payment ${paymentIntentId} ${status} -> ${sub} plan ${lic.plan} ${lic.status}`);
+  }
+}
+
 async function handlePaidSession(session) {
   if (session.mode !== "payment") return; // nothing else is sold
   if (session.payment_status !== "paid" && session.payment_status !== "no_payment_required") {
     // Delayed payment methods: wait for async_payment_succeeded.
     return;
   }
+  if (session.metadata?.kind === "licence") return handleLicenceSession(session);
 
   const accountId = session.client_reference_id;
   if (!accountId) {
@@ -233,9 +315,11 @@ async function handlePaidSession(session) {
   const packName = session.metadata?.pack || AMOUNT_TO_PACK[session.amount_total];
   const credits = Number(session.metadata?.credits) || PACK_CREDITS[packName];
   if (!packName || !credits) {
-    // Not one of ours (e.g. a Payment Link on the same Stripe account). A 500
-    // can never succeed on retry, so log for a manual look and acknowledge.
-    console.error(`stripe-webhook: session ${session.id} isn't a SupportFlow credit pack (amount ${session.amount_total}, metadata ${JSON.stringify(session.metadata || {})}); acknowledged without changes`);
+    // Not one of ours (e.g. a Payment Link or a price sold outside the app on
+    // the same Stripe account). Stripe would resend the identical payload, so
+    // a 500 can never succeed and only shows up as a failed delivery: log it
+    // for a manual look and acknowledge.
+    console.error(`stripe-webhook: session ${session.id} isn't a SupportFlow credit pack or licence (amount ${session.amount_total}, metadata ${JSON.stringify(session.metadata || {})}); acknowledged without changes`);
     return;
   }
 
@@ -275,9 +359,9 @@ export default async (req) => {
     return new Response("Method not allowed", { status: 405 });
   }
 
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  const secrets = webhookSecrets();
   const supaConfigured = process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY;
-  if (!webhookSecret || !supaConfigured) {
+  if (!secrets.length || !supaConfigured) {
     // Fail loudly in the logs, but return 500 rather than 200 — a 200 tells
     // Stripe "handled", and a silently-dropped event is worse than a retry.
     console.error("stripe-webhook: missing STRIPE_WEBHOOK_SECRET or Supabase env vars");
@@ -287,9 +371,10 @@ export default async (req) => {
   const payload = await req.text();
   const sigHeader = req.headers.get("stripe-signature");
 
-  if (!verifyStripeSignature(payload, sigHeader, webhookSecret)) {
-    console.error("stripe-webhook: signature verification failed");
-    return new Response("Invalid signature", { status: 400 });
+  const sig = verifyStripeSignature(payload, sigHeader, secrets);
+  if (!sig.ok) {
+    console.error(`stripe-webhook: signature verification failed: ${sig.reason}`);
+    return new Response(`Invalid signature: ${sig.reason}`, { status: 400 });
   }
 
   let event;
@@ -304,6 +389,22 @@ export default async (req) => {
       case "checkout.session.completed":
       case "checkout.session.async_payment_succeeded":
         await handlePaidSession(event.data.object);
+        break;
+
+      // Licence reversals. Register these events on the webhook endpoint too.
+      case "charge.refunded": {
+        const charge = event.data.object;
+        // Only a full refund removes the licence; a partial goodwill refund doesn't.
+        if (charge.refunded === true || Number(charge.amount_refunded) >= Number(charge.amount)) {
+          await handleLicenceReversal(charge.payment_intent, "refunded");
+        }
+        break;
+      }
+      case "charge.dispute.created":
+        await handleLicenceReversal(event.data.object.payment_intent, "disputed");
+        break;
+      case "charge.dispute.closed":
+        if (event.data.object.status === "won") await handleLicenceReversal(event.data.object.payment_intent, "paid");
         break;
 
       default:

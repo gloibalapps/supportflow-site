@@ -1,6 +1,6 @@
 /* SupportFlow™ — service worker
    Bump CACHE when you deploy, or testers will keep the old build. */
-const CACHE = 'supportflow-v20-public-full';
+const CACHE = 'supportflow-v21-public-full';
 
 // Everything needed to open the app with no network at all.
 const CORE = [
@@ -85,7 +85,7 @@ self.addEventListener('fetch', (e) => {
 self.addEventListener("activate", event => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
-    await Promise.all(keys.map(k => (k.startsWith("supportflow-v") && k !== "supportflow-v20-public-full") ? caches.delete(k) : Promise.resolve()));
+    await Promise.all(keys.map(k => (k.startsWith("supportflow-v") && k !== "supportflow-v21-public-full") ? caches.delete(k) : Promise.resolve()));
     await self.clients.claim();
   })());
 });

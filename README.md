@@ -12,6 +12,7 @@ Installable web app. Splash page at `index.html`, the app itself at `app.html`.
 | `manifest.webmanifest` | Name, icons, colours, install behaviour |
 | `sw.js` | Service worker — offline caching |
 | `icon-*.png` | Icons, including a maskable one for Android |
+| `LICENSING.md` | Owner guide to the one-off device licence (off until you switch it on) |
 
 ## Getting it online
 
@@ -151,3 +152,10 @@ SupportFlow is an independent software product and is not affiliated with, endor
 
 
 **Domain transition:** All new-user links use `supportflow.work`. The former domain remains only for existing-user compatibility/redirects during transition.
+
+## Device licensing (off by default)
+
+One-off A$49 "One device" / A$69 "Phone and computer" licences tied to a
+Google account, behind an owner switch. Nothing changes for anyone until the
+switch is turned on. Setup, testing and the exact steps to turn it on are in
+[`LICENSING.md`](LICENSING.md).
