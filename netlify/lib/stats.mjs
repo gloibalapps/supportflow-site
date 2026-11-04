@@ -130,10 +130,11 @@ async function stripeGet(path, params = {}) {
 export async function stripeStats({ days = 30 } = {}) {
   const sinceIso = process.env.STRIPE_STATS_SINCE || process.env.LAUNCH_DATE || new Date(Date.now() - 90 * DAY).toISOString();
   const since = Math.floor(Date.parse(sinceIso) / 1000);
-  let charges, payouts, balance;
+  let charges, payouts, balance, bts;
   if (process.env.STRIPE_FIXTURE) {
     const f = JSON.parse(fs.readFileSync(process.env.STRIPE_FIXTURE, "utf8"));
     charges = f.charges.filter((c) => c.created >= since); payouts = f.payouts; balance = f.balance;
+    bts = (f.balance_transactions || []).filter((b) => b.created >= since);
   } else {
     charges = [];
     let after;
@@ -145,14 +146,30 @@ export async function stripeStats({ days = 30 } = {}) {
       if (!res.has_more) break;
       after = res.data.at(-1).id;
     }
+    bts = [];
+    let bAfter;
+    for (let page = 0; page < 20; page++) {
+      const p = { limit: 100, "created[gte]": since };
+      if (bAfter) p.starting_after = bAfter;
+      const res = await stripeGet("balance_transactions", p);
+      bts.push(...res.data);
+      if (!res.has_more) break;
+      bAfter = res.data.at(-1).id;
+    }
     [payouts, balance] = await Promise.all([stripeGet("payouts", { limit: 5 }).then((r) => r.data), stripeGet("balance")]);
   }
   const ok = charges.filter((c) => c.status === "succeeded" && c.paid);
   const cents = (n) => +(n / 100).toFixed(2);
   const gross = ok.reduce((s, c) => s + c.amount, 0);
   const refunds = ok.reduce((s, c) => s + (c.amount_refunded || 0), 0);
-  const haveFees = ok.length > 0 && ok.every((c) => c.balance_transaction && typeof c.balance_transaction === "object");
-  const fees = haveFees ? ok.reduce((s, c) => s + (c.balance_transaction.fee || 0), 0) : null;
+  // Fees and net come from balance transactions (the ledger Stripe pays out
+  // from): charge/refund fees plus standalone "stripe_fee" lines. Payouts and
+  // transfers are excluded because they move money, not earn it.
+  const ledger = (bts || []).filter((b) => b.currency === "aud" && !["payout", "transfer", "payout_cancel", "payout_failure"].includes(b.type));
+  const fees = bts ? ledger.reduce((s, b) => s + (b.type === "stripe_fee" ? -b.net : b.fee), 0) : null;
+  const ledgerNet = bts ? ledger.reduce((s, b) => s + b.net, 0) : null;
+  const LICENCE_CENTS = [4900, 6900, 2000]; // $49 one device, $69 two, $20 upgrade
+  const lic = ok.filter((c) => LICENCE_CENTS.includes(c.amount) && !c.amount_refunded);
   const today = new Date(new Date().toISOString().slice(0, 10)).getTime();
   const trend = [];
   for (let i = days - 1; i >= 0; i--) trend.push({ day: new Date(today - i * DAY).toISOString().slice(0, 10), revenue: 0, count: 0 });
@@ -172,8 +189,10 @@ export async function stripeStats({ days = 30 } = {}) {
     refundedCount: ok.filter((c) => c.amount_refunded > 0).length,
     disputes: ok.filter((c) => c.disputed).length,
     feesAud: fees === null ? null : cents(fees),
-    netAud: cents(gross - refunds - (fees || 0)),
-    netBasis: fees === null ? "gross − refunds (fees not loaded)" : "gross − refunds − Stripe fees",
+    netAud: ledgerNet === null ? cents(gross - refunds) : cents(ledgerNet),
+    netBasis: ledgerNet === null ? "gross − refunds (fees not loaded)" : "balance transactions: gross − refunds − all Stripe fees",
+    licenceSales: { count: lic.length, grossAud: cents(lic.reduce((s, c) => s + c.amount, 0)) },
+    otherCharges: ok.length - lic.length,
     trend,
     recent: charges.slice(0, 10).map((c) => ({
       at: new Date(c.created * 1000).toISOString(), amountAud: cents(c.amount), status: c.status,

@@ -42,7 +42,9 @@ const PANELS = [
       const k = (v, l) => `<div><div class="big" style="font-size:30px">${v}</div><div class="sub">${l}</div></div>`;
       return `<div class="sub" style="margin:-6px 0 12px">Charges created on/after ${esc(s.since.slice(0, 10))} (AUD, live Stripe)</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:14px">
-        ${k(aud(s.grossAud), `gross · ${s.successfulPayments} payments`)}${k(aud(s.netAud), "net · " + esc(s.netBasis))}
+        ${k(s.licenceSales.count, `licence sales · ${aud(s.licenceSales.grossAud)}`)}
+        ${k(aud(s.grossAud), `gross · ${s.successfulPayments} payments (${s.otherCharges} non-licence)`)}
+        ${k(s.feesAud === null ? "—" : aud(s.feesAud), "Stripe fees")}${k(aud(s.netAud), "net · " + esc(s.netBasis))}
         ${k(aud(s.refundsAud), `refunds · ${s.refundedCount} charges`)}${k(s.disputes, "disputes")}
         ${k(aud(s.balance.pendingAud), "balance pending")}${k(aud(s.balance.availableAud), "balance available")}</div>
       <div class="bar" style="height:90px;margin-top:16px">${s.trend.map(t => `<div title="${t.day}: ${aud(t.revenue)} (${t.count})" style="height:${(t.revenue / max) * 100}%"></div>`).join("")}</div>
