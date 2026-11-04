@@ -175,7 +175,7 @@ export async function stripeStats({ days = 30 } = {}) {
   const ledger = (bts || []).filter((b) => b.currency === "aud" && !["payout", "transfer", "payout_cancel", "payout_failure"].includes(b.type));
   const fees = bts ? ledger.reduce((s, b) => s + (b.type === "stripe_fee" ? -b.net : b.fee), 0) : null;
   const ledgerNet = bts ? ledger.reduce((s, b) => s + b.net, 0) : null;
-  const LICENCE_CENTS = [4900, 6900, 2000]; // $49 one device, $69 two, $20 upgrade
+  const LICENCE_CENTS = [4900, 6900, 2900, 2000]; // $49 one device, $69 two, $29 upgrade (2000 = earlier $20 upgrade sales)
   const lic = ok.filter((c) => LICENCE_CENTS.includes(c.amount) && !c.amount_refunded);
   const today = new Date(new Date().toISOString().slice(0, 10)).getTime();
   const trend = [];

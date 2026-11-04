@@ -236,7 +236,7 @@ async function grantLifetime(accountId) {
 }
 
 // ---------------------------------------------------------------------------
-// Device licences (One device A$49 / Phone and computer A$69 / A$20 upgrade).
+// Device licences (One device A$49 / Phone and computer A$69 / A$29 upgrade).
 // Created by netlify/functions/licence.mjs with metadata.kind = "licence".
 // This webhook is the ONLY thing that marks a Google account as paid; the
 // browser's ?licence=success return never does. See LICENSING.md.
@@ -279,7 +279,7 @@ async function handleLicenceSession(session) {
 
 // Refunds and disputes: mark the payment and recompute. A refunded $49/$69
 // drops the account back to unpaid (it locks on the next server check); a
-// refunded $20 upgrade drops Phone and computer back to One device.
+// refunded $29 upgrade drops Phone and computer back to One device.
 async function handleLicenceReversal(paymentIntentId, status) {
   if (!paymentIntentId) return;
   const rows = await supa(`licence_payments?stripe_payment_intent_id=eq.${encodeURIComponent(paymentIntentId)}&select=google_sub,status`);

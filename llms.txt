@@ -5,7 +5,7 @@
 ## Main pages
 
 - [Home](https://supportflow.work/): what SupportFlow does and how to get started
-- [Pricing](https://supportflow.work/pricing.html): A$49 one-time Lifetime licence, with a free trial of 5 invoices
+- [Pricing](https://supportflow.work/pricing.html): A$49 one-off for one licence, A$69 one-off for two; existing A$49 owners can add a second licence for A$29. Free trial of 5 invoices
 - [Invoice template](https://supportflow.work/ndis-support-worker-invoice-template): NDIS invoice template for support workers
 - [Progress notes template](https://supportflow.work/ndis-support-worker-progress-notes): NDIS progress notes template
 - [Privacy policy](https://supportflow.work/privacy): how data is handled

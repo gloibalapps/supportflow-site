@@ -545,7 +545,7 @@ const APP_VERSION = "21";
 
 /* ---------------- device licensing ----------------
    One-off licences owned by a Google account: "One device" (A$49) or
-   "Phone and computer" (A$69, or A$20 upgrade). Everything is decided by the
+   "Phone and computer" (A$69, or A$29 upgrade). Everything is decided by the
    server (netlify/functions/licence.mjs); this side only stores a device id,
    the sign-in session and a signed 7-day offline lease in IndexedDB.
    Nothing here does anything until the owner switch is on -- while it's off
@@ -904,7 +904,7 @@ function LicencePlans({ onBuy, busy }) {
   );
   return <div style={{ width: "100%", maxWidth: 420 }}>
     {card("one", "One device", 49, "One device at a time.",
-      ["Use SupportFlow on one phone, tablet or computer", "Move it to a new device whenever you like", "Upgrade to Phone and computer later for $20", "No subscription, no monthly fees"],
+      ["Use SupportFlow on one phone, tablet or computer", "Move it to a new device whenever you like", "Upgrade to Phone and computer later for $29", "No subscription, no monthly fees"],
       ["Not signed in on two devices at the same time"])}
     {card("two", "Phone and computer", 69, "Phone and computer signed in together.",
       ["Two devices signed in at the same time", "Swap either device whenever you like", "No subscription, no monthly fees"],
@@ -944,7 +944,7 @@ function LicenceDeviceChooser({ info, busy, onActivate, onUpgrade }) {
       <div style={{ fontSize: 12, color: "var(--tx-3)", lineHeight: 1.6, marginTop: 12, maxWidth: 360 }}>
         {d.label || "The other device"} will lock the next time it connects. We'll email your Google address to let you know.
       </div>
-      <button className="btn ghost tiny" style={{ marginTop: 16 }} disabled={busy} onClick={onUpgrade}>Use both at once? Upgrade to Phone and computer &mdash; pay $20 more</button>
+      <button className="btn ghost tiny" style={{ marginTop: 16 }} disabled={busy} onClick={onUpgrade}>Use both at once? Upgrade to Phone and computer &mdash; pay $29 more</button>
     </>;
   }
   return <>
@@ -1080,7 +1080,7 @@ function LicencePanel({ licence, open, onToggle }) {
         </div>
         {info.plan === 1 && (
           <button className="btn" style={{ marginBottom: 12 }} disabled={busy || licence.offline} onClick={() => run(() => licence.checkout("upgrade"))}>
-            Upgrade to Phone and computer &mdash; pay $20 more
+            Upgrade to Phone and computer &mdash; pay $29 more
           </button>
         )}
         <div style={{ fontSize: 12, color: "var(--tx-3)" }}>

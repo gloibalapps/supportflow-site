@@ -6,7 +6,7 @@ SupportFlow can sell a one-off licence that belongs to a **Google account**:
 |---|---|---|
 | One device | A$49 | 1 |
 | Phone and computer | A$69 | 2 |
-| Upgrade One device → Phone and computer | A$20 | 2 |
+| Upgrade One device → Phone and computer | A$29 | 2 |
 
 There are no licence keys, redeem codes, share links, subscriptions or trials.
 Everything sits behind an **owner switch**. While the switch is off, every
@@ -25,7 +25,7 @@ the existing credit packs / Lifetime flow keep working.
    copy each Price ID (`price_...`):
    * "SupportFlow: One device" A$49
    * "SupportFlow: Phone and computer" A$69
-   * "SupportFlow: Upgrade to Phone and computer" A$20
+   * "SupportFlow: Upgrade to Phone and computer" A$29
 3. **Stripe webhook**: on the existing endpoint
    `https://<your-site>/.netlify/functions/stripe-webhook`, make sure these
    events are selected (the first two are already there):
@@ -38,7 +38,7 @@ the existing credit packs / Lifetime flow keep working.
    | `LICENCE_SECRET` | A long random string (at least 24 characters, e.g. the output of `openssl rand -base64 48`). Signs sign-in sessions and the 7-day offline leases. Changing it signs everyone out once and makes old leases invalid. |
    | `STRIPE_PRICE_49` | Price ID of the A$49 price. (Fallbacks: `STRIPE_PRICE_LICENCE_ONE`, then the existing `STRIPE_PRICE_LIFETIME`.) |
    | `STRIPE_PRICE_69` | Price ID of the A$69 price (fallback name `STRIPE_PRICE_LICENCE_TWO`) |
-   | `STRIPE_PRICE_UPGRADE` | Price ID of the A$20 price (fallback name `STRIPE_PRICE_LICENCE_UPGRADE`) |
+   | `STRIPE_PRICE_UPGRADE` | Price ID of the A$29 price (fallback name `STRIPE_PRICE_LICENCE_UPGRADE`) |
    | `LICENCE_EMAIL_FROM` | Optional. Sender for the "licence moved" email, e.g. `SupportFlow <no-reply@supportflow.work>` (must be a Resend-verified domain). |
    | `LICENSING_TEST_EMAILS` | Optional. Comma-separated Google addresses that get the licensing experience while the switch is still off, for testing. |
 
@@ -143,7 +143,7 @@ records a payment (`licence_payments`) and sets the licence
 stripe_payment_intent_id`). The `?licence=success` return only makes the app
 poll until the webhook has landed. Unpaid / expired sessions write nothing.
 A full refund or a dispute marks that payment and recomputes the licence: a
-refunded A$49/A$69 → `revoked` (locks on next check); a refunded A$20 upgrade
+refunded A$49/A$69 → `revoked` (locks on next check); a refunded A$29 upgrade
 → back to One device. A dispute that is won restores it.
 
 **Earlier Lifetime buyers.** People who bought the old A$49 Lifetime (keyed to

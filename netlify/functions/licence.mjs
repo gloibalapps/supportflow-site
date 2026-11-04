@@ -46,7 +46,7 @@ async function config(req) {
       { id: "one", plan: 1, name: PLAN_NAMES[1], priceAud: 49 },
       { id: "two", plan: 2, name: PLAN_NAMES[2], priceAud: 69 },
     ],
-    upgradeAud: 20,
+    upgradeAud: 29,
   });
 }
 
@@ -94,11 +94,11 @@ async function checkout(session, dev, body) {
   const lic = await getLicence(session.sub);
   const activePlan = lic && lic.status === "active" ? lic.plan : 0;
   if (product === "upgrade" && activePlan !== 1) {
-    return json({ error: activePlan === 2 ? "You already have Phone and computer." : "The $20 upgrade is for One device licences." }, 409);
+    return json({ error: activePlan === 2 ? "You already have Phone and computer." : "The $29 upgrade is for One device licences." }, 409);
   }
   if (product === "one" && activePlan >= 1) return json({ error: "This Google account already has a licence." }, 409);
   if (product === "two" && activePlan === 2) return json({ error: "This Google account already has Phone and computer." }, 409);
-  if (product === "two" && activePlan === 1) return json({ error: "You already have One device. Upgrade for $20 instead.", upgrade: true }, 409);
+  if (product === "two" && activePlan === 1) return json({ error: "You already have One device. Upgrade for $29 instead.", upgrade: true }, 409);
 
   const meta = { kind: "licence", product, google_sub: session.sub, device_id: dev.deviceId };
   const params = {
