@@ -4462,7 +4462,7 @@ function useTrackerAccess() {
       if (status === 401) { setSt((c) => ({ ...c, cfg, preview, phase: preview ? "unlocked" : "signedout" })); return; }
       if (status >= 400) throw new Error(data.error || "error");
       try { localStorage.setItem("sf_tracker_access_v1", JSON.stringify({ unlocked: !!data.unlocked, product: data.product, sub: ref.current.session.sub })); } catch (e) { }
-      setSt((c) => ({ ...c, cfg, preview, session: ref.current.session, phase: data.unlocked || preview ? "unlocked" : "locked", paid: !!data.paid, devices: data.devices || 0, deviceLimit: !!data.deviceLimit, product: data.product, serverPrefs: data.prefs, autosendServer: !!data.autosendServer }));
+      setSt((c) => ({ ...c, cfg, preview, session: ref.current.session, phase: data.unlocked || preview ? "unlocked" : "locked", paid: !!data.paid, devices: data.devices || 0, sms: data.sms || null, deviceLimit: !!data.deviceLimit, product: data.product, serverPrefs: data.prefs, autosendServer: !!data.autosendServer }));
     } catch (e) {
       setSt((c) => ({ ...c, cfg, preview, session: ref.current.session, phase: preview || cachedUnlocked ? "unlocked" : "offline" }));
     }
@@ -4500,7 +4500,8 @@ function useTrackerAccess() {
 function TrackerUpsell({ access, owed, count, go }) {
   // Not paid: base (one computer) or the full package. Base owners: only the
   // $29 second-computer add-on (gated server-side like the licence upgrade).
-  const offer = (access.cfg?.offer || []).filter((o) => (o.available || access.preview) && (access.paid ? o.id === "tracker_addon" : o.id !== "tracker_addon"));
+  const offer = (access.cfg?.offer || []).filter((o) => (o.available || access.preview) && (access.paid ? o.id === "tracker_addon" : o.id !== "tracker_addon") && o.id !== "tracker_sms");
+  const smsOffer = (access.cfg?.offer || []).find((o) => o.id === "tracker_sms");
   return (
     <div className="panel" style={{ borderColor: "var(--brass)" }}>
       <div className="eyebrow" style={{ color: "var(--brass)" }}>Payment tracker · paid add-on</div>
@@ -4511,6 +4512,9 @@ function TrackerUpsell({ access, owed, count, go }) {
         ✓ Sends a polite reminder at day 7 and a firmer one at day 12, automatically (you can read and change them first)<br />
         ✓ At day 20, emails you a ready-to-file NDIA complaint draft. Nothing is filed for you<br />
         ✓ Shows plan managers who are late again and again, and exports a payment history
+      </div>
+      <div style={{ fontSize: 13, color: "var(--tx-2)", marginTop: 10 }}>
+        Free: push notifications.{smsOffer ? ` Optional: SMS alerts A$${smsOffer.priceAud}/month for 50 texts, added after you unlock the tracker. Not included in any package.` : ""}
       </div>
       {access.phase === "signedout" && (
         <div style={{ marginTop: 14 }}>
@@ -4758,6 +4762,7 @@ function PaymentTracker({ data, save, go, access }) {
             {server.log.length === 0 ? "Nothing sent yet." : server.log.map((l, k) => <div key={k}>{fmtAu(l.created_at.slice(0, 10))} · #{l.invoice_no || "—"} · {l.channel} to {l.recipient_masked || "—"} · {l.status}{l.subject ? ` · ${l.subject}` : ""}</div>)}
           </div>}
         </div>
+        <SmsAlertsPanel access={access} />
         <div className="panel">
           <div className="eyebrow" style={{ marginBottom: 10 }}>Counting business days</div>
           <label className="f"><span>Your state (for public holidays)</span>
@@ -4809,6 +4814,68 @@ function PaymentTracker({ data, save, go, access }) {
         <button className="btn ghost" style={{ minHeight: 48 }} onClick={() => setView("report")}>Report</button>
         <button className="btn ghost" style={{ minHeight: 48 }} onClick={() => setView("settings")}>Settings</button>
       </div>
+    </div>
+  );
+}
+
+/* Optional paid SMS alerts (A$4.99/month, 50 texts) to the worker's OWN
+   mobile only. Free alternative: push notifications. */
+function SmsAlertsPanel({ access }) {
+  const sms = access.sms || {};
+  const offer = (access.cfg?.offer || []).find((o) => o.id === "tracker_sms");
+  const [phone, setPhone] = useState("");
+  const [agree, setAgree] = useState(false);
+  const [code, setCode] = useState("");
+  const [step, setStep] = useState("idle");
+  const [msg, setMsg] = useState("");
+  const active = ["active", "trialing", "past_due"].includes(sms.subscription);
+  const call = async (body, next) => {
+    setMsg("");
+    try {
+      const { status, data } = await access.post(body);
+      if (status >= 400) { setMsg(data.error || "Something went wrong."); return; }
+      if (next) setStep(next);
+      if (body.action === "sms-start") setMsg(data.sent ? `Code sent to ${data.phone}.` : "SMS sending is switched off on the server, so no code was sent.");
+      await access.refresh();
+    } catch (e) { setMsg("You're offline. Connect and try again."); }
+  };
+  return (
+    <div className="panel">
+      <div className="eyebrow" style={{ marginBottom: 6 }}>Alerts</div>
+      <div style={{ fontSize: 13.5, lineHeight: 1.6, marginBottom: 10 }}>
+        Free: push notifications.{offer ? <> Optional: SMS alerts A${offer.priceAud}/month for 50 texts.</> : null}<br />
+        <span style={{ color: "var(--tx-3)", fontSize: 12.5 }}>Texts go only to your own mobile, at day 7, 12 and 20 and when a complaint draft is ready. They never go to the NDIA, a plan manager or anyone you invoice. Each text uses 1 credit (2 if it's long). Unused texts don't roll over. If you run out, alerts continue as notifications.</span>
+      </div>
+      {!active && offer && (
+        <button className="btn ghost" style={{ minHeight: 44, width: "100%" }} disabled={!!access.busy} onClick={() => access.buy("tracker_sms")}>
+          {access.busy === "tracker_sms" ? "One moment..." : `Add SMS alerts · A$${offer.priceAud}/month`}
+        </button>
+      )}
+      {active && (
+        <div style={{ fontSize: 13.5 }}>
+          <div>SMS pack: {sms.subscription}{sms.renews ? ` · renews ${fmtAu(sms.renews.slice(0, 10))}` : ""} · <b>{sms.balance}</b> text{sms.balance === 1 ? "" : "s"} left</div>
+          {sms.balance === 0 && <div style={{ color: "var(--warn)", marginTop: 4 }}>No texts left this month. Alerts come as notifications until the pack renews.</div>}
+          {sms.verified && sms.optedIn ? (
+            <div style={{ marginTop: 8 }}>Texts go to {sms.phone}. <button className="btn ghost tiny" style={{ minHeight: 36 }} onClick={() => call({ action: "sms-optout" })}>Stop texts</button></div>
+          ) : step !== "code" ? (
+            <div style={{ marginTop: 10 }}>
+              {sms.phone && !sms.optedIn && <div style={{ fontSize: 12.5, color: "var(--tx-3)", marginBottom: 6 }}>Texts are off for {sms.phone}. Verify again to turn them back on.</div>}
+              <label className="f"><span>Your mobile number</span><input type="tel" inputMode="tel" placeholder="04xx xxx xxx" value={phone} onChange={(e) => setPhone(e.target.value)} /></label>
+              <label className="check" style={{ marginBottom: 10 }}><input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} /><span>Send payment alerts to this number. I can reply STOP or turn them off here at any time.</span></label>
+              <button className="btn" style={{ minHeight: 44 }} disabled={!agree || !phone} onClick={() => call({ action: "sms-start", phone, optIn: agree }, "code")}>Send me a code</button>
+            </div>
+          ) : (
+            <div style={{ marginTop: 10 }}>
+              <label className="f"><span>6-digit code</span><input inputMode="numeric" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} /></label>
+              <button className="btn" style={{ minHeight: 44, marginRight: 8 }} disabled={code.length !== 6} onClick={() => call({ action: "sms-verify", code }, "idle")}>Verify</button>
+              <button className="btn ghost" style={{ minHeight: 44 }} onClick={() => setStep("idle")}>Change number</button>
+            </div>
+          )}
+          <button className="btn ghost tiny" style={{ minHeight: 36, marginTop: 8 }} onClick={async () => { const { data } = await access.post({ action: "sms-manage" }); if (data.url) location.href = data.url; else setMsg(data.error || "Couldn't open billing."); }}>Manage or cancel the SMS pack</button>
+          <div style={{ fontSize: 12, color: "var(--tx-3)", marginTop: 6 }}>Remaining texts end when the pack is cancelled or refunded.</div>
+        </div>
+      )}
+      {msg && <div style={{ fontSize: 12.5, color: "var(--warn)", marginTop: 8 }}>{msg}</div>}
     </div>
   );
 }

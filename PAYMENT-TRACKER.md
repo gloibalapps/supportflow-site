@@ -1,5 +1,7 @@
 # Payment tracker add-on: build notes, setup and launch blockers
 
+Tests: `node payment-tracker-rules.test.mjs`, `node netlify/tracker-sender.test.mjs`, `node netlify/tracker-sms.test.mjs` (need `web-push` installed), `node netlify/tracker-migration.test.mjs` (needs `@electric-sql/pglite`).
+
 Status: built on the local branch `feature/payment-tracker` only. It has not been pushed or deployed. No Stripe objects exist, no migration has been applied, and no Netlify env vars have been changed.
 Supersedes these decisions in payment-tracker-brief.md: D1 (price) and D2 (one-tap send).
 
@@ -9,6 +11,8 @@ Supersedes these decisions in payment-tracker-brief.md: D1 (price) and D2 (one-t
 | `tracker_base` | A$49 one-off | `STRIPE_PRICE_TRACKER_BASE` | Tracker on one computer |
 | `tracker_addon` | A$29 one-off | `STRIPE_PRICE_TRACKER_ADDON` | A second computer. **Only for base owners**, gated server-side like the licence $29 upgrade |
 | `tracker_full` | A$99 one-off | `STRIPE_PRICE_TRACKER_FULL` | Full package: everything, two devices |
+
+| `tracker_sms` | **A$4.99 / month, recurring** | `STRIPE_PRICE_TRACKER_SMS` | **Optional** SMS alerts, 50 texts per billing period, to the worker's own mobile. **Not included in any package (including the A$99 full package).** Only tracker owners (base or full) can buy it, one active pack per account |
 
 **Flag for the owner:** base + add-on = A$78, but the full package is A$99, so the package currently costs A$21 more than buying both. The copy is neutral: it shows each option with its price and claims no savings.
 The entitlement is per Google account, recorded in `licence_payments` (the same ledger as licences). **Only** the Stripe webhook writes it, and refunds and disputes reverse it through `handleLicenceReversal`. Device seats work like the main licence: the first N devices hold seats, and a seat frees after 21 days unseen.
@@ -31,6 +35,16 @@ The entitlement is per Google account, recorded in `licence_payments` (the same 
 | Web push (VAPID) to the worker's devices | sw.js `push`/`notificationclick`, `web-push` dependency |
 | Migration (NOT APPLIED) | `TRACKER-MIGRATION.sql` |
 
+## SMS alerts add-on (optional, paid)
+- **Who gets texts:** only the worker, at their own verified AU mobile. They need to tick the opt-in and enter a 6-digit code (10-minute expiry, 5 tries, a 60 s gap between codes, max 5 a day). `sendWorkerSms()` takes no recipient, so it cannot text the NDIA, a plan manager or a payer.
+- **When:** at each automatic stage: day 7 and 12 (with "reminder emailed to the payer" when it was sent), day 20 / NDIA-managed day 15 ("your NDIA draft is ready, nothing has been filed"), and NDIA-managed portal checks. Texts are short, single segment, contain no participant or payer names, and end with "Reply STOP to opt out." If the sender is one-way, set `TRACKER_SMS_ONE_WAY=true` and the ending becomes "Opt out in SupportFlow settings."
+- **Credits:** 1 credit = 1 SMS segment (GSM-7 160/153, Unicode 70/67). `invoice.paid` **resets** the balance to 50; unused texts expire and are written to the ledger. Spending is atomic (`tracker_sms_consume`). A provider failure refunds the segments. Cancellation, `unpaid` status, a refund or a dispute zeroes the balance. `past_due` keeps the balance but stops sending, because only active and trialing packs send.
+- **Out of credits:** no text is sent. The alert goes out as a web push instead, and once per period the worker gets a push saying "SMS alerts used up... alerts continue as notifications". It is logged in the send log.
+- **STOP:** replying STOP/STOPALL/UNSUBSCRIBE/CANCEL/END/QUIT to the number opts out (`tracker-sms-inbound.mjs`, Twilio-signature verified). START turns texts back on. Settings has "Stop texts" too.
+- **Provider:** adapter interface `{ name, send({to, from, body}) }` with **Twilio** (built) and **Telnyx** (send built; inbound STOP not wired yet, because it needs an Ed25519 webhook signature check). Choose with `TRACKER_SMS_PROVIDER`. It is **off unless `TRACKER_SMS_ENABLED=true`** and in **dry run unless `TRACKER_SMS_DRY_RUN=false`**. Dry run spends no credits and sends no codes. Tests use a mock provider.
+- **Cancel/manage:** the "Manage or cancel the SMS pack" button opens the Stripe customer portal. The portal needs to be configured in Stripe.
+- **Margin:** A$4.99 incl. GST → A$4.54 ex GST, less Stripe ~A$0.25 (1.7% + A$0.30 domestic card), leaves ~A$4.29. 50 texts at A$0.06–0.08 cost A$3.00–4.00 if all are used. That is a margin of about **A$0.30–1.30 at full use** and far more at typical use (~25 texts ≈ A$1.75). A dedicated reply-capable number (~US$8.25/month on Twilio) is a fixed cost shared across all workers.
+
 ## How auto-send works with the phone closed
 1. When the worker turns on "Send automatically", the app shows a consent prompt. It then syncs a **minimised record** for each open invoice to `tracker.mjs`. The record holds sent date, due date, payer type, thresholds and the paused flag in the clear. The invoice no., amount, recipient email and name, and the rendered message text (including any edits) are sealed with AES-256-GCM under `TRACKER_DATA_KEY` before they reach Supabase. The id is an HMAC of (account, local invoice id). Paid, deleted or no-longer-open invoices are closed on the next sync and deleted after 30 days. Turning auto-send off deletes everything synced.
 2. `tracker-sender` runs hourly. For each enabled, unlocked worker, it only acts on that worker's state business days, between 9am and 4pm their time. It sends the **latest** stage reached and never a backlog. The server owns `last_stage_sent`, and Resend idempotency keys stop double sends.
@@ -48,8 +62,10 @@ Mail goes `From: "Jane Smith via SupportFlow" <invoices@send.supportflow.work>`,
 2. Product "Payment tracker: second computer", one-off Price **A$29.00 AUD** → `STRIPE_PRICE_TRACKER_ADDON`. Product "Payment tracker: full package", one-off Price **A$99.00 AUD** → `STRIPE_PRICE_TRACKER_FULL`.
 3. Optional display overrides: `TRACKER_{BASE,ADDON,FULL}_LABEL` and `TRACKER_{BASE,ADDON,FULL}_AUD`.
 4. Webhook: reuse the existing `/.netlify/functions/stripe-webhook` endpoint and `STRIPE_WEBHOOK_SECRET`. Make sure it listens for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `charge.refunded`, `charge.dispute.created` and `charge.dispute.closed` (the same events as licences). Checkout sessions carry `metadata.kind=tracker`, `product`, `google_sub` and `device_id`. The `?tracker=success` return never unlocks anything: the app polls `status` until the webhook lands.
+4b. **SMS pack:** Product "Payment tracker SMS alerts", **recurring monthly Price A$4.99 AUD** → `STRIPE_PRICE_TRACKER_SMS` (`TRACKER_SMS_LABEL` / `TRACKER_SMS_AUD` for display). Checkout uses `mode=subscription`, with metadata on both the session and `subscription_data`. **Add these webhook events:** `invoice.paid`, `customer.subscription.updated`, `customer.subscription.deleted` (in addition to `charge.refunded` and `charge.dispute.created`, which already cover SMS refunds and disputes). Configure the **Customer portal** (Settings → Billing → Customer portal: allow cancel). Test: subscribe → `invoice.paid` → 50 credits; test-clock renewal → reset to 50; cancel → 0; refund → 0.
 5. Existing env vars that are reused: `STRIPE_SECRET_KEY`, `SITE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `LICENCE_SECRET`, `GOOGLE_CLIENT_ID`, `RESEND_API_KEY`.
 6. New env vars: `TRACKER_DATA_KEY` (`openssl rand -base64 32`; losing it makes the synced records unreadable), `TRACKER_EMAIL_FROM`, `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT` (`npx web-push generate-vapid-keys`), `TRACKER_AUTOSEND_ENABLED` (leave unset), `TRACKER_AUTOSEND_DRY_RUN` (default true).
+   SMS: `STRIPE_PRICE_TRACKER_SMS`, `TRACKER_SMS_LABEL`, `TRACKER_SMS_AUD`, `TRACKER_SMS_ENABLED` (leave unset = off), `TRACKER_SMS_DRY_RUN` (default true), `TRACKER_SMS_PROVIDER` (twilio | telnyx), `TRACKER_SMS_CREDITS` (default 50), `TRACKER_SMS_ONE_WAY`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM` (registered sender ID or AU number), `TELNYX_API_KEY`, `TELNYX_FROM`. Point the Twilio number's inbound webhook at `/.netlify/functions/tracker-sms-inbound`.
 7. Apply `TRACKER-MIGRATION.sql` after `LICENSING-MIGRATION.sql`. It widens the `licence_payments.product` check.
 8. Test: a test-mode purchase → webhook row → status unlocked → a second computer is blocked until the A$29 add-on; the add-on is refused without the base; the full package gives two devices → refund re-locks.
 
@@ -80,11 +96,12 @@ Push works only on iOS/iPadOS 16.4+, only after the user adds SupportFlow to the
 3. **Pricing:** A$49 base / A$29 add-on / A$99 full. The package costs more than base + add-on (A$78), so the owner should confirm this is intended and decide what "everything" includes beyond two devices. The Stripe products still need creating, and the pricing page/PRICING.md need the wording.
 4. **iOS push limits** (above). **Public holiday table:** the computed rules need checking against data.gov.au. WA's King's Birthday is approximated as the last Monday in September; part-day/regional holidays are ignored.
 5. **Testing:** Stripe test-mode purchase/refund/second device; a dry-run sender week with `TRACKER_AUTOSEND_DRY_RUN=true`; real devices (Android Chrome, iPhone Home Screen); a deliverability check (mail-tester, Gmail/Outlook inboxes); the migration on a Supabase branch first.
-6. The owner decides on open brief questions 2, 10 and 11 (Commission option, NDIA-managed eligibility, self-managed BD-20).
+6. **SMS (only if the add-on ships):** (a) **ACMA SMS Sender ID Register**: from 1 Jul 2026, an alphanumeric sender (e.g. "SupportFlw") must be registered by SupportFlow's ABN through the provider, or texts show "Unverified". Alphanumeric senders are one-way, so to receive STOP replies use a dedicated AU number (Twilio ~US$8.25/month) or set `TRACKER_SMS_ONE_WAY=true`. (b) **Spam Act:** alerts to the worker about their own invoices are factual service messages, not marketing. They still identify SupportFlow, keep STOP/in-app opt-out working at once, and must never carry promotion. Record express opt-in (`opt_in_at`). (c) Privacy: the worker's mobile is stored sealed; add it to the privacy policy. (d) Provider account and spend caps (Twilio balance alerts), plus SMS pumping protection for the code endpoint (rate limits are in place).
+7. The owner decides on open brief questions 2, 10 and 11 (Commission option, NDIA-managed eligibility, self-managed BD-20).
 
 ## Not built (design only / remaining)
 - PDF report (CSV only now; reuse the jsPDF incident code).
-- SMS add-on (design and pricing above).
+- SMS add-on: built behind flags (above). Not built: Telnyx inbound STOP, an admin view of SMS usage.
 - An "Undo" toast after Mark paid; a separate plan-manager complaints email/URL field; P5 "getting worse" rule; the yearly holiday-data refresh.
 - Admin view of the tracker send logs; a webhook for Resend bounce/complaint events into the send log.
 
@@ -97,5 +114,5 @@ Push works only on iOS/iPadOS 16.4+, only after the user adds SupportFlow to the
 | Stripe test-mode setup, end-to-end purchase/refund/second-device tests | 1 |
 | Migration on a Supabase branch, dry-run week, then go live | 1 (+ a week's elapsed time) |
 | PDF report, P5, Undo, complaints fields | 2 |
-| SMS add-on (if approved): provider, sender ID registration, credits ledger, Stripe product | 3–4 |
-| **Total** | **~8–10 dev days without SMS; ~12–14 with SMS** |
+| SMS add-on remaining (built locally): provider account, sender ID / number registration, Stripe price + portal, test-mode subscription lifecycle, real-device SMS test | 1.5–2 (+ ACMA registration elapsed time) |
+| **Total** | **~8–10 dev days without SMS; ~10–12 with SMS** |

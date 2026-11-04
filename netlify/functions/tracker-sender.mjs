@@ -14,6 +14,7 @@
 // subscribed. Nothing is ever filed with the NDIA or the Commission.
 import { supa } from "../lib/licence.mjs";
 import { autosendEnabled, autosendDryRun, open, maskEmail, unsubToken, localNow, resendSend, trackerUnlock } from "../lib/tracker.mjs";
+import { sendWorkerSms, smsEnabled } from "../lib/sms.mjs";
 import { trackerStage, trackerFillDynamic, isBusinessDay, TRACKER_STAGE_LABEL } from "../../payment-tracker-rules.js";
 
 export const config = { schedule: "5 * * * *" };
@@ -47,6 +48,23 @@ async function pushTo(sub, title, body) {
     }
   }
   return n;
+}
+
+// <= 160 GSM-7 chars incl. the " Reply STOP to opt out." suffix added by sendWorkerSms.
+export function smsText(payerType, stage, invoiceNo, toWorkerOnly, status) {
+  const inv = `Invoice ${String(invoiceNo || "").slice(0, 12)}`;
+  if (stage === 3) return `SupportFlow: ${inv} is unpaid. Your NDIA ${payerType === "agency" ? "enquiry" : "complaint"} draft is ready in the app. Nothing has been filed.`;
+  if (payerType === "agency") return `SupportFlow: ${inv} is still unpaid. Check the myplace portal.`;
+  const d = stage === 1 ? "7" : "12";
+  return `SupportFlow: ${inv} is ${d} business days unpaid.${status === "sent" ? " Reminder emailed to the payer." : " Open the app to review."}`;
+}
+// Once per billing period: tell the worker texts ran out and alerts continue as push.
+async function creditsGoneNotice(sub, dry) {
+  const prof = (await supa(`tracker_sms_profiles?google_sub=eq.${q(sub)}&select=low_notice_at`))?.[0];
+  if (!prof || prof.low_notice_at) return;
+  await supa(`tracker_sms_profiles?google_sub=eq.${q(sub)}`, { method: "PATCH", prefer: "return=minimal", body: { low_notice_at: new Date().toISOString() } });
+  const n = dry ? 0 : await pushTo(sub, "SMS alerts used up", "You've used this month's 50 texts. Alerts continue as notifications until your pack renews.");
+  await log({ google_sub: sub, stage: 0, channel: "push", recipient_masked: n ? `${n} device(s)` : null, subject: "SMS credits used up", status: dry ? "dry_run" : n ? "sent" : "skipped", detail: "Fell back to push" });
 }
 
 function footer(sub, rhash, worker) {
@@ -104,11 +122,24 @@ async function runWorker(prefs) {
       // Move on even when skipped, so a missing address can't retry every hour.
       await supa(`tracker_records?id=eq.${q(r.id)}`, { method: "PATCH", prefer: "return=minimal", body: { last_stage_sent: stage, last_sent_at: new Date().toISOString(), updated_at: new Date().toISOString() } });
     }
-    if (prefs.notify_push && (status === "sent" || status === "dry_run" || status === "skipped")) {
+    if (status === "sent" || status === "dry_run" || status === "skipped") {
       const label = TRACKER_STAGE_LABEL[r.payer_type]?.[stage] || "Payment update";
       const what = toWorkerOnly ? "A draft is ready in SupportFlow." : status === "sent" ? "A reminder email was sent for you." : "Open SupportFlow to review.";
-      const n = dry ? 0 : await pushTo(sub, `Unpaid invoice: ${label}`, what);
-      if (n) await log({ ...base, channel: "push", recipient_masked: `${n} device(s)`, subject: label, status: "sent" });
+      // Optional paid SMS to the worker's own verified mobile (never the payer).
+      // Short, no participant or payer names. Falls back to push when out of credits.
+      let smsDone = false;
+      if (smsEnabled()) {
+        const sms = await sendWorkerSms(sub, smsText(r.payer_type, stage, p.invoiceNo, toWorkerOnly, status));
+        if (sms.status !== "off" && sms.status !== "not_set_up") {
+          await log({ ...base, channel: "sms", recipient_masked: sms.to || null, subject: `${label} (${sms.segments || 0} credit${sms.segments === 1 ? "" : "s"})`, status: sms.status === "sent" || sms.status === "dry_run" ? sms.status : sms.status === "no_credits" ? "no_credits" : "failed", detail: sms.detail || (sms.balance != null ? `${sms.balance} left` : null) });
+        }
+        smsDone = sms.status === "sent" || sms.status === "dry_run";
+        if (sms.status === "no_credits") await creditsGoneNotice(sub, dry);
+      }
+      if (prefs.notify_push && !smsDone) {
+        const n = dry ? 0 : await pushTo(sub, `Unpaid invoice: ${label}`, what);
+        if (n) await log({ ...base, channel: "push", recipient_masked: `${n} device(s)`, subject: label, status: "sent" });
+      }
     }
     if (++sent >= MAX_PER_RUN) break;
   }

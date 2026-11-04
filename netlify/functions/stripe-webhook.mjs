@@ -21,6 +21,7 @@
 import crypto from "node:crypto";
 import { supa, recomputeLicence, PRODUCTS, emailSub } from "../lib/licence.mjs";
 import { isTrackerProduct } from "../lib/tracker.mjs";
+import { SMS_CREDITS_PER_PERIOD } from "../lib/sms.mjs";
 
 const TOLERANCE_SECONDS = 300; // reject anything claiming to be older than 5 minutes
 
@@ -251,7 +252,7 @@ async function handleLicenceSession(session) {
   // Payment tracker unlocks (metadata.kind = "tracker") are recorded in the
   // same licence_payments ledger with product tracker_base / tracker_addon / tracker_full, so
   // refunds and disputes reverse them through handleLicenceReversal below.
-  if (!sub || !(PRODUCTS[product] || (session.metadata?.kind === "tracker" && isTrackerProduct(product)))) {
+  if (!sub || !(PRODUCTS[product] || (session.metadata?.kind === "tracker" && isTrackerProduct(product) && product !== "tracker_sms"))) {
     console.error(`stripe-webhook: licence session ${session.id} missing google_sub/email/product`);
     return;
   }
@@ -297,8 +298,75 @@ async function handleLicenceReversal(paymentIntentId, status) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Payment tracker SMS pack (A$4.99/month, 50 texts). Stripe subscription with
+// metadata { kind: "tracker", product: "tracker_sms", google_sub } copied onto
+// the subscription (subscription_data.metadata). Credits are granted ONLY on
+// invoice.paid, reset (not added) to 50 each period, idempotent per invoice.
+// ---------------------------------------------------------------------------
+const subMeta = (o) => o?.metadata || {};
+async function upsertSmsSubscription(sub, s) {
+  await supa("tracker_sms_subscriptions?on_conflict=stripe_subscription_id", {
+    method: "POST", prefer: "resolution=merge-duplicates,return=minimal",
+    body: {
+      stripe_subscription_id: s.id, google_sub: sub, stripe_customer_id: typeof s.customer === "string" ? s.customer : s.customer?.id || null,
+      status: s.status || "active",
+      current_period_end: (s.current_period_end || s.items?.data?.[0]?.current_period_end) ? new Date(1000 * (s.current_period_end || s.items.data[0].current_period_end)).toISOString() : null,
+      cancel_at_period_end: !!s.cancel_at_period_end, updated_at: new Date().toISOString(),
+    },
+  });
+}
+async function stripeGet(path) {
+  const r = await fetch(`https://api.stripe.com/v1/${path}`, { headers: { Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}` } });
+  if (!r.ok) throw new Error(`Stripe GET ${path.split("?")[0]} ${r.status}`);
+  return r.json();
+}
+async function smsSubscriptionFromInvoice(inv) {
+  const subId = inv.subscription || inv.parent?.subscription_details?.subscription || inv.lines?.data?.[0]?.parent?.subscription_item_details?.subscription;
+  if (!subId) return null;
+  const meta = inv.subscription_details?.metadata || inv.parent?.subscription_details?.metadata;
+  if (meta?.product === "tracker_sms" && meta?.google_sub) return { id: typeof subId === "string" ? subId : subId.id, google_sub: meta.google_sub };
+  const s = await stripeGet(`subscriptions/${encodeURIComponent(typeof subId === "string" ? subId : subId.id)}`);
+  if (subMeta(s).product !== "tracker_sms") return null;
+  await upsertSmsSubscription(subMeta(s).google_sub, s);
+  return { id: s.id, google_sub: subMeta(s).google_sub };
+}
+async function handleSmsInvoicePaid(inv) {
+  const s = await smsSubscriptionFromInvoice(inv);
+  if (!s?.google_sub) return; // not an SMS pack invoice
+  const periodEnd = inv.lines?.data?.[0]?.period?.end ? new Date(inv.lines.data[0].period.end * 1000).toISOString() : null;
+  await supa("rpc/tracker_sms_reset", { method: "POST", body: {
+    p_sub: s.google_sub, p_invoice: inv.id, p_credits: SMS_CREDITS_PER_PERIOD(), p_period_end: periodEnd,
+    p_payment_intent: typeof inv.payment_intent === "string" ? inv.payment_intent : null, p_charge: typeof inv.charge === "string" ? inv.charge : null,
+  } });
+  console.log(`stripe-webhook: SMS credits reset for invoice ${inv.id}`);
+}
+async function handleSmsSubscriptionChange(s, deleted) {
+  if (subMeta(s).product !== "tracker_sms" || !subMeta(s).google_sub) return;
+  await upsertSmsSubscription(subMeta(s).google_sub, deleted ? { ...s, status: "canceled" } : s);
+  // Cancelled (or unpaid) -> remaining credits are removed; push alerts carry on for free.
+  if (deleted || s.status === "unpaid" || s.status === "incomplete_expired") {
+    await supa("rpc/tracker_sms_zero", { method: "POST", body: { p_sub: subMeta(s).google_sub, p_reason: deleted ? "cancelled" : s.status, p_ref: s.id } });
+  }
+}
+// Refund / dispute of an SMS pack charge: zero what's left of that period.
+async function handleSmsReversal(paymentIntentId, chargeId, reason) {
+  const filt = paymentIntentId ? `stripe_payment_intent_id=eq.${encodeURIComponent(paymentIntentId)}` : chargeId ? `stripe_charge_id=eq.${encodeURIComponent(chargeId)}` : null;
+  if (!filt) return;
+  const rows = await supa(`tracker_sms_ledger?${filt}&kind=eq.grant&select=google_sub,stripe_invoice_id`);
+  for (const r of rows || []) await supa("rpc/tracker_sms_zero", { method: "POST", body: { p_sub: r.google_sub, p_reason: reason, p_ref: r.stripe_invoice_id } });
+}
+
 async function handlePaidSession(session) {
-  if (session.mode !== "payment") return; // nothing else is sold
+  if (session.mode === "subscription") {
+    // SMS pack: record the subscription; credits wait for invoice.paid.
+    if (session.metadata?.kind === "tracker" && session.metadata?.product === "tracker_sms" && session.subscription) {
+      const s = await stripeGet(`subscriptions/${encodeURIComponent(typeof session.subscription === "string" ? session.subscription : session.subscription.id)}`);
+      await upsertSmsSubscription(session.metadata.google_sub || session.client_reference_id, s);
+    }
+    return;
+  }
+  if (session.mode !== "payment") return;
   if (session.payment_status !== "paid" && session.payment_status !== "no_payment_required") {
     // Delayed payment methods: wait for async_payment_succeeded.
     return;
@@ -404,10 +472,23 @@ export default async (req) => {
         if (charge.refunded === true || Number(charge.amount_refunded) >= Number(charge.amount)) {
           await handleLicenceReversal(charge.payment_intent, "refunded");
         }
+        // Any refund of an SMS pack charge removes that period's remaining texts.
+        await handleSmsReversal(charge.payment_intent, charge.id, "refunded");
         break;
       }
       case "charge.dispute.created":
         await handleLicenceReversal(event.data.object.payment_intent, "disputed");
+        await handleSmsReversal(event.data.object.payment_intent, event.data.object.charge, "disputed");
+        break;
+      // Payment tracker SMS pack (subscription).
+      case "invoice.paid":
+        await handleSmsInvoicePaid(event.data.object);
+        break;
+      case "customer.subscription.updated":
+        await handleSmsSubscriptionChange(event.data.object, false);
+        break;
+      case "customer.subscription.deleted":
+        await handleSmsSubscriptionChange(event.data.object, true);
         break;
       case "charge.dispute.closed":
         if (event.data.object.status === "won") await handleLicenceReversal(event.data.object.payment_intent, "paid");

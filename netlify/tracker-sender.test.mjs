@@ -28,3 +28,26 @@ await mod.default();
 const sends = calls.filter((c) => c[1].includes("resend")).map((c) => ({ to: c[2].to[0], subject: c[2].subject, reply: c[2].reply_to, unsub: !!c[2].headers["List-Unsubscribe"] }));
 console.log(JSON.stringify(sends, null, 1));
 console.log(calls.filter((c) => c[1].startsWith("tracker_send_log") && c[2]).map((c) => c[2].status + "/" + c[2].stage + "/" + c[2].recipient_masked).join("  "));
+
+// SMS on, worker verified, but 0 credits: alerts fall back to push and the
+// worker gets a one-off "SMS credits used up" notice (logged).
+{
+  const S = await import("./lib/sms.mjs");
+  S.__setTestProvider({ name: "mock", async send() { throw new Error("must not send"); } });
+  process.env.TRACKER_SMS_ENABLED = "true"; process.env.TRACKER_SMS_DRY_RUN = "false";
+  calls.length = 0;
+  const prev = globalThis.fetch;
+  globalThis.fetch = async (url, opt = {}) => {
+    const u = String(url);
+    if (u.includes("tracker_sms_profiles")) return (opt.method && opt.method !== "GET") ? new Response(null, { status: 204 })
+      : new Response(JSON.stringify([{ phone_enc: T.seal({ phone: "+61412345678" }), verified_at: "x", opted_in: true, stopped_at: null, low_notice_at: null }]), { status: 200 });
+    if (u.includes("tracker_sms_subscriptions")) return new Response(JSON.stringify([{ stripe_subscription_id: "sub_1" }]), { status: 200 });
+    if (u.endsWith("rpc/tracker_sms_consume")) return new Response("-1", { status: 200 });
+    return prev(url, opt);
+  };
+  await mod.default();
+  const logs = calls.filter((c) => c[1].startsWith("tracker_send_log") && c[2]).map((c) => c[2]);
+  if (!logs.some((l) => l.channel === "sms" && l.status === "no_credits")) throw new Error("expected sms no_credits log");
+  if (!logs.some((l) => l.subject === "SMS credits used up")) throw new Error("expected credits-used-up notice");
+  console.log("sms fallback: no_credits logged, credits-used-up notice logged, nothing sent by SMS");
+}

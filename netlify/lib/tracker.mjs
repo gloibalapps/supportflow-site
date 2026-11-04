@@ -10,6 +10,9 @@
 //   STRIPE_PRICE_TRACKER_ADDON  A$29 one-off, second computer; ONLY for base owners
 //                               (gated like the licence $29 upgrade)
 //   STRIPE_PRICE_TRACKER_FULL   A$99 one-off, full package (everything, two devices)
+//   STRIPE_PRICE_TRACKER_SMS    A$4.99 / month RECURRING (checkout mode=subscription):
+//                               50 SMS alerts per billing period, to the worker only.
+//                               Optional; NOT part of the full package; tracker owners only.
 //   NOTE: 49 + 29 = 78 < 99, so the package currently costs more than base + add-on.
 //   TRACKER_{BASE,ADDON,FULL}_LABEL / _AUD override display only; Stripe's Price is what is charged.
 import crypto from "node:crypto";
@@ -19,6 +22,7 @@ export const TRACKER_PRODUCTS = Object.freeze({
   tracker_base: { env: "STRIPE_PRICE_TRACKER_BASE", labelEnv: "TRACKER_BASE_LABEL", audEnv: "TRACKER_BASE_AUD", label: "Payment tracker, one computer", aud: 49, devices: 1 },
   tracker_addon: { env: "STRIPE_PRICE_TRACKER_ADDON", labelEnv: "TRACKER_ADDON_LABEL", audEnv: "TRACKER_ADDON_AUD", label: "Add a second computer", aud: 29, devices: 2, requires: "tracker_base" },
   tracker_full: { env: "STRIPE_PRICE_TRACKER_FULL", labelEnv: "TRACKER_FULL_LABEL", audEnv: "TRACKER_FULL_AUD", label: "Payment tracker, full package", aud: 99, devices: 2 },
+  tracker_sms: { env: "STRIPE_PRICE_TRACKER_SMS", labelEnv: "TRACKER_SMS_LABEL", audEnv: "TRACKER_SMS_AUD", label: "SMS alerts, 50 texts a month", aud: 4.99, recurring: "month", requires: "tracker" },
 });
 export const isTrackerProduct = (p) => Object.prototype.hasOwnProperty.call(TRACKER_PRODUCTS, p);
 
@@ -27,7 +31,8 @@ export function trackerOffer() {
     id,
     label: process.env[p.labelEnv] || p.label,
     priceAud: Number(process.env[p.audEnv]) || p.aud,
-    devices: p.devices,
+    devices: p.devices || 0,
+    recurring: p.recurring || null,
     available: !!process.env[p.env],
   }));
 }
@@ -36,6 +41,7 @@ const q = encodeURIComponent;
 // { product: "tracker_full"|"tracker_base", devices: 1|2, addon, full } or null when not unlocked.
 export async function trackerUnlock(sub) {
   if (!sub) return null;
+  // tracker_sms is a subscription, kept in tracker_sms_subscriptions, never here.
   const rows = (await supa(`licence_payments?google_sub=eq.${q(sub)}&product=in.(tracker_base,tracker_addon,tracker_full)&status=eq.paid&select=product,created_at&order=created_at.asc`)) || [];
   const has = (p) => rows.some((r) => r.product === p);
   if (has("tracker_full")) return { product: "tracker_full", devices: 2, full: true, addon: has("tracker_addon") };
