@@ -328,6 +328,12 @@ html,body{overscroll-behavior-y:none;background:#14150F;height:100%;overflow-x:h
 .pill.sent{background:rgba(91,124,157,.16);color:var(--sent)}
 .pill.overdue{background:rgba(192,57,43,.16);color:var(--req)}
 .pill.draft{background:var(--bg-3);color:var(--tx-3)}
+.pill.part{background:rgba(200,145,58,.16);color:var(--brass-lift)}
+.pill.nudge{background:rgba(200,145,58,.16);color:var(--brass-lift)}
+.pill.firm{background:rgba(214,120,40,.2);color:var(--warn)}
+.pill.lower{text-transform:none;letter-spacing:.02em;font-size:11px}
+.navdot{position:absolute;top:8px;right:calc(50% - 18px);width:9px;height:9px;border-radius:50%;background:var(--req)}
+.mobnav{position:relative}
 
 label.f{display:block;margin-bottom:13px}
 label.f > span{display:block;font-size:10px;letter-spacing:.16em;text-transform:uppercase;font-weight:600;color:var(--tx-3);margin-bottom:6px}
@@ -1796,6 +1802,316 @@ const termsHint = (n) => {
 const PLAN_TYPES = [["plan", "Plan managed"], ["self", "Self managed"], ["agency", "NDIA / agency managed"]];
 const planLabel = (v) => (PLAN_TYPES.find((p) => p[0] === v) || PLAN_TYPES[0])[1];
 
+/* ---------------- Payment tracker: shared rules ----------------
+   Business days, chase stages and templates. The block between the markers
+   is copied from payment-tracker-rules.js by build-app.mjs; edit that file. */
+/* @@TRACKER_RULES_START */
+// SupportFlow Payment tracker: shared rules (business days, chase stages,
+// message templates). ONE source of truth: imported by the Netlify functions
+// (netlify/lib/tracker.mjs) and inlined into app.jsx by build-app.mjs between
+// the @@TRACKER_RULES markers. Keep it dependency-free plain JS.
+//
+// Dates are "YYYY-MM-DD" strings in the worker's local calendar.
+
+const TRACKER_DEFAULT_THRESHOLDS = Object.freeze({ plan: [7, 12, 20], self: [7, 12, 20], agency: [3, 10, 15] });
+const TRACKER_STATES = ["SA", "NSW", "VIC", "QLD", "WA", "TAS", "ACT", "NT"];
+
+const pad2 = (n) => String(n).padStart(2, "0");
+const ymd = (d) => `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
+const parse = (s) => { const [y, m, d] = String(s).slice(0, 10).split("-").map(Number); return new Date(Date.UTC(y, m - 1, d)); };
+const addCal = (s, n) => { const d = parse(s); d.setUTCDate(d.getUTCDate() + n); return ymd(d); };
+const dow = (s) => parse(s).getUTCDay();
+// nth weekday (0=Sun..6=Sat) of month; n<0 = last.
+function nthDow(y, m, wd, n) {
+  if (n > 0) { const d = new Date(Date.UTC(y, m - 1, 1)); const off = (wd - d.getUTCDay() + 7) % 7; d.setUTCDate(1 + off + 7 * (n - 1)); return ymd(d); }
+  const d = new Date(Date.UTC(y, m, 0)); const off = (d.getUTCDay() - wd + 7) % 7; d.setUTCDate(d.getUTCDate() - off); return ymd(d);
+}
+function easterSunday(y) { // Anonymous Gregorian algorithm
+  const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25),
+    g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4,
+    l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451), mo = Math.floor((h + l - 7 * m + 114) / 31),
+    da = ((h + l - 7 * m + 114) % 31) + 1;
+  return `${y}-${pad2(mo)}-${pad2(da)}`;
+}
+// Weekend holiday -> next Monday (Christmas/Boxing Day pair handled together).
+const observed = (s) => (dow(s) === 6 ? addCal(s, 2) : dow(s) === 0 ? addCal(s, 1) : s);
+
+// Public holidays that close a business day: national days plus the main
+// state-wide ones. Part-day and regional holidays (Adelaide Christmas Eve /
+// NYE evenings, Brisbane Ekka, AFL Grand Final Friday) are ignored. Verify
+// against data.gov.au "Australian Public Holidays Dates" each year.
+const _hol = {};
+function auHolidays(year, state = "SA") {
+  const key = year + state;
+  if (_hol[key]) return _hol[key];
+  const y = year, S = String(state || "SA").toUpperCase(), set = new Set();
+  const add = (s) => set.add(s);
+  add(observed(`${y}-01-01`)); add(observed(`${y}-01-26`));
+  const easter = easterSunday(y); add(addCal(easter, -2)); add(addCal(easter, 1));
+  add(`${y}-04-25`); // Anzac Day (WA/ACT substitute a weekday; others don't)
+  if (S === "WA" || S === "ACT") add(observed(`${y}-04-25`));
+  const xmas = `${y}-12-25`, box = `${y}-12-26`;
+  if (dow(xmas) === 6) { add(addCal(xmas, 2)); add(addCal(xmas, 3)); }
+  else if (dow(xmas) === 0) { add(addCal(xmas, 1)); add(addCal(xmas, 2)); }
+  else { add(xmas); add(dow(box) === 6 ? addCal(box, 2) : box); }
+  const kingsJune = nthDow(y, 6, 1, 2);
+  if (S === "SA") { add(nthDow(y, 3, 1, 2)); add(kingsJune); add(nthDow(y, 10, 1, 1)); }
+  if (S === "NSW") { add(kingsJune); add(nthDow(y, 10, 1, 1)); }
+  if (S === "VIC") { add(nthDow(y, 3, 1, 2)); add(kingsJune); add(addCal(nthDow(y, 11, 1, 1), 1)); }
+  if (S === "QLD") { add(nthDow(y, 5, 1, 1)); add(nthDow(y, 10, 1, 1)); }
+  if (S === "WA") { add(nthDow(y, 3, 1, 1)); add(nthDow(y, 6, 1, 1)); add(nthDow(y, 9, 1, -1)); }
+  if (S === "TAS") { add(nthDow(y, 3, 1, 2)); add(kingsJune); }
+  if (S === "ACT") { add(nthDow(y, 3, 1, 2)); const r = `${y}-05-27`; add(addCal(r, (8 - dow(r)) % 7)); /* Reconciliation Day: Monday on or after 27 May */ add(kingsJune); add(nthDow(y, 10, 1, 1)); }
+  if (S === "NT") { add(nthDow(y, 5, 1, 1)); add(kingsJune); add(nthDow(y, 8, 1, 1)); }
+  _hol[key] = set;
+  return set;
+}
+function isBusinessDay(s, state) {
+  const w = dow(s);
+  return w !== 0 && w !== 6 && !auHolidays(Number(String(s).slice(0, 4)), state).has(String(s).slice(0, 10));
+}
+// Business days after `from` up to and including `to` (the send day is BD 0).
+function businessDaysBetween(from, to, state) {
+  if (!from || !to || to <= from) return 0;
+  let n = 0, d = String(from).slice(0, 10);
+  for (let i = 0; i < 4000 && d < to; i++) { d = addCal(d, 1); if (isBusinessDay(d, state)) n++; }
+  return n;
+}
+function addBusinessDays(from, n, state) {
+  let d = String(from).slice(0, 10), k = 0;
+  while (k < n) { d = addCal(d, 1); if (isBusinessDay(d, state)) k++; }
+  return d;
+}
+const nextBusinessDayAfter = (s, state) => addBusinessDays(s, 1, state);
+
+// payerType from the participant's planType ("plan" | "self" | "agency").
+const trackerPayerType = (planType) => (planType === "self" ? "self" : planType === "agency" ? "agency" : "plan");
+
+// The date each chase stage becomes due. Stage 1 never fires before the
+// first business day after the invoice's own due date (brief s5 rule).
+function trackerStageDates({ sentAt, due, payerType = "plan", thresholds, state }) {
+  const t = (thresholds && thresholds[payerType]) || TRACKER_DEFAULT_THRESHOLDS[payerType] || TRACKER_DEFAULT_THRESHOLDS.plan;
+  const d = t.map((n) => addBusinessDays(sentAt, n, state));
+  if (due && payerType !== "agency") {
+    const afterDue = nextBusinessDayAfter(due, state);
+    if (afterDue > d[0]) d[0] = afterDue;
+    if (d[1] < d[0]) d[1] = d[0];
+    if (d[2] < d[1]) d[2] = d[1];
+  }
+  return d;
+}
+// stage 0 = OK (waiting), 1 = nudge due, 2 = firm reminder due, 3 = complaint / NDIA draft ready.
+// A missed stage shows only the latest one; it never queues several.
+function trackerStage({ sentAt, due, payerType = "plan", thresholds, state, asOf }) {
+  if (!sentAt) return { stage: -1, bd: 0, dates: [] };
+  const dates = trackerStageDates({ sentAt, due, payerType, thresholds, state });
+  const bd = businessDaysBetween(sentAt, asOf, state);
+  let stage = 0;
+  dates.forEach((dt, i) => { if (asOf >= dt) stage = i + 1; });
+  return { stage, bd, dates, next: stage < 3 ? dates[stage] : null };
+}
+const TRACKER_STAGE_LABEL = {
+  plan: ["Waiting", "Nudge due", "Firm reminder due", "Complaint ready"],
+  self: ["Waiting", "Reminder due", "Firmer reminder due", "NDIA contact draft ready"],
+  agency: ["Waiting", "Check the portal", "Check for a hold", "NDIA enquiry ready"],
+};
+
+/* ---------------- message templates ----------------
+   Rendered on the device with everything the worker can see and edit. The
+   only tokens left for the server to fill at send time are {bdays},
+   {reply_by} and {today}, which depend on the day it actually goes out. */
+const fill = (s, v) => String(s).replace(/\{(\w+)\}/g, (m, k) => (v[k] != null ? String(v[k]) : m));
+function trackerFillDynamic(text, { sentAt, state, asOf }) {
+  return String(text)
+    .replace(/\{bdays\}/g, String(businessDaysBetween(sentAt, asOf, state)))
+    .replace(/\{reply_by\}/g, fmtAu(addBusinessDays(asOf, 5, state)))
+    .replace(/\{today\}/g, fmtAu(asOf));
+}
+const fmtAu = (s) => { if (!s) return ""; const [y, m, d] = String(s).slice(0, 10).split("-"); return `${d}/${m}/${y}`; };
+
+const T = {
+  plan: [
+    { subject: "Invoice {invoice_no} for {participant}: payment check",
+      body: "Hi {to_name},\n\nI hope you're well. I'm following up on invoice {invoice_no} for ${amount}, sent on {sent_date} for supports provided to {participant}{ndis_bit}{service_bit}.\n\nCould you please confirm you've received it and let me know when payment is expected? If anything is missing or needs correcting, just tell me and I'll fix it straight away.\n\nThank you,\n{worker_name}\n{business_line}" },
+    { subject: "Second request: invoice {invoice_no} (${amount}) now {bdays} business days outstanding",
+      body: "Hi {to_name},\n\nI followed up earlier about invoice {invoice_no} for ${amount}, sent on {sent_date} for {participant}{ndis_bit}. It is now {bdays} business days since the invoice was sent and I have not received payment.\n\nThe NDIS Guide to Plan Management says a plan manager \"must validate\" invoices \"within no more than five business days\", and the NDIA says plan managers should pay providers \"within 2 business days\" of receiving payment from the NDIS.\n\nPlease reply by {reply_by} with either:\n- the date payment will be made, or\n- the specific reason the invoice is on hold and what you need from me.\n\nPlease also send me a copy of your complaints process, in case this cannot be resolved.\n\nRegards,\n{worker_name}\n{business_line}" },
+  ],
+  self: [
+    { subject: "Invoice {invoice_no}: friendly reminder",
+      body: "Hi {to_name},\n\nJust a friendly reminder about invoice {invoice_no} for ${amount}{service_bit}, sent on {sent_date}. If you've already paid, thank you, and please let me know the date so I can match it up. If anything on the invoice needs changing, just tell me.\n\nThanks,\n{worker_name}" },
+    { subject: "Invoice {invoice_no}: payment now overdue",
+      body: "Hi {to_name},\n\nInvoice {invoice_no} for ${amount}, sent on {sent_date}, is now {bdays} business days old and I haven't received payment yet. When you self-manage, the NDIA usually pays your claim into your account within 2 business days, and then the provider is paid. Could you let me know by {reply_by} when you expect to pay? If something is holding up your claim, I'm happy to help with the details it needs.\n\nThanks,\n{worker_name}\n{business_line}" },
+  ],
+};
+function trackerTemplate(payerType, stage, vars) {
+  const set = T[payerType];
+  if (!set || stage < 1 || stage > 2) return null;
+  const t = set[stage - 1];
+  return { subject: fill(t.subject, vars), body: fill(t.body, vars) };
+}
+// Day-20 (plan/self) or day-15 (agency) draft for the worker to file with the
+// NDIA. Never filed automatically.
+function trackerNdiaDraft(payerType, vars) {
+  const role = payerType === "plan" ? "Provider (sole-trader support worker) to a plan-managed participant"
+    : payerType === "self" ? "Provider (sole-trader support worker) to a self-managed participant"
+    : "Provider to an NDIA-managed participant";
+  const ask = payerType === "plan" ? "Please contact the plan manager and help resolve payment of the outstanding invoice(s)."
+    : payerType === "self" ? "The participant has not responded to my payment requests. Please advise how this can be resolved."
+    : "Please advise the status of this payment request and what is needed for it to be paid.";
+  const fields = [
+    ["Feedback type", payerType === "agency" ? "Enquiry" : "Complaint"],
+    ["Have you contacted the Agency about this before?", "(answer yes/no and add any reference number)"],
+    ["Your details", vars.business_line ? `${vars.worker_name}, ${vars.business_line}` : vars.worker_name],
+    ["Your role", role],
+    ["Participant", `${vars.participant}${vars.ndis_number ? ` (NDIS ${vars.ndis_number})` : ""}`],
+    ...(payerType === "plan" ? [["Plan manager", vars.payer_name || ""]] : []),
+    ["Invoice", `${vars.invoice_no}, $${vars.amount}, sent ${vars.sent_date}${vars.service_period ? `, supports ${vars.service_period}` : ""}`],
+    ["Business days outstanding", "{bdays}"],
+    ["Follow-up so far", vars.chase_history || "(none recorded)"],
+    ["Benchmark", "NDIS Guide to Plan Management s4.2.1: validate invoices within 5 business days; NDIA: plan managers pay providers within 2 business days of receiving NDIS funds."],
+    ["Requested action", ask],
+    ["Attach", "The invoice PDF, the reminder emails, and the SupportFlow payment history report."],
+  ];
+  return {
+    subject: `Ready to file: NDIA ${payerType === "agency" ? "enquiry" : "complaint"} draft for invoice ${vars.invoice_no}`,
+    fields,
+    body: fields.map(([k, v]) => `${k}:\n${v}`).join("\n\n") +
+      "\n\nHow to file: NDIA Feedback and complaints form https://www.ndis.gov.au/contact/feedback-and-complaints or phone 1800 800 110." +
+      "\nThe NDIS Quality and Safeguards Commission does not handle unpaid invoices; contact it only about conduct concerns or if supports to the participant may stop.",
+  };
+}
+/* @@TRACKER_RULES_END */
+
+// Local calendar date. today() is UTC, which is still "yesterday" before
+// 10:30am in Adelaide; the tracker counts the worker's own days.
+const localToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+// ONE definition of overdue, used everywhere (app-flow-review #3): sent,
+// not paid, and past its due date. Drafts are never overdue or "owed".
+const isOverdue = (i) => i.status === "sent" && !!i.due && i.due < localToday();
+const hasAmountPaid = (i) => i.amountPaid != null && i.amountPaid !== "" && !isNaN(Number(i.amountPaid));
+const invAmountPaid = (i) => (i.status === "paid" ? (hasAmountPaid(i) ? Number(i.amountPaid) : invTotal(i)) : 0);
+const isPartPaid = (i) => i.status === "paid" && hasAmountPaid(i) && Number(i.amountPaid) + 0.005 < invTotal(i);
+const invStatusKey = (i) => (i.status === "draft" ? "draft" : i.status === "paid" ? (isPartPaid(i) ? "part" : "paid") : isOverdue(i) ? "overdue" : "sent");
+const INV_STATUS_LABEL = { draft: "Not sent yet", sent: "Waiting", overdue: "Overdue", paid: "Paid", part: "Part paid" };
+const TRACKER_PREVIEW_FLAG = "sf_tracker_preview_v1"; // owner testing: ?trackerpreview=1 / =0
+const TRACKER_API = "/.netlify/functions/tracker";
+
+const trackerSettingsOf = (data) => ({
+  state: "SA", thresholds: TRACKER_DEFAULT_THRESHOLDS, autoSend: false, replyTo: data.profile.email || "",
+  includeNdis: false, notifyPush: true, ...(data.trackerSettings || {}),
+});
+// Chase state of one invoice: business days since sent, stage 0-3, label.
+function invoiceChase(i, data, asOf) {
+  if (i.status !== "sent" || !i.sentAt) return null;
+  const pt = data.participants.find((x) => x.id === i.participantId);
+  const payerType = trackerPayerType(pt?.planType);
+  const s = trackerSettingsOf(data);
+  const st = trackerStage({ sentAt: i.sentAt, due: i.due, payerType, thresholds: s.thresholds, state: s.state, asOf: asOf || localToday() });
+  return { ...st, payerType, label: TRACKER_STAGE_LABEL[payerType][Math.max(0, st.stage)], paused: !!(i.chase && i.chase.paused) };
+}
+const STAGE_TONE = ["sent", "nudge", "firm", "overdue"];
+
+function trackerVars(i, data) {
+  const r = resolve(i, data);
+  const s = trackerSettingsOf(data);
+  const p = data.profile;
+  const words = (r.client || "").trim().split(/\s+/).filter(Boolean);
+  const participant = words.length ? words[0] + (words.length > 1 ? " " + words[words.length - 1][0] + "." : "") : "the participant";
+  const shifts = data.shifts.filter((x) => (i.shiftIds || []).includes(x.id)).map((x) => x.date).sort();
+  const period = shifts.length ? (shifts[0] === shifts[shifts.length - 1] ? fmtAu(shifts[0]) : `${fmtAu(shifts[0])} to ${fmtAu(shifts[shifts.length - 1])}`) : "";
+  const payerType = trackerPayerType(r.pt?.planType);
+  const history = (data.chaseEvents || []).filter((e) => e.invoiceId === i.id).sort((a, b) => (a.at < b.at ? -1 : 1))
+    .map((e) => `${fmtAu(e.at)}: ${CHASE_TYPES[e.type] || e.type}${e.summary ? `, ${e.summary}` : ""}`).join("\n");
+  return {
+    invoice_no: i.number, amount: invTotal(i).toFixed(2), sent_date: fmtAu(i.sentAt), participant,
+    ndis_bit: s.includeNdis && r.participantNo ? ` (NDIS ${r.participantNo})` : "",
+    ndis_number: s.includeNdis ? r.participantNo : "",
+    service_bit: period ? `, ${period}` : "", service_period: period,
+    to_name: payerType === "plan" ? (r.mgr?.contact || `${r.mgr?.name || "plan manager"} accounts team`) : (words[0] || "there"),
+    payer_name: r.mgr?.name || "",
+    worker_name: p.name || "",
+    business_line: [p.tradingName, p.abn ? `ABN ${p.abn}` : "", p.phone, p.email].filter(Boolean).join(" · "),
+    chase_history: history,
+  };
+}
+const CHASE_TYPES = { nudge1: "Reminder 1 sent", nudge2: "Reminder 2 sent", auto: "Sent automatically", call: "Phone call", reply: "Reply received", complaint_pm: "Complaint to plan manager", complaint_ndia: "NDIA complaint filed", note: "Note", paid: "Marked paid" };
+
+// The three messages for an invoice, with the worker's edits applied.
+// Stage 1-2 go to the payer (agency: reminders to the worker); stage 3 is
+// always the NDIA draft, for the worker only.
+function trackerMessages(i, data) {
+  const v = trackerVars(i, data);
+  const payerType = trackerPayerType(resolve(i, data).pt?.planType);
+  const custom = (i.chase && i.chase.custom) || {};
+  const agency = {
+    1: { subject: `Check the myplace portal: invoice ${v.invoice_no}`, body: `Your payment request for invoice ${v.invoice_no} ($${v.amount}) was submitted on ${v.sent_date}. Valid claims are usually paid within 2 to 3 business days. Check the myplace provider portal for its status.` },
+    2: { subject: `Still unpaid: invoice ${v.invoice_no}`, body: `Invoice ${v.invoice_no} is still unpaid after {bdays} business days. Look in the myplace provider portal for a hold (you have at least 14 days to provide information) or a rejection (the NDIA writes with reasons).` },
+  };
+  const base = (n) => (payerType === "agency" ? agency[n] : trackerTemplate(payerType, n, v));
+  const draft = trackerNdiaDraft(payerType, v);
+  return {
+    payerType,
+    1: custom[1] || base(1), 2: custom[2] || base(2),
+    3: custom[3] ? { ...draft, ...custom[3] } : draft,
+    to: payerType === "agency" ? "" : resolve(i, data).billToEmail,
+  };
+}
+
+// Pattern rules P1-P4, P6 (brief s6), computed on the device.
+function trackerPatterns(data) {
+  const s = trackerSettingsOf(data);
+  const asOf = localToday();
+  const yearAgo = addDays(asOf, -365);
+  const groups = {};
+  data.invoices.filter((i) => i.sentAt && i.status !== "draft").forEach((i) => {
+    const r = resolve(i, data);
+    const payerType = trackerPayerType(r.pt?.planType);
+    const key = payerType === "plan" ? "m:" + (r.mgr?.id || "?") : payerType === "agency" ? "ndia" : "p:" + (r.pt?.id || "?");
+    const name = payerType === "plan" ? (r.mgr?.name || "Plan manager") : payerType === "agency" ? "NDIA (agency-managed)" : (r.client || "Participant");
+    const g = groups[key] || (groups[key] = { key, name, payerType, inv: [] });
+    const end = i.status === "paid" ? (i.paidAt || null) : asOf;
+    const bd = end ? businessDaysBetween(i.sentAt, end, s.state) : null;
+    g.inv.push({ i, bd, late: bd != null && bd > 12, open: i.status === "sent" });
+  });
+  return Object.values(groups).map((g) => {
+    const late12m = g.inv.filter((x) => x.late && x.i.sentAt >= yearAgo);
+    const paidBds = g.inv.filter((x) => x.i.status === "paid" && x.bd != null).map((x) => x.bd).sort((a, b) => a - b);
+    const median = paidBds.length ? paidBds[Math.floor(paidBds.length / 2)] : null;
+    const avg = g.inv.filter((x) => x.bd != null).reduce((n, x, _, a) => n + x.bd / a.length, 0);
+    const openInv = g.inv.filter((x) => x.open);
+    const owed = openInv.reduce((n, x) => n + invTotal(x.i), 0);
+    const silent = openInv.filter((x) => {
+      const ev = (data.chaseEvents || []).filter((e) => e.invoiceId === x.i.id);
+      return ev.filter((e) => /^nudge|auto/.test(e.type)).length >= 2 && !ev.some((e) => e.type === "reply");
+    });
+    const partials = g.inv.filter((x) => isPartPaid(x.i)).length;
+    const rules = [];
+    if (late12m.length >= 3) rules.push(`Late on ${late12m.length} of ${g.inv.length} invoices in the last 12 months.`);
+    if (median != null && paidBds.length >= 4 && median > 15) rules.push(`Usually takes ${median} business days to pay (median of ${paidBds.length}).`);
+    if (openInv.length >= 2 || owed > 1000) rules.push(`${openInv.length} invoice${openInv.length === 1 ? "" : "s"} unpaid at once, ${money(owed)} owed.`);
+    if (silent.length) rules.push(`No reply logged after 2 reminders on ${silent.length} invoice${silent.length === 1 ? "" : "s"}.`);
+    if (partials >= 2) rules.push(`${partials} part payments. Check your rates against the NDIS Price Limits.`);
+    return { ...g, late: g.inv.filter((x) => x.late).length, avg: Math.round(avg), owed, rules };
+  }).sort((a, b) => b.rules.length - a.rules.length || b.owed - a.owed);
+}
+
+function trackerCsv(data, { from, to, payer, mode }) {
+  const s = trackerSettingsOf(data);
+  const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const rows = [["Invoice", "Participant", "Payer", "Management", "Amount", "Sent", "Due", "Paid on", "Amount received", "Business days", "Status", ...(mode === "complaint" ? ["Chase log"] : [])]];
+  data.invoices.filter((i) => i.status !== "draft" && (i.sentAt || i.date) >= from && (i.sentAt || i.date) <= to)
+    .filter((i) => !payer || resolve(i, data).mgr?.id === payer)
+    .forEach((i) => {
+      const r = resolve(i, data);
+      const words = (r.client || "").split(/\s+/).filter(Boolean);
+      const bd = i.sentAt ? businessDaysBetween(i.sentAt, i.status === "paid" ? (i.paidAt || localToday()) : localToday(), s.state) : "";
+      rows.push([i.number, mode === "complaint" ? r.client : words.map((w) => w[0]).join(""), r.billToName, planLabel(r.pt?.planType), invTotal(i).toFixed(2),
+        i.sentAt || "", i.due || "", i.paidAt || "", i.status === "paid" ? invAmountPaid(i).toFixed(2) : "", bd, INV_STATUS_LABEL[invStatusKey(i)],
+        ...(mode === "complaint" ? [(data.chaseEvents || []).filter((e) => e.invoiceId === i.id).map((e) => `${e.at} ${CHASE_TYPES[e.type] || e.type} ${e.summary || ""}`).join(" | ")] : [])]);
+    });
+  return rows.map((r) => r.map(esc).join(",")).join("\r\n");
+}
+
 /* ---------------- email ---------------- */
 /* ---------------- PDF ---------------- */
 let _pdfLoad = null;
@@ -2111,6 +2427,7 @@ const BLANK = {
     // touched by this, it only shapes what a fresh profile starts with.
     backupEvery: "daily", backupAt: "18:00" },
   participants: [], managers: [], shifts: [], claimCache: {}, onboarded: false, clients: [], invoices: [], expenses: [], trips: [], notes: [], incidents: [], priorTotals: null,
+  chaseEvents: [], trackerSettings: null,
 };
 // Three simple stroked-line icons, matching the weight of the app's own
 // mark rather than pulling in an icon package this file has no bundler to
@@ -2155,9 +2472,10 @@ function ShortcutIcon({ type, tone }) {
   return <span className={`shorticon ${tone || "yellow"}`}><svg viewBox="0 0 24 24" aria-hidden="true">{paths[type]}</svg></span>;
 }
 
-function ShortcutCard({ icon, tone, title, sub, onClick, wide }) {
-  return <button className={`shortcard${wide ? " wide" : ""}`} onClick={onClick}>
+function ShortcutCard({ icon, tone, title, sub, onClick, wide, badge }) {
+  return <button className={`shortcard${wide ? " wide" : ""}`} onClick={onClick} style={badge ? { position: "relative" } : undefined}>
     <ShortcutIcon type={icon} tone={tone}/><b>{title}</b><small>{sub}</small><span className="shortchev">›</span>
+    {badge ? <span className="pill overdue lower" style={{ position: "absolute", top: 10, right: 10 }}>{badge}</span> : null}
   </button>;
 }
 
@@ -2520,6 +2838,7 @@ function LockScreen({ onUnlock, onForgot }) {
 function App() {
   // Device licensing. phase "off" (switch off) leaves everything as before.
   const licence = useLicence();
+  const trackerAccess = useTrackerAccess();
   const [theme, setTheme] = useState("dark");
   const [tab, setTab] = useState("home");
   const [sumTab, setSumTab] = useState("invoices");   // invoices | expenses | position | bas
@@ -2716,9 +3035,13 @@ function App() {
           // touches "managers", it only surfaces later, silently, inside
           // whatever event handler first tries to .find/.filter/.map it,
           // somewhere React's error boundary can't see or report it.
-          ["participants", "managers", "shifts", "invoices", "expenses", "trips", "notes", "clients"].forEach((k) => {
+          ["participants", "managers", "shifts", "invoices", "expenses", "trips", "notes", "clients", "chaseEvents"].forEach((k) => {
             if (!Array.isArray(d[k])) d[k] = [];
           });
+          // Payment tracker: invoices sent before sentAt existed get the
+          // issue date as an estimate, flagged so the worker can correct it.
+          d.invoices = d.invoices.map((i) => (i && (i.status === "sent" || i.status === "paid") && !i.sentAt && i.date
+            ? { ...i, sentAt: i.date, sentAtEstimated: true } : i));
           // profile isn't an array, but the same explicit-null gap applies,
           // and virtually every screen in the app reads data.profile.X
           // directly with no guard at all, so this one has to be whole,
@@ -2785,7 +3108,7 @@ function App() {
 
   const m = useMemo(() => {
     const inv = data.invoices.filter((i) => inFY(i.date, fy));
-    const income = inv.filter((i) => i.status === "paid").reduce((s, i) => s + invTotal(i), 0);
+    const income = inv.filter((i) => i.status === "paid").reduce((s, i) => s + invAmountPaid(i), 0);
     const invoiced = inv.reduce((s, i) => s + invTotal(i), 0);
     const expenses = data.expenses.filter((e) => inFY(e.date, fy)).reduce((s, e) => s + Number(e.amount || 0), 0);
     const km = data.trips.filter((t) => inFY(t.date, fy)).reduce((s, t) => s + Number(t.km || 0), 0);
@@ -2918,7 +3241,7 @@ function App() {
   const flags = {
     shifts: data.shifts.some((x) => needsConfirm(x)) ? "warn" : null,
     travel: null,
-    invoices: data.invoices.some((i) => i.status === "sent" && i.due && i.due < today()) ? "warn"
+    invoices: data.invoices.some((i) => isOverdue(i) || (invoiceChase(i, data)?.stage >= 1)) ? "warn"
       : (data.shifts.some((x) => isBillable(x) && !shiftInvoice(x, data.invoices))
           || data.trips.some((t) => t.billable && t.participantId && !tripInvoice(t, data.invoices))) ? "on" : null,
     agreements: data.participants.some((x) => !x.agreement) ? "warn"
@@ -2927,7 +3250,7 @@ function App() {
 
   const askClaim = (term) => { setClaimSeed(term || ""); setTab("summary"); setSumTab("position"); };
 
-  const wipeAll = () => save({ ...data, managers: [], participants: [], invoices: [], expenses: [], trips: [], notes: [], clients: [], shifts: [], priorTotals: null });
+  const wipeAll = () => save({ ...data, managers: [], participants: [], invoices: [], expenses: [], trips: [], notes: [], clients: [], shifts: [], chaseEvents: [], priorTotals: null });
 
   // The one path every "raise an invoice" action goes through, whether it's
   // opened blank from a participant or pre-loaded from a specific shift or
@@ -3258,6 +3581,23 @@ function App() {
               </div>
             </div>
             <div className="hubscroll">
+              {(() => {
+                const waiting = data.invoices.filter((i) => i.status === "sent");
+                if (!waiting.length) return null;
+                const owedNow = waiting.reduce((n, i) => n + invTotal(i), 0);
+                const act = waiting.filter((i) => { const c = invoiceChase(i, data); return c && c.stage >= 1 && !c.paused; }).length;
+                const over = waiting.filter(isOverdue).length;
+                return (
+                  <button className="panel" style={{ display: "block", width: "100%", textAlign: "left", cursor: "pointer", marginBottom: 14, font: "inherit", color: "inherit" }}
+                    onClick={() => go("summary", "tracker")}>
+                    <div className="eyebrow">Money owed to you</div>
+                    <div className="disp num" style={{ fontSize: 26, marginTop: 4 }}>{money(owedNow)}</div>
+                    <div style={{ fontSize: 13.5, marginTop: 4, color: act || over ? "var(--warn)" : "var(--tx-2)" }}>
+                      {waiting.length} invoice{waiting.length === 1 ? "" : "s"}{over ? ` · ${over} overdue` : ""}{act ? ` · ${act} need${act === 1 ? "s" : ""} a nudge` : ""} ›
+                    </div>
+                  </button>
+                );
+              })()}
               <div className="shortgrid">
                 <ShortcutCard icon="shift" tone="pink" title="Add a shift" sub="Open the existing Add Shift form." onClick={() => { setOpenNewShiftRequest(true); go("invoices", "shifts"); }}/>
                 <ShortcutCard icon="notes" tone="teal" title="Add a note" sub="Open the existing progress notes screen." onClick={() => go("invoices", "notes")}/>
@@ -3291,7 +3631,9 @@ function App() {
             </div>
             <div className="hubscroll">
               <div className="shortgrid">
-                <ShortcutCard icon="invoice" tone="blue" title="Invoices" sub="Open your existing invoice screen." onClick={() => go("summary", "invoices")}/>
+                <ShortcutCard icon="invoice" tone="blue" title="Invoices" sub="Raise, send and mark invoices paid." onClick={() => go("summary", "invoices")}
+                  badge={(() => { const n = data.invoices.filter(isOverdue).length; return n ? `${n} overdue` : null; })()}/>
+                <ShortcutCard icon="document" tone="teal" title="Payment tracker" sub="See who owes you and chase it." onClick={() => go("summary", "tracker")}/>
                 <ShortcutCard icon="expense" tone="pink" title="Expenses" sub="Open your existing expenses screen." onClick={() => go("summary", "expenses")}/>
                 <ShortcutCard icon="tax" tone="yellow" title="Tax" sub="Income, tax estimate and Claimable checker." onClick={() => { setClaimSeed(""); go("summary", "position"); }} wide={!data.profile.gstRegistered}/>
                 {data.profile.gstRegistered && <ShortcutCard icon="tax" tone="yellow" title="BAS" sub="Open the existing BAS worksheet." onClick={() => go("summary", "bas")}/>}
@@ -3321,11 +3663,12 @@ function App() {
             <>
               <SectionReturnHeader
                 section="Money"
-                title={({ invoices: "Invoices", expenses: "Expenses", position: "Tax", bas: "BAS" })[sumTab] || "Money"}
+                title={({ invoices: "Invoices", expenses: "Expenses", position: "Tax", bas: "BAS", tracker: "Payment tracker" })[sumTab] || "Money"}
                 onBack={() => { setClaimSeed(""); goHub("moneyhub"); }}
               />
               {sumTab === "invoices" && <InvoiceList data={data} m={m} fy={fy} save={save} newInvoice={newInvoice} open={setEditing} go={go} billTick={billTick} setBillTick={setBillTick} />}
               {sumTab === "bas" && <BAS data={data} fy={fy} />}
+              {sumTab === "tracker" && <PaymentTracker data={data} save={save} go={go} access={trackerAccess} />}
               {sumTab === "position" && <Summary data={data} save={save} m={m} go={go} newInvoice={newInvoice} resume={() => setTab("setup")}              snoozeBackup={() => save({ ...data, profile: { ...data.profile, remindedOn: today() } })}
                 dismissBackupNotice={() => save({ ...data, profile: { ...data.profile, backupNoticeSeen: true } })}
                 daysUntilTrialEnd={daysUntilTrialEnd} onSubscribe={() => setShowTrialNotice(true)} claimSeed={claimSeed} />}
@@ -3385,6 +3728,7 @@ function App() {
           <button key={k} className="mobnav" data-on={navActive(k) ? 1 : 0} onClick={() => goHub(k)}>
             <span className="mobnav-icon">{NAV_ICONS[k]}</span>
             <span>{l}</span>
+            {k === "moneyhub" && flags.invoices === "warn" && <span className="navdot" aria-label="Unpaid invoices need attention" />}
           </button>
         ))}
       </div>
@@ -4055,9 +4399,452 @@ function BAS({ data, fy }) {
   );
 }
 
+
+/* ---------------- Mark paid (date + amount, app-flow-review D3) ---------------- */
+function MarkPaidSheet({ inv, onSave, onCancel }) {
+  const [paidAt, setPaidAt] = useState(localToday());
+  const [amount, setAmount] = useState(invTotal(inv).toFixed(2));
+  return (
+    <div className="callout" style={{ marginTop: 8, textAlign: "left" }}>
+      <div style={{ fontWeight: 600, marginBottom: 8 }}>Mark invoice #{inv.number} paid</div>
+      <div className="two" style={{ marginBottom: 8 }}>
+        <label className="f" style={{ marginBottom: 0 }}><span>Date the money arrived</span><AuDateInput value={paidAt} onChange={setPaidAt} /></label>
+        <label className="f" style={{ marginBottom: 0 }}><span>Amount received</span><input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button className="btn" style={{ minHeight: 44 }} disabled={!paidAt || isNaN(Number(amount))} onClick={() => onSave({ paidAt, amountPaid: Number(amount) })}>Save as paid</button>
+        <button className="btn ghost" style={{ minHeight: 44 }} onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+const markPaid = (data, id, { paidAt, amountPaid }) => ({
+  ...data,
+  invoices: data.invoices.map((i) => (i.id === id ? { ...i, status: "paid", paidAt, amountPaid } : i)),
+  chaseEvents: [...(data.chaseEvents || []), { id: uid(), invoiceId: id, type: "paid", at: paidAt, summary: money(amountPaid) }],
+});
+
+/* ---------------- Payment tracker access (paywall) ----------------
+   Unlocked = the server says this Google account has a paid "tracker"
+   row, plus a seat for this device (1, or 2 with the A$29 add-on) (written only by the Stripe webhook). The last answer is
+   cached so the screens work offline. Server-side auto-send re-checks the
+   unlock itself, so editing this cache can't send anything. */
+function useTrackerAccess() {
+  const [st, setSt] = useState(() => {
+    let cached = null;
+    try { cached = JSON.parse(localStorage.getItem("sf_tracker_access_v1") || "null"); } catch (e) { }
+    let preview = false;
+    try { preview = localStorage.getItem(TRACKER_PREVIEW_FLAG) === "1"; } catch (e) { }
+    return { phase: preview ? "unlocked" : cached?.unlocked ? "unlocked" : "loading", preview, cfg: null, session: null, deviceId: "", product: cached?.product || null, error: "" };
+  });
+  const ref = useRef({});
+  const post = async (body) => {
+    const r = await fetch(TRACKER_API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deviceId: ref.current.deviceId, session: ref.current.session?.token, ...body }) });
+    const d = await r.json().catch(() => ({}));
+    return { status: r.status, data: d };
+  };
+  const refresh = async () => {
+    try {
+      const sp = new URLSearchParams(location.search);
+      if (sp.get("trackerpreview") === "1") localStorage.setItem(TRACKER_PREVIEW_FLAG, "1");
+      if (sp.get("trackerpreview") === "0") localStorage.removeItem(TRACKER_PREVIEW_FLAG);
+    } catch (e) { }
+    const preview = (() => { try { return localStorage.getItem(TRACKER_PREVIEW_FLAG) === "1"; } catch (e) { return false; } })();
+    ref.current.deviceId = await licenceDeviceId();
+    ref.current.session = await licGet("session");
+    let cfg = null;
+    try { cfg = await (await fetch(TRACKER_API + "?action=config", { cache: "no-store" })).json(); } catch (e) { }
+    // Offline / signed-out fallback: the last server answer for this account, or the owner preview flag.
+    const cachedUnlocked = (() => { try { const c = JSON.parse(localStorage.getItem("sf_tracker_access_v1") || "null"); return !!(c && c.unlocked && (!ref.current.session?.sub || c.sub === ref.current.session.sub)); } catch (e) { return false; } })();
+    if (!ref.current.session?.token) { setSt((c) => ({ ...c, cfg, preview, phase: preview ? "unlocked" : "signedout" })); return; }
+    try {
+      const { status, data } = await post({ action: "status" });
+      if (status === 401) { setSt((c) => ({ ...c, cfg, preview, phase: preview ? "unlocked" : "signedout" })); return; }
+      if (status >= 400) throw new Error(data.error || "error");
+      try { localStorage.setItem("sf_tracker_access_v1", JSON.stringify({ unlocked: !!data.unlocked, product: data.product, sub: ref.current.session.sub })); } catch (e) { }
+      setSt((c) => ({ ...c, cfg, preview, session: ref.current.session, phase: data.unlocked || preview ? "unlocked" : "locked", paid: !!data.paid, devices: data.devices || 0, deviceLimit: !!data.deviceLimit, product: data.product, serverPrefs: data.prefs, autosendServer: !!data.autosendServer }));
+    } catch (e) {
+      setSt((c) => ({ ...c, cfg, preview, session: ref.current.session, phase: preview || cachedUnlocked ? "unlocked" : "offline" }));
+    }
+  };
+  useEffect(() => {
+    refresh();
+    // Back from Stripe: the webhook unlocks; poll briefly until it lands.
+    let n = 0, t = null;
+    try {
+      if (new URLSearchParams(location.search).get("tracker") === "success") {
+        const tick = async () => { await refresh(); if (++n < 8) t = setTimeout(tick, 2500); };
+        t = setTimeout(tick, 1500);
+      }
+    } catch (e) { }
+    return () => t && clearTimeout(t);
+  }, []);
+  const signIn = async (idToken) => {
+    ref.current.deviceId = ref.current.deviceId || await licenceDeviceId();
+    const { data } = await post({ action: "signin", idToken });
+    if (data.session) { const s = licenceSessionInfo(data.session); await licSet("session", s); LICENCE_CTX.session = s.token; }
+    else setSt((c) => ({ ...c, error: data.error || "Sign-in failed." }));
+    await refresh();
+  };
+  const buy = async (product) => {
+    setSt((c) => ({ ...c, busy: product, error: "" }));
+    try {
+      const { data } = await post({ action: "checkout", product });
+      if (data.url) { location.href = data.url; return; }
+      setSt((c) => ({ ...c, busy: null, error: data.error || "Couldn't start checkout." }));
+    } catch (e) { setSt((c) => ({ ...c, busy: null, error: "You're offline. Connect and try again." })); }
+  };
+  return { ...st, refresh, signIn, buy, post };
+}
+
+function TrackerUpsell({ access, owed, count, go }) {
+  // A$99 unlock first; the A$29 second-device add-on only once that's paid
+  // (or when this device is over the one-device limit).
+  const offer = (access.cfg?.offer || []).filter((o) => (o.available || access.preview) && (access.paid ? o.id === "tracker_second_device" : o.id === "tracker"));
+  return (
+    <div className="panel" style={{ borderColor: "var(--brass)" }}>
+      <div className="eyebrow" style={{ color: "var(--brass)" }}>Payment tracker · paid add-on</div>
+      <div className="disp" style={{ fontSize: 24, margin: "6px 0 8px" }}>Get paid on time without chasing</div>
+      {count > 0 && <div style={{ fontSize: 14, marginBottom: 10 }}>You're owed <b>{money(owed)}</b> across {count} invoice{count === 1 ? "" : "s"}.</div>}
+      <div style={{ fontSize: 13.5, lineHeight: 1.6, color: "var(--tx-2)" }}>
+        ✓ Counts business days on every invoice you send<br />
+        ✓ Sends a polite reminder at day 7 and a firmer one at day 12, automatically (you can read and change them first)<br />
+        ✓ At day 20, emails you a ready-to-file NDIA complaint draft. Nothing is filed for you<br />
+        ✓ Shows plan managers who are late again and again, and exports a payment history
+      </div>
+      {access.phase === "signedout" && (
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontSize: 13, marginBottom: 8 }}>Sign in with Google so the unlock stays with you on every device.</div>
+          {access.cfg?.clientId ? <LicenceGoogleButton clientId={access.cfg.clientId} onCredential={access.signIn} /> : <div style={{ fontSize: 12.5, color: "var(--tx-3)" }}>Sign-in isn't available right now.</div>}
+        </div>
+      )}
+      {access.phase === "locked" && access.deviceLimit && <div style={{ fontSize: 13, marginTop: 12 }}>Your Payment tracker is already in use on your other device. Add this one too:</div>}
+      {access.phase === "locked" && (offer.length ? offer.map((o) => (
+        <button key={o.id} className="btn" style={{ width: "100%", marginTop: 10, minHeight: 48 }} disabled={!!access.busy} onClick={() => access.buy(o.id)}>
+          {access.busy === o.id ? "One moment..." : o.id === "tracker" ? `Unlock on this device · A$${o.priceAud} once` : `Add a second device (PC + phone) · A$${o.priceAud} once`}
+        </button>
+      )) : <div style={{ fontSize: 12.5, color: "var(--tx-3)", marginTop: 12 }}>The Payment tracker isn't on sale yet.</div>)}
+      {access.phase === "offline" && <div style={{ fontSize: 12.5, color: "var(--warn)", marginTop: 12 }}>Connect to the internet to unlock the Payment tracker.</div>}
+      {access.phase === "loading" && <div style={{ fontSize: 12.5, color: "var(--tx-3)", marginTop: 12 }}>Checking…</div>}
+      {access.error && <div style={{ fontSize: 12.5, color: "var(--warn)", marginTop: 10 }}>{access.error}</div>}
+      <button className="btn ghost" style={{ width: "100%", marginTop: 10, minHeight: 44 }} onClick={() => go("summary", "invoices")}>See my invoices</button>
+    </div>
+  );
+}
+
+const copyText = (t) => { try { navigator.clipboard.writeText(t); return true; } catch (e) { return false; } };
+const urlB64ToUint8 = (b) => { const s = atob((b + "=".repeat((4 - (b.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from(s, (c) => c.charCodeAt(0)); };
+const isIOS = () => /iPhone|iPad/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+
+/* ---------------- Payment tracker (brief screens 2-8) ---------------- */
+function PaymentTracker({ data, save, go, access }) {
+  const [view, setView] = useState("list");
+  const [sel, setSel] = useState(null);       // invoice id
+  const [stageSel, setStageSel] = useState(1);
+  const [filter, setFilter] = useState("action");
+  const [paying, setPaying] = useState(null);
+  const [logForm, setLogForm] = useState(null);
+  const [server, setServer] = useState({ status: {}, log: null, msg: "" });
+  const s = trackerSettingsOf(data);
+  const setS = (p) => save({ ...data, trackerSettings: { ...s, ...p } });
+  const asOf = localToday();
+  const open = data.invoices.filter((i) => i.status === "sent");
+  const rows = data.invoices.filter((i) => i.status !== "draft").map((i) => ({ i, c: invoiceChase(i, data, asOf), r: resolve(i, data) }));
+  const needs = (x) => x.c && x.c.stage >= 1 && !x.c.paused;
+  const shown = rows.filter((x) => (filter === "all" ? x.i.status === "sent" : filter === "paid" ? x.i.status === "paid" : needs(x)))
+    .sort((a, b) => (b.c?.bd || 0) - (a.c?.bd || 0) || (a.i.paidAt < b.i.paidAt ? 1 : -1));
+  const owed = open.reduce((n, i) => n + invTotal(i), 0);
+  const inv = sel ? data.invoices.find((i) => i.id === sel) : null;
+  const setInv = (id, p) => save({ ...data, invoices: data.invoices.map((i) => (i.id === id ? { ...i, ...p } : i)) });
+  const addEvent = (ev) => save({ ...data, chaseEvents: [...(data.chaseEvents || []), { id: uid(), at: localToday(), ...ev }] });
+
+  // Sync minimised records for server-side auto-send (only when switched on).
+  const syncNow = async (prefsOverride) => {
+    const prefs = { ...s, ...(prefsOverride || {}) };
+    const records = open.map((i) => {
+      const r = resolve(i, data); const msgs = trackerMessages(i, data);
+      if (!i.sentAt) return null;
+      return {
+        id: i.id, sentAt: i.sentAt, due: i.due || null, payerType: msgs.payerType, paused: !!(i.chase && i.chase.paused),
+        thresholds: prefs.thresholds?.[msgs.payerType] || null, invoiceNo: String(i.number), amount: invTotal(i).toFixed(2),
+        recipientEmail: msgs.to || "", recipientName: msgs.payerType === "plan" ? (r.mgr?.name || "") : "",
+        messages: { 1: msgs[1], 2: msgs[2], 3: { subject: msgs[3].subject, body: msgs[3].body } },
+      };
+    }).filter(Boolean);
+    const { status, data: d } = await access.post({ action: "sync", prefs: { enabled: !!prefs.autoSend, replyTo: prefs.replyTo, workerName: data.profile.name, state: prefs.state, notifyPush: prefs.notifyPush }, records });
+    if (status >= 400) { setServer((c) => ({ ...c, msg: d.error || "Couldn't sync." })); return false; }
+    setServer((c) => ({ ...c, status: d.status || {}, msg: d.autosendServer ? "" : "Automatic sending is switched off on the server for now. Nothing will be sent until SupportFlow turns it on." }));
+    return true;
+  };
+  const sig = JSON.stringify(open.map((i) => [i.id, i.sentAt, i.due, i.chase])) + JSON.stringify(s);
+  useEffect(() => {
+    if (access.phase !== "unlocked" || access.preview || !s.autoSend) return;
+    const t = setTimeout(() => { syncNow().catch(() => {}); }, 1500);
+    return () => clearTimeout(t);
+  }, [sig, access.phase]);
+
+  if (access.phase !== "unlocked") return <TrackerUpsell access={access} owed={owed} count={open.length} go={go} />;
+
+  const chip = (k, label, n) => (
+    <button key={k} className={"btn" + (filter === k ? "" : " ghost")} style={{ minHeight: 44, flex: 1 }} onClick={() => setFilter(k)} aria-pressed={filter === k}>{label}{n != null ? ` (${n})` : ""}</button>
+  );
+  const back = (v = "list") => <button className="btn ghost" style={{ minHeight: 44, marginBottom: 12 }} onClick={() => setView(v)}>← Back</button>;
+
+  if (view === "detail" && inv) {
+    const c = invoiceChase(inv, data, asOf);
+    const r = resolve(inv, data);
+    const ev = (data.chaseEvents || []).filter((e) => e.invoiceId === inv.id).sort((a, b) => (a.at < b.at ? -1 : 1));
+    const srv = server.status[inv.id];
+    return (
+      <div className="band">
+        {back()}
+        <div className="panel">
+          <div className="eyebrow">Invoice #{inv.number} · {planLabel(r.pt?.planType)}</div>
+          <div className="disp" style={{ fontSize: 24, marginTop: 4 }}>{money(invTotal(inv))} · {r.billToName || "No payer"}</div>
+          <div style={{ fontSize: 13.5, marginTop: 8, lineHeight: 1.7 }}>
+            Sent {inv.sentAt ? fmtAu(inv.sentAt) : "—"}{inv.sentAtEstimated ? " (estimated from the issue date, tap Edit to fix)" : ""} · Due {inv.due ? fmtAu(inv.due) : "—"}<br />
+            {c && <>{c.bd} business day{c.bd === 1 ? "" : "s"} since sent · <span className={"pill " + STAGE_TONE[c.stage]}>{c.label}</span>{c.next ? <> · next step {fmtAu(c.next)}</> : null}</>}
+            {inv.status === "paid" && <>Paid {inv.paidAt ? fmtAu(inv.paidAt) : ""} · {money(invAmountPaid(inv))} received</>}
+          </div>
+          {srv?.stageSent > 0 && <div style={{ fontSize: 12.5, color: "var(--good)", marginTop: 6 }}>Step {srv.stageSent} sent automatically {srv.sentAt ? fmtAu(srv.sentAt.slice(0, 10)) : ""}.</div>}
+          {srv?.stop === "unsubscribed" && <div style={{ fontSize: 12.5, color: "var(--warn)", marginTop: 6 }}>The payer asked not to get automatic reminders. Contact them yourself.</div>}
+          <label className="f" style={{ marginTop: 12 }}><span>Date sent</span><AuDateInput value={inv.sentAt || ""} onChange={(v) => setInv(inv.id, { sentAt: v, sentAtEstimated: false })} /></label>
+        </div>
+        <div className="panel">
+          <div className="eyebrow" style={{ marginBottom: 8 }}>Timeline</div>
+          <div style={{ fontSize: 13.5, lineHeight: 1.8 }}>
+            {inv.sentAt && <div>{fmtAu(inv.sentAt)} · Invoice sent</div>}
+            {ev.map((e) => <div key={e.id}>{fmtAu(e.at)} · {CHASE_TYPES[e.type] || e.type}{e.summary ? ` · ${e.summary}` : ""}</div>)}
+          </div>
+        </div>
+        {inv.status === "sent" && (
+          <div style={{ display: "grid", gap: 8 }}>
+            {[1, 2].map((n) => <button key={n} className={"btn" + (c && c.stage === n ? "" : " ghost")} style={{ minHeight: 48 }} onClick={() => { setStageSel(n); setView("message"); }}>
+              {c?.payerType === "agency" ? (n === 1 ? "Portal check reminder" : "Hold/rejection check") : n === 1 ? "Review reminder 1 (day 7)" : "Review reminder 2 (day 12)"}</button>)}
+            <button className={"btn" + (c && c.stage === 3 ? "" : " ghost")} style={{ minHeight: 48 }} onClick={() => setView("draft")}>NDIA {c?.payerType === "agency" ? "enquiry" : "complaint"} draft</button>
+            <button className="btn ghost" style={{ minHeight: 48 }} onClick={() => setLogForm({ type: "call", summary: "", at: localToday() })}>Log a call or reply</button>
+            <button className="btn ghost" style={{ minHeight: 48 }} onClick={() => setInv(inv.id, { chase: { ...(inv.chase || {}), paused: !c?.paused } })}>{c?.paused ? "Resume chasing" : "Pause chasing"}</button>
+            <button className="btn" style={{ minHeight: 48 }} onClick={() => setPaying(inv.id)}>Mark paid</button>
+          </div>
+        )}
+        {logForm && (
+          <div className="callout" style={{ marginTop: 10 }}>
+            <label className="f"><span>What happened</span>
+              <select value={logForm.type} onChange={(e) => setLogForm({ ...logForm, type: e.target.value })}>
+                <option value="call">Phone call</option><option value="reply">Reply received</option><option value="complaint_pm">Complaint to plan manager</option><option value="complaint_ndia">NDIA complaint filed</option><option value="note">Note</option>
+              </select></label>
+            <label className="f"><span>Date</span><AuDateInput value={logForm.at} onChange={(v) => setLogForm({ ...logForm, at: v })} /></label>
+            <label className="f"><span>Summary</span><input value={logForm.summary} placeholder='e.g. "They said next week"' onChange={(e) => setLogForm({ ...logForm, summary: e.target.value })} /></label>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn" style={{ minHeight: 44 }} onClick={() => { addEvent({ invoiceId: inv.id, ...logForm }); setLogForm(null); }}>Save</button>
+              <button className="btn ghost" style={{ minHeight: 44 }} onClick={() => setLogForm(null)}>Cancel</button>
+            </div>
+          </div>
+        )}
+        {paying === inv.id && <MarkPaidSheet inv={inv} onCancel={() => setPaying(null)} onSave={(p) => { save(markPaid(data, inv.id, p)); setPaying(null); }} />}
+      </div>
+    );
+  }
+
+  if (view === "message" && inv) {
+    const msgs = trackerMessages(inv, data);
+    const m = msgs[stageSel];
+    const c = invoiceChase(inv, data, asOf);
+    const fill = (t) => trackerFillDynamic(t, { sentAt: inv.sentAt, state: s.state, asOf });
+    const edit = (p) => setInv(inv.id, { chase: { ...(inv.chase || {}), custom: { ...((inv.chase && inv.chase.custom) || {}), [stageSel]: { ...m, ...p } } } });
+    const toWorker = msgs.payerType === "agency";
+    const when = c?.dates?.[stageSel - 1];
+    return (
+      <div className="band">
+        {back("detail")}
+        <div className="panel">
+          <div className="eyebrow" style={{ marginBottom: 8 }}>{toWorker ? "Reminder to you" : `Reminder ${stageSel}`} · invoice #{inv.number}</div>
+          {s.autoSend && !inv.chase?.paused && when && <div className="callout" style={{ marginBottom: 10 }}>
+            {toWorker ? "SupportFlow will remind you" : "SupportFlow will send this automatically"} on {fmtAu(when)} if the invoice is still unpaid. Change anything below and the new text is what goes.</div>}
+          {!toWorker && <label className="f"><span>To</span><input value={msgs.to} readOnly /></label>}
+          {!toWorker && !msgs.to && <div style={{ fontSize: 12.5, color: "var(--warn)", marginBottom: 8 }}>No email address for this payer. Add one in People.</div>}
+          <label className="f"><span>Subject</span><input value={m.subject} onChange={(e) => edit({ subject: e.target.value })} /></label>
+          <label className="f"><span>Message</span><textarea rows={14} value={m.body} onChange={(e) => edit({ body: e.target.value })} /></label>
+          <div style={{ fontSize: 12, color: "var(--tx-3)", marginBottom: 10 }}>{"{bdays}"} and {"{reply_by}"} are filled in on the day it's sent. The participant is named by first name and initial unless you turn on NDIS numbers in settings.</div>
+          <div style={{ display: "grid", gap: 8 }}>
+            {!toWorker && <a className="btn" style={{ minHeight: 48, display: "flex", alignItems: "center", justifyContent: "center" }}
+              href={`mailto:${encodeURIComponent(msgs.to || "")}?subject=${encodeURIComponent(fill(m.subject))}&body=${encodeURIComponent(fill(m.body) + "\n\n(Invoice attached)")}`}
+              onClick={() => setTimeout(() => { if (confirm("Did you send it?")) addEvent({ invoiceId: inv.id, type: stageSel === 1 ? "nudge1" : "nudge2", summary: "from my email" }); }, 1200)}>Send now from my email</a>}
+            <button className="btn ghost" style={{ minHeight: 44 }} onClick={() => copyText(fill(m.subject) + "\n\n" + fill(m.body))}>Copy text</button>
+            {!toWorker && <button className="btn ghost" style={{ minHeight: 44 }} onClick={() => addEvent({ invoiceId: inv.id, type: stageSel === 1 ? "nudge1" : "nudge2", summary: "sent another way" })}>I sent it another way</button>}
+            {inv.chase?.custom?.[stageSel] && <button className="btn ghost" style={{ minHeight: 44 }} onClick={() => { const cu = { ...inv.chase.custom }; delete cu[stageSel]; setInv(inv.id, { chase: { ...inv.chase, custom: cu } }); }}>Reset to the standard wording</button>}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (view === "draft" && inv) {
+    const d = trackerMessages(inv, data)[3];
+    const fill = (t) => trackerFillDynamic(t, { sentAt: inv.sentAt, state: s.state, asOf });
+    return (
+      <div className="band">
+        {back("detail")}
+        <div className="callout">This is a draft for you to file. SupportFlow never files anything with the NDIA for you{s.autoSend ? ", and at the last step it emails this draft to you, not to anyone else" : ""}. The NDIS Commission doesn't handle unpaid invoices; contact it only about conduct, or if supports to the participant may stop.</div>
+        {d.fields.map(([k, v]) => (
+          <div className="panel" key={k} style={{ padding: 12 }}>
+            <div className="eyebrow">{k}</div>
+            <div style={{ fontSize: 13.5, whiteSpace: "pre-wrap", margin: "6px 0" }}>{fill(v)}</div>
+            <button className="btn ghost tiny" style={{ minHeight: 36 }} onClick={() => copyText(fill(v))}>Copy</button>
+          </div>
+        ))}
+        <div style={{ display: "grid", gap: 8 }}>
+          <a className="btn" style={{ minHeight: 48, display: "flex", alignItems: "center", justifyContent: "center" }} href="https://www.ndis.gov.au/contact/feedback-and-complaints" target="_blank" rel="noopener">Open the NDIA feedback form</a>
+          <a className="btn ghost" style={{ minHeight: 48, display: "flex", alignItems: "center", justifyContent: "center" }} href="tel:1800800110">Call the NDIA 1800 800 110</a>
+          <button className="btn ghost" style={{ minHeight: 44 }} onClick={() => addEvent({ invoiceId: inv.id, type: "complaint_ndia", summary: "" })}>I filed it</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (view === "patterns") {
+    const pats = trackerPatterns(data);
+    return (
+      <div className="band">
+        {back()}
+        {pats.length === 0 && <div className="empty">Patterns show here once you've sent a few invoices.</div>}
+        {pats.map((g) => (
+          <div className="panel" key={g.key}>
+            <div style={{ fontWeight: 600, fontSize: 15 }}>{g.name}</div>
+            <div style={{ fontSize: 13, color: "var(--tx-2)", marginTop: 4 }}>Late on {g.late} of {g.inv.length} invoices · average {g.avg} business days · {money(g.owed)} owed now</div>
+            {g.rules.map((t) => <div key={t} style={{ fontSize: 13, marginTop: 6, color: "var(--warn)" }}>• {t}</div>)}
+          </div>
+        ))}
+        <button className="btn" style={{ minHeight: 48, width: "100%" }} onClick={() => setView("report")}>Export evidence</button>
+      </div>
+    );
+  }
+
+  if (view === "report") return <TrackerReport data={data} onBack={() => setView("list")} />;
+
+  if (view === "settings") {
+    const enableAuto = async (on) => {
+      if (on && !/^\S+@\S+\.\S+$/.test(s.replyTo || "")) { setServer((c) => ({ ...c, msg: "Add your email address first, so replies come back to you." })); return; }
+      if (on && !confirm("Turn on automatic emails?\n\nSupportFlow will keep a minimal, encrypted copy of your unpaid invoices (invoice number, amount, dates, the payer's email and the message text) on its server so it can send reminders when your phone is off. Reminders go from a SupportFlow address with replies to you. The day-20 complaint draft is emailed to you only.")) return;
+      setS({ autoSend: on });
+      if (!access.preview) { if (on) await syncNow({ autoSend: true }); else await access.post({ action: "forget" }); }
+    };
+    const enablePush = async () => {
+      try {
+        if (isIOS() && !licenceStandalone()) { setServer((c) => ({ ...c, msg: "On iPhone and iPad, add SupportFlow to your Home Screen first (Share → Add to Home Screen, iOS 16.4 or later), then turn this on from the Home Screen app." })); return; }
+        if (!("PushManager" in window) || !navigator.serviceWorker) { setServer((c) => ({ ...c, msg: "This browser can't show notifications." })); return; }
+        const key = access.cfg?.vapidPublicKey;
+        if (!key) { setServer((c) => ({ ...c, msg: "Notifications aren't set up on the server yet." })); return; }
+        if ((await Notification.requestPermission()) !== "granted") { setServer((c) => ({ ...c, msg: "Notifications were not allowed. You can change this in your browser settings." })); return; }
+        const reg = await navigator.serviceWorker.ready;
+        const subn = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToUint8(key) });
+        const { status } = await access.post({ action: "push", subscription: subn.toJSON() });
+        setServer((c) => ({ ...c, msg: status < 400 ? "Notifications are on for this device." : "Couldn't turn notifications on." }));
+      } catch (e) { setServer((c) => ({ ...c, msg: "Couldn't turn notifications on: " + (e.message || e) })); }
+    };
+    const loadLog = async () => { const { data: d } = await access.post({ action: "log" }); setServer((c) => ({ ...c, log: d.log || [] })); };
+    return (
+      <div className="band">
+        {back()}
+        <div className="panel">
+          <div className="eyebrow" style={{ marginBottom: 10 }}>Automatic emails</div>
+          <label className="f"><span>Your email (replies come here)</span><input type="email" value={s.replyTo} onChange={(e) => setS({ replyTo: e.target.value })} /></label>
+          <label className="check" style={{ marginBottom: 10 }}><input type="checkbox" checked={!!s.autoSend} onChange={(e) => enableAuto(e.target.checked)} /><span>Send reminders automatically at day 7 and day 12, and email me the NDIA draft at day 20</span></label>
+          <label className="check" style={{ marginBottom: 10 }}><input type="checkbox" checked={!!s.includeNdis} onChange={(e) => setS({ includeNdis: e.target.checked })} /><span>Include the participant's NDIS number (only with their consent)</span></label>
+          {server.msg && <div style={{ fontSize: 12.5, color: "var(--warn)", marginBottom: 8 }}>{server.msg}</div>}
+          <button className="btn ghost" style={{ minHeight: 44, marginRight: 8 }} onClick={enablePush}>Turn on phone notifications</button>
+          <button className="btn ghost" style={{ minHeight: 44 }} onClick={loadLog}>What was sent</button>
+          {server.log && <div style={{ marginTop: 10, fontSize: 12.5, lineHeight: 1.7 }}>
+            {server.log.length === 0 ? "Nothing sent yet." : server.log.map((l, k) => <div key={k}>{fmtAu(l.created_at.slice(0, 10))} · #{l.invoice_no || "—"} · {l.channel} to {l.recipient_masked || "—"} · {l.status}{l.subject ? ` · ${l.subject}` : ""}</div>)}
+          </div>}
+        </div>
+        <div className="panel">
+          <div className="eyebrow" style={{ marginBottom: 10 }}>Counting business days</div>
+          <label className="f"><span>Your state (for public holidays)</span>
+            <select value={s.state} onChange={(e) => setS({ state: e.target.value })}>{TRACKER_STATES.map((x) => <option key={x}>{x}</option>)}</select></label>
+          {[["plan", "Plan managed"], ["self", "Self managed"], ["agency", "NDIA managed"]].map(([k, l]) => (
+            <label className="f" key={k}><span>{l}: business days for each step</span>
+              <input value={(s.thresholds[k] || []).join(", ")} onChange={(e) => {
+                const n = e.target.value.split(/[,\s]+/).map(Number).filter((x) => x > 0);
+                if (n.length === 3 && n[0] < n[1] && n[1] < n[2]) setS({ thresholds: { ...s.thresholds, [k]: n } });
+              }} /></label>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="band">
+      <div className="panel">
+        <div className="eyebrow">Money owed to you</div>
+        <div className="disp num" style={{ fontSize: 30, marginTop: 6 }}>{money(owed)}</div>
+        <div style={{ fontSize: 13.5, color: "var(--tx-2)", marginTop: 4 }}>{open.length} invoice{open.length === 1 ? "" : "s"} waiting · {rows.filter(needs).length} need action{s.autoSend ? " · automatic emails on" : ""}</div>
+      </div>
+      <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+        {chip("action", "Needs action", rows.filter(needs).length)}{chip("all", "Waiting", open.length)}{chip("paid", "Paid", null)}
+      </div>
+      {shown.length === 0 && <div className="empty">{filter === "action" ? "Nothing needs chasing today." : "Nothing here yet."}</div>}
+      {shown.map(({ i, c, r }) => (
+        <div className="panel" key={i.id} style={{ padding: 12 }}>
+          <button style={{ all: "unset", cursor: "pointer", display: "block", width: "100%" }} onClick={() => { setSel(i.id); setView("detail"); }} aria-label={`Open invoice ${i.number}`}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+              <div style={{ fontWeight: 600, fontSize: 14.5 }}>{r.billToName || "No payer"}</div>
+              <div className="num" style={{ fontWeight: 600 }}>{money(invTotal(i))}</div>
+            </div>
+            <div style={{ fontSize: 13, color: "var(--tx-2)", marginTop: 3 }}>
+              #{i.number} · {(r.client || "").split(/\s+/).map((w) => w[0]).join("")} · {i.status === "paid" ? `Paid ${i.paidAt ? fmtAu(i.paidAt) : ""}` : c ? `Sent ${c.bd} business day${c.bd === 1 ? "" : "s"} ago` : "No sent date"}
+              {c && <> · <span className={"pill " + STAGE_TONE[c.stage]}>{c.paused ? "Paused" : c.label}</span></>}
+            </div>
+          </button>
+          {c && c.stage >= 1 && !c.paused && (
+            <button className="btn" style={{ width: "100%", minHeight: 48, marginTop: 10 }} onClick={() => { setSel(i.id); if (c.stage === 3) setView("draft"); else { setStageSel(c.stage); setView("message"); } }}>
+              {c.stage === 3 ? "Open the NDIA draft" : c.payerType === "agency" ? "Check the portal" : s.autoSend ? "View the reminder" : "Review the reminder"}
+            </button>
+          )}
+        </div>
+      ))}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+        <button className="btn ghost" style={{ minHeight: 48 }} onClick={() => setView("patterns")}>Patterns</button>
+        <button className="btn ghost" style={{ minHeight: 48 }} onClick={() => setView("report")}>Report</button>
+        <button className="btn ghost" style={{ minHeight: 48 }} onClick={() => setView("settings")}>Settings</button>
+      </div>
+    </div>
+  );
+}
+
+function TrackerReport({ data, onBack }) {
+  const fyStart = (() => { const t = localToday(); const y = Number(t.slice(0, 4)) - (t.slice(5, 7) < "07" ? 1 : 0); return `${y}-07-01`; })();
+  const [from, setFrom] = useState(fyStart);
+  const [to, setTo] = useState(localToday());
+  const [payer, setPayer] = useState("");
+  const [mode, setMode] = useState("accountant");
+  const download = () => {
+    const blob = new Blob([trackerCsv(data, { from, to, payer, mode })], { type: "text/csv" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = `supportflow-payments-${mode}-${from}-to-${to}.csv`; document.body.appendChild(a); a.click(); a.remove();
+  };
+  return (
+    <div className="band">
+      <button className="btn ghost" style={{ minHeight: 44, marginBottom: 12 }} onClick={onBack}>← Back</button>
+      <div className="panel">
+        <div className="eyebrow" style={{ marginBottom: 10 }}>Payment history report</div>
+        <div className="two"><label className="f"><span>From</span><AuDateInput value={from} onChange={setFrom} /></label><label className="f"><span>To</span><AuDateInput value={to} onChange={setTo} /></label></div>
+        <label className="f"><span>Plan manager</span><select value={payer} onChange={(e) => setPayer(e.target.value)}><option value="">All</option>{data.managers.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></label>
+        <label className="f"><span>For</span><select value={mode} onChange={(e) => setMode(e.target.value)}><option value="accountant">My accountant (initials, no chase log)</option><option value="complaint">A complaint (full names and chase log)</option></select></label>
+        <button className="btn" style={{ minHeight: 48, width: "100%" }} onClick={download}>Download CSV</button>
+      </div>
+    </div>
+  );
+}
+
 function InvoiceList({ data, m, fy, save, newInvoice, open, go, billTick, setBillTick }) {
-  const rows = [...m.inv].reverse();
-  const setStatus = (id, status) => save({ ...data, invoices: data.invoices.map((i) => (i.id === id ? { ...i, status } : i)) });
+  const [invFilter, setInvFilter] = useState("all");
+  const [paying, setPaying] = useState(null);
+  const allRows = [...m.inv].reverse();
+  const FILTERS = [["all", "All"], ["draft", "Not sent"], ["sent", "Waiting"], ["overdue", "Overdue"], ["paid", "Paid"]];
+  const inFilter = (i, k) => k === "all" || (k === "paid" ? i.status === "paid" : k === "sent" ? i.status === "sent" : invStatusKey(i) === k);
+  const rows = allRows.filter((i) => inFilter(i, invFilter));
   const nameOf = (id) => (data.participants.find((x) => x.id === id) || {}).name || "No participant";
   const unbilled = data.shifts.filter((x) => isBillable(x) && !shiftInvoice(x, data.invoices))
     .sort((a, b) => (a.date < b.date ? -1 : 1));
@@ -4149,7 +4936,9 @@ function InvoiceList({ data, m, fy, save, newInvoice, open, go, billTick, setBil
       )}
 
       {m.outstanding > 0 && (() => {
-        const unpaid = [...m.inv].filter((i) => i.status !== "paid" && i.due).sort((a, b) => (a.due < b.due ? -1 : 1));
+        // Sent and not yet paid only: a draft was never sent, so it isn't owed (review D5/I1).
+        const unpaid = [...m.inv].filter((i) => i.status === "sent" && i.due).sort((a, b) => (a.due < b.due ? -1 : 1));
+        if (!unpaid.length) return null;
         return (
           <div className="band" style={{ paddingTop: 0 }}>
             <div className="panel">
@@ -4158,7 +4947,7 @@ function InvoiceList({ data, m, fy, save, newInvoice, open, go, billTick, setBil
                 <div className="num" style={{ fontSize: 13.5, fontWeight: 600, color: "var(--tx)" }}>{money(m.outstanding)}</div>
               </div>
               {unpaid.map((i) => {
-                const overdue = i.due && i.due < today();
+                const overdue = isOverdue(i);
                 return (
                   <div className="row" key={i.id} style={overdue ? { borderLeft: "4px solid var(--req)", paddingLeft: 10, background: "rgba(192,57,43,.10)", borderRadius: 8 } : undefined}>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -4179,8 +4968,18 @@ function InvoiceList({ data, m, fy, save, newInvoice, open, go, billTick, setBil
         );
       })()}
 
+      {allRows.length > 0 && (
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }} role="group" aria-label="Filter invoices">
+          {FILTERS.map(([k, l]) => (
+            <button key={k} className={"btn tiny" + (invFilter === k ? "" : " ghost")} style={{ minHeight: 40 }} aria-pressed={invFilter === k} onClick={() => setInvFilter(k)}>
+              {l} ({allRows.filter((i) => inFilter(i, k)).length})
+            </button>
+          ))}
+        </div>
+      )}
       <div className="band">
-        {rows.length === 0
+        {allRows.length > 0 && rows.length === 0 && <div className="empty">No invoices match this filter.</div>}
+        {allRows.length === 0
           ? (
             <div className="empty">
               No invoices yet this year.<br />
@@ -4190,21 +4989,25 @@ function InvoiceList({ data, m, fy, save, newInvoice, open, go, billTick, setBil
             </div>
           )
           : rows.map((i) => {
-            const overdue = i.status === "sent" && i.due && i.due < today();
-            const displayStatus = overdue ? "overdue" : i.status;
+            const displayStatus = invStatusKey(i);
+            const chase = invoiceChase(i, data);
             return (
-              <div className="row" key={i.id}>
+              <React.Fragment key={i.id}>
+              <div className="row">
                 <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => open({ ...i })}>
                   <div style={{ fontSize: 14, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{resolve(i, data).client || "Untitled"}</div>
                   <div style={{ fontSize: 11, color: "var(--tx-3)", marginTop: 3, display: "flex", gap: 8, alignItems: "center" }}>
-                    <span className="mono">#{i.number}</span><span>{fmtDate(i.date)}</span><span className={"pill " + displayStatus}>{displayStatus}</span>
+                    <span className="mono">#{i.number}</span><span>{fmtDate(i.date)}</span><span className={"pill lower " + displayStatus}>{INV_STATUS_LABEL[displayStatus]}</span>
+                    {chase && chase.stage >= 1 && <span className={"pill lower " + STAGE_TONE[chase.stage]}>{chase.label}</span>}
                   </div>
                 </div>
                 <div style={{ textAlign: "right" }}>
                   <div className="num" style={{ fontSize: 15, fontWeight: 600 }}>{money(invTotal(i))}</div>
-                  {i.status !== "paid" && <button className="btn ghost tiny" style={{ marginTop: 6 }} onClick={() => setStatus(i.id, "paid")}>Mark paid</button>}
+                  {i.status === "sent" && <button className="btn ghost" style={{ marginTop: 6, minHeight: 44 }} onClick={() => setPaying(i.id)}>Mark paid</button>}
                 </div>
               </div>
+              {paying === i.id && <MarkPaidSheet inv={i} onCancel={() => setPaying(null)} onSave={(pp) => { save(markPaid(data, i.id, pp)); setPaying(null); }} />}
+              </React.Fragment>
             );
           })}
       </div>
@@ -4276,11 +5079,27 @@ function Editor({ inv, setInv, onSave, onCancel, onDelete, profile, data, go }) 
             <AuDateInput value={inv.due} style={inv.due ? {} : { borderColor: "var(--req)" }} onChange={(v) => set({ due: v })} />
           </label>
           <label className="f" style={{ marginBottom: 0 }}><span>Status</span>
-            <select value={inv.status} onChange={(e) => set({ status: e.target.value })}>
-              <option value="draft">Draft</option><option value="sent">Sent</option><option value="paid">Paid</option>
+            <select value={inv.status} onChange={(e) => {
+              const v = e.target.value;
+              set({ status: v,
+                ...(v !== "draft" && !inv.sentAt ? { sentAt: localToday(), sentAtEstimated: false } : {}),
+                ...(v === "paid" && !inv.paidAt ? { paidAt: localToday() } : {}) });
+            }}>
+              <option value="draft">Not sent yet</option><option value="sent">Sent, waiting</option><option value="paid">Paid</option>
             </select>
           </label>
         </div>
+        {inv.status !== "draft" && (
+          <div className="three" style={{ marginTop: 12, marginBottom: 0 }}>
+            <label className="f" style={{ marginBottom: 0 }}><span>Date sent{inv.sentAtEstimated ? " (estimated)" : ""}</span>
+              <AuDateInput value={inv.sentAt || ""} onChange={(v) => set({ sentAt: v, sentAtEstimated: false })} /></label>
+            {inv.status === "paid" && <>
+              <label className="f" style={{ marginBottom: 0 }}><span>Date paid</span><AuDateInput value={inv.paidAt || ""} onChange={(v) => set({ paidAt: v })} /></label>
+              <label className="f" style={{ marginBottom: 0 }}><span>Amount received</span>
+                <input inputMode="decimal" value={inv.amountPaid ?? ""} placeholder={invTotal(inv).toFixed(2)} onChange={(e) => set({ amountPaid: e.target.value })} /></label>
+            </>}
+          </div>
+        )}
       </div>
 
       {/* What's on the invoice, read-only. Every line here came from ticking
@@ -4344,7 +5163,7 @@ function Editor({ inv, setInv, onSave, onCancel, onDelete, profile, data, go }) 
         </label>
       </div>
 
-      <SendPanel inv={inv} profile={profile} r={r} onSent={() => { const next = { ...inv, status: "sent" }; setInv(next); onSave(next); }} />
+      <SendPanel inv={inv} profile={profile} r={r} onSent={() => { const next = { ...inv, status: "sent", sentAt: inv.sentAt && !inv.sentAtEstimated ? inv.sentAt : localToday(), sentAtEstimated: false }; setInv(next); onSave(next); }} />
 
       <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
         <button className="btn ghost" onClick={onCancel}>Cancel</button>
@@ -6478,7 +7297,7 @@ function Shifts({ data, save, fy, newInvoice, canCreate, onBlocked, onShiftSaved
             const st = statusOf(x);
             const confirm = needsConfirm(x);
             const billed = shiftInvoice(x, data.invoices);
-            const overdue = billed && billed.status === "sent" && billed.due && billed.due < today();
+            const overdue = billed && isOverdue(billed);
             return (
               <div className="row" key={x.id}>
                 <span className="dot" style={{ background: confirm ? "var(--warn)"

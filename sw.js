@@ -1,6 +1,6 @@
 /* SupportFlow™ — service worker
    Bump CACHE when you deploy, or testers will keep the old build. */
-const CACHE = 'supportflow-v22-public-full';
+const CACHE = 'supportflow-v23-payment-tracker';
 
 // Everything needed to open the app with no network at all.
 const CORE = [
@@ -89,4 +89,23 @@ self.addEventListener("activate", event => {
     await Promise.all(keys.map(k => (k.startsWith("supportflow-v") && k !== "supportflow-v22-public-full") ? caches.delete(k) : Promise.resolve()));
     await self.clients.claim();
   })());
+});
+
+// Payment tracker: web push (Android Chrome/Firefox/Samsung, desktop, and
+// iOS/iPadOS 16.4+ ONLY when SupportFlow is added to the Home Screen).
+// Payloads carry no invoice or participant detail.
+self.addEventListener('push', (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (_) { d = { title: 'SupportFlow', body: e.data && e.data.text() }; }
+  e.waitUntil(self.registration.showNotification(d.title || 'SupportFlow', {
+    body: d.body || '', icon: './icon-192.png', badge: './icon-192.png', tag: 'sf-tracker', data: { url: d.url || '/app' },
+  }));
+});
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = (e.notification.data && e.notification.data.url) || '/app';
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+    for (const c of list) { if ('focus' in c) { c.navigate(url).catch(() => {}); return c.focus(); } }
+    return self.clients.openWindow(url);
+  }));
 });

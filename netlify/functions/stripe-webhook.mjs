@@ -20,6 +20,7 @@
 
 import crypto from "node:crypto";
 import { supa, recomputeLicence, PRODUCTS, emailSub } from "../lib/licence.mjs";
+import { isTrackerProduct } from "../lib/tracker.mjs";
 
 const TOLERANCE_SECONDS = 300; // reject anything claiming to be older than 5 minutes
 
@@ -247,7 +248,10 @@ async function handleLicenceSession(session) {
   // buyer's next verified Google sign-in with that address adopts it.
   const sub = session.metadata?.google_sub || session.client_reference_id || (email ? emailSub(email) : null);
   const product = session.metadata?.product;
-  if (!sub || !PRODUCTS[product]) {
+  // Payment tracker unlocks (metadata.kind = "tracker") are recorded in the
+  // same licence_payments ledger with product tracker / tracker_second_device, so
+  // refunds and disputes reverse them through handleLicenceReversal below.
+  if (!sub || !(PRODUCTS[product] || (session.metadata?.kind === "tracker" && isTrackerProduct(product)))) {
     console.error(`stripe-webhook: licence session ${session.id} missing google_sub/email/product`);
     return;
   }
@@ -299,7 +303,7 @@ async function handlePaidSession(session) {
     // Delayed payment methods: wait for async_payment_succeeded.
     return;
   }
-  if (session.metadata?.kind === "licence") return handleLicenceSession(session);
+  if (session.metadata?.kind === "licence" || session.metadata?.kind === "tracker") return handleLicenceSession(session);
 
   const accountId = session.client_reference_id;
   if (!accountId) {
