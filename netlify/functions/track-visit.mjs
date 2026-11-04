@@ -22,6 +22,7 @@ export default async (req, context) => {
     day, path,
     visitor_hash: crypto.createHash("sha256").update(`${salt}|${day}|${ip}|${ua}`).digest("hex"),
     referrer_host: clean(b.r, 120), utm_source: clean(b.s, 60), utm_medium: clean(b.m, 60), utm_campaign: clean(b.c, 60),
+    is_new: b.n === 1 ? true : b.n === 0 ? false : null,
     country: clean(context?.geo?.country?.code, 2)?.toUpperCase() || null,
     region: context?.geo?.subdivision?.code ? String(context.geo.subdivision.code).slice(0, 10) : null,
   };

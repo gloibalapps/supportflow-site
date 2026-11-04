@@ -165,7 +165,7 @@
 <p>SupportFlow configures Google Analytics for measurement only and disables Google Signals and advertising-personalisation signals in the website tag. Participant records, progress notes, invoice contents, NDIS numbers, locally stored app records and encrypted backup contents are not intentionally sent to Google Analytics.</p>
 <h3>Website visit counter</h3>
 <p>The public website also counts page visits with our own cookie-free counter. It records the page, the referring website, any link tags (utm), the date, and your approximate country and state from our host's network data. Your IP address and browser details are never stored: they are combined with a secret value and the date and turned into a one-way code, used only to count unique visitors per day. The counter honours your browser's Do Not Track setting and is not used in the app, admin or tester pages.</p>
-<p>In short: visits are counted anonymously from a scrambled IP address, and visit records are kept for 13 months and then deleted.</p>
+<p>In short: visits are counted anonymously from a scrambled IP address, and visit records are kept for 13 months and then deleted. The counter also keeps a small marker on your device (sf_seen) that only notes whether you've visited before, so we can tell new visits from returning ones. It holds no personal information, isn't a cookie, and you can clear it any time by clearing your browser's site data.</p>
 <h3>Licence and billing records</h3>
 <p>To run the free trial and the Lifetime licence, the following information is stored in a secure server-side database (Supabase, operated by Supabase Inc. and hosted on Amazon Web Services infrastructure):</p>
 <ul>

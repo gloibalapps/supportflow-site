@@ -222,7 +222,7 @@ export async function visitorStats({ days = 30 } = {}) {
     const k = process.env.SUPABASE_SERVICE_KEY;
     v = [];
     for (let off = 0; off < 200000; off += 1000) {
-      const r = await fetch(`${process.env.SUPABASE_URL}/rest/v1/site_visits?select=day,path,visitor_hash,referrer_host,utm_source,utm_campaign,country,region&day=gte.${since}&order=id`, {
+      const r = await fetch(`${process.env.SUPABASE_URL}/rest/v1/site_visits?select=day,path,visitor_hash,is_new,referrer_host,utm_source,utm_campaign,country,region&day=gte.${since}&order=id`, {
         headers: { apikey: k, Authorization: `Bearer ${k}`, Range: `${off}-${off + 999}` },
       });
       if (!r.ok) return null; // table not created yet
@@ -236,9 +236,36 @@ export async function visitorStats({ days = 30 } = {}) {
   const uniq = (rows) => new Set(rows.map((r) => r.day + r.visitor_hash)).size;
   const top = (rows, f, n = 8) => Object.entries(rows.reduce((m, r) => { const key = f(r); if (key) m[key] = (m[key] || 0) + 1; return m; }, {})).sort((a, b) => b[1] - a[1]).slice(0, n);
   const t = v.filter((r) => r.day === today), w = v.filter((r) => r.day >= d7);
+  // New vs returning, counted as distinct visitor-days (day + visitor_hash).
+  // A visitor-day is "new" if any of its hits had is_new=true (first page of a
+  // first visit), else "returning" if any had is_new=false, else "unknown"
+  // (older rows, or browsers that block localStorage).
+  const split = (rows) => {
+    const m = new Map();
+    for (const r of rows) { const key = r.day + r.visitor_hash, cur = m.get(key); m.set(key, cur === true || r.is_new === true ? true : cur === false || r.is_new === false ? false : null); }
+    const o = { new: 0, returning: 0, unknown: 0 };
+    for (const x of m.values()) o[x === true ? "new" : x === false ? "returning" : "unknown"]++;
+    return o;
+  };
+  // Since launch: LAUNCH_DATE (else everything kept, max 13 months).
+  let all = null;
+  const launch = /^\d{4}-\d{2}-\d{2}/.test(process.env.LAUNCH_DATE || "") ? process.env.LAUNCH_DATE.slice(0, 10) : "2000-01-01";
+  if (process.env.VISITS_FIXTURE) all = JSON.parse(fs.readFileSync(process.env.VISITS_FIXTURE, "utf8")).filter((r) => r.day >= launch);
+  else {
+    const k = process.env.SUPABASE_SERVICE_KEY; all = [];
+    for (let off = 0; off < 500000; off += 1000) {
+      const r = await fetch(`${process.env.SUPABASE_URL}/rest/v1/site_visits?select=day,visitor_hash,is_new&day=gte.${launch}&order=id`, {
+        headers: { apikey: k, Authorization: `Bearer ${k}`, Range: `${off}-${off + 999}` },
+      });
+      if (!r.ok) { all = null; break; }
+      const page = await r.json(); all.push(...page);
+      if (page.length < 1000) break;
+    }
+  }
   const trend = [];
   for (let i = days - 1; i >= 0; i--) { const day = adl(Date.now() - i * DAY); const rs = v.filter((r) => r.day === day); trend.push({ day, visits: rs.length, unique: uniq(rs) }); }
   return {
+    newReturning: { today: split(t), d7: split(w), sinceLaunch: all ? { ...split(all), since: launch === "2000-01-01" ? null : launch } : null },
     today: { visits: t.length, unique: uniq(t) }, d7: { visits: w.length, unique: uniq(w) }, d30: { visits: v.length, unique: uniq(v) },
     topPages: top(v, (r) => r.path),
     topReferrers: top(v, (r) => r.referrer_host),
