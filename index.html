@@ -435,6 +435,43 @@
   </main>
 </section>
 
+<!-- Live stats strip. Fed by /.netlify/functions/public-stats (aggregate-only).
+     Hidden entirely if the function is unavailable or returns no numbers. -->
+<section id="live-stats" class="live-stats" hidden aria-label="SupportFlow in numbers">
+  <style>
+    .live-stats{max-width:1120px;margin:0 auto;padding:clamp(28px,4vw,48px) clamp(20px,3.6vw,40px) 0}
+    .live-stats .ls-row{display:flex;flex-wrap:wrap;justify-content:center;gap:clamp(14px,2.4vw,28px)}
+    .live-stats .ls-card{flex:1 1 220px;max-width:320px;text-align:center;padding:22px 18px;border:1px solid var(--line);border-radius:16px;
+      background:linear-gradient(180deg,var(--ink-2),var(--ink));opacity:0;transform:translateY(10px);transition:opacity .7s ease,transform .7s ease}
+    .live-stats .ls-card.in{opacity:1;transform:none}
+    .live-stats .ls-num{font-family:'Fraunces',Georgia,serif;font-weight:400;font-size:clamp(34px,4.6vw,48px);color:var(--brass-lift);font-variant-numeric:tabular-nums;line-height:1.1}
+    .live-stats .ls-lbl{margin-top:6px;font-size:13.5px;color:var(--muted-2);letter-spacing:.02em}
+    @media (prefers-reduced-motion:reduce){.live-stats .ls-card{transition:none;opacity:1;transform:none}}
+  </style>
+  <div class="ls-row" id="ls-row"></div>
+</section>
+<script>
+(function(){
+  var sec=document.getElementById('live-stats'),row=document.getElementById('ls-row');
+  var reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function card(lbl){var c=document.createElement('div');c.className='ls-card';c.innerHTML='<div class="ls-num">0</div><div class="ls-lbl"></div>';c.lastChild.textContent=lbl;row.appendChild(c);return c;}
+  function countUp(el,to){if(reduce){el.textContent=to.toLocaleString();return;}var t0=performance.now(),d=1400;
+    (function f(t){var p=Math.min(1,(t-t0)/d),e=1-Math.pow(1-p,3);el.textContent=Math.round(to*e).toLocaleString();if(p<1)requestAnimationFrame(f);})(t0);}
+  function since(el,iso){var s=Date.parse(iso);if(!s)return false;function tick(){var ms=Date.now()-s,d=Math.floor(ms/864e5),h=Math.floor(ms/36e5)%24,m=Math.floor(ms/6e4)%60,x=Math.floor(ms/1e3)%60;
+    el.textContent=d+'d '+String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(x).padStart(2,'0');}tick();setInterval(tick,1000);return true;}
+  fetch('/.netlify/functions/public-stats').then(function(r){return r.ok?r.json():null}).then(function(s){
+    if(!s||!s.ok)return;var jobs=[];
+    if(typeof s.licencesSold==='number')jobs.push([card('Licences sold'),s.licencesSold]);
+    if(typeof s.appOpens==='number')jobs.push([card('Devices that have opened SupportFlow'),s.appOpens]);
+    var live=null;if(s.launchDate&&Date.parse(s.launchDate)<=Date.now()){live=card('Since launch');}
+    if(!jobs.length&&!live)return;
+    sec.hidden=false;
+    var go=function(){jobs.forEach(function(j){j[0].classList.add('in');countUp(j[0].firstChild,j[1]);});if(live){live.classList.add('in');since(live.firstChild,s.launchDate);}};
+    if('IntersectionObserver' in window){var io=new IntersectionObserver(function(e){if(e[0].isIntersecting){io.disconnect();go();}},{threshold:.3});io.observe(sec);}else go();
+  }).catch(function(){});
+})();
+</script>
+
 <section style="max-width:1120px;margin:0 auto;padding:clamp(40px,5vw,64px) clamp(20px,3.6vw,40px) clamp(20px,3vw,36px)">
   <div class="sec-head" style="margin-bottom:clamp(24px,3.5vw,40px)">
     <h2>Everything in one place</h2>

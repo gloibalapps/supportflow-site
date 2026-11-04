@@ -183,6 +183,18 @@
   to = "/admin.html"
   status = 200
 
+# Owner stats dashboard (token-protected server-side, noindex).
+[[redirects]]
+  from = "/admin/dashboard"
+  to = "/admin/dashboard.html"
+  status = 200
+
+[[headers]]
+  for = "/admin/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+    Cache-Control = "no-store"
+
 # Owner-only dashboards (password protected, noindex).
 [[redirects]]
   from = "/signups"
