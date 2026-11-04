@@ -52,6 +52,16 @@ const PANELS = [
       <div style="display:grid;grid-template-columns:2fr 1fr;gap:18px;margin-top:14px">
         <table>${s.recent.map(c => `<tr><td>${esc(c.at.slice(0, 16).replace("T", " "))}</td><td>${aud(c.amountAud)}</td><td>${esc(c.status)}${c.refundedAud ? " · refunded " + aud(c.refundedAud) : ""}${c.disputed ? " · disputed" : ""}</td><td>${esc(c.who || "—")}</td></tr>`).join("") || "<tr><td>No charges</td></tr>"}</table>
         <table>${s.payouts.map(p => `<tr><td>${esc(p.arrival)}</td><td>A$${p.amountAud.toFixed(2)}</td><td>${esc(p.status)}</td></tr>`).join("")}</table></div>`; } },
+  { id: "visits", title: "Website visitors", size: "w4", render: d => {
+      const v = d.visits; if (!v) return null;
+      const max = Math.max(1, ...v.trend.map(t => t.visits));
+      const k = (n, u, l) => `<div><div class="big" style="font-size:30px">${n.toLocaleString()}</div><div class="sub">${l} · ${u.toLocaleString()} unique</div></div>`;
+      const list = (title, rows) => `<div><div class="sub" style="margin-bottom:6px;color:var(--paper)">${title}</div><table>${rows.map(([a, n]) => `<tr><td>${esc(a)}</td><td style="text-align:right">${n}</td></tr>`).join("") || "<tr><td>—</td></tr>"}</table></div>`;
+      return `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">${k(v.today.visits, v.today.unique, "visits today")}${k(v.d7.visits, v.d7.unique, "visits 7 days")}${k(v.d30.visits, v.d30.unique, "visits 30 days")}</div>
+      <div class="bar" style="height:90px;margin-top:16px">${v.trend.map(t => `<div title="${t.day}: ${t.visits} visits, ${t.unique} unique" style="height:${(t.visits / max) * 100}%"></div>`).join("")}</div>
+      <div class="legend">Daily visits. Unique = distinct visitors per day (salted hash rotates daily, so multi-day totals are visitor-days).</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:18px;margin-top:14px">
+        ${list("Top pages", v.topPages)}${list("Top referrers", v.topReferrers)}${list("UTM source / campaign", v.topUtm)}${list("Countries / regions", v.countries)}</div>`; } },
   { id: "sales", title: "Sales (Supabase)", render: d => d.sales && `<div class="big">${d.sales.count}</div><div class="sub">paid checkouts · ${d.sales.refunded} refunded · ${d.sales.disputed} disputed</div>` },
   { id: "revenue", title: "Revenue (Supabase)", render: d => d.sales && `<div class="big">${aud(d.sales.revenueAud)}</div><div class="sub">gross, paid licence_payments</div>` },
   { id: "licences", title: "Active licences", render: d => d.licences && `<div class="big">${d.licences.active}</div><div class="sub">${d.licences.plan1} one-device · ${d.licences.plan2} phone+computer · ${d.licences.revoked} revoked</div>` },

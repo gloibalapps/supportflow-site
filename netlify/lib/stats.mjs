@@ -210,3 +210,39 @@ export async function stripeStats({ days = 30 } = {}) {
     balance: { availableAud: sum(balance?.available), pendingAud: sum(balance?.pending) },
   };
 }
+
+/* ---------------- Website visits (site_visits) ---------------- */
+export async function visitorStats({ days = 30 } = {}) {
+  const since = new Date(Date.now() - (days - 1) * DAY).toISOString().slice(0, 10);
+  let v;
+  if (process.env.VISITS_FIXTURE) v = JSON.parse(fs.readFileSync(process.env.VISITS_FIXTURE, "utf8")).filter((r) => r.day >= since);
+  else {
+    if (!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY)) return null;
+    const k = process.env.SUPABASE_SERVICE_KEY;
+    v = [];
+    for (let off = 0; off < 200000; off += 1000) {
+      const r = await fetch(`${process.env.SUPABASE_URL}/rest/v1/site_visits?select=day,path,visitor_hash,referrer_host,utm_source,utm_campaign,country,region&day=gte.${since}&order=id`, {
+        headers: { apikey: k, Authorization: `Bearer ${k}`, Range: `${off}-${off + 999}` },
+      });
+      if (!r.ok) return null; // table not created yet
+      const page = await r.json(); v.push(...page);
+      if (page.length < 1000) break;
+    }
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  const d7 = new Date(Date.now() - 6 * DAY).toISOString().slice(0, 10);
+  // visitor_hash is per-day, so "unique" = sum of daily uniques (visitor-days).
+  const uniq = (rows) => new Set(rows.map((r) => r.day + r.visitor_hash)).size;
+  const top = (rows, f, n = 8) => Object.entries(rows.reduce((m, r) => { const key = f(r); if (key) m[key] = (m[key] || 0) + 1; return m; }, {})).sort((a, b) => b[1] - a[1]).slice(0, n);
+  const t = v.filter((r) => r.day === today), w = v.filter((r) => r.day >= d7);
+  const trend = [];
+  for (let i = days - 1; i >= 0; i--) { const day = new Date(Date.now() - i * DAY).toISOString().slice(0, 10); const rs = v.filter((r) => r.day === day); trend.push({ day, visits: rs.length, unique: uniq(rs) }); }
+  return {
+    today: { visits: t.length, unique: uniq(t) }, d7: { visits: w.length, unique: uniq(w) }, d30: { visits: v.length, unique: uniq(v) },
+    topPages: top(v, (r) => r.path),
+    topReferrers: top(v, (r) => r.referrer_host),
+    topUtm: top(v, (r) => r.utm_source && [r.utm_source, r.utm_campaign].filter(Boolean).join(" / ")),
+    countries: top(v, (r) => r.country && (r.region ? `${r.country}-${r.region}` : r.country), 10),
+    trend,
+  };
+}

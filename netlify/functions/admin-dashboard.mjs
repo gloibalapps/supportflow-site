@@ -1,7 +1,7 @@
 // GET /.netlify/functions/admin-dashboard  (Authorization: Bearer <ADMIN_DASHBOARD_TOKEN>)
 // Owner-only stats. Token checked server-side with a constant-time compare.
 import crypto from "node:crypto";
-import { dashboardStats, statsConfigured, stripeStats, stripeConfigured } from "../lib/stats.mjs";
+import { dashboardStats, statsConfigured, stripeStats, stripeConfigured, visitorStats } from "../lib/stats.mjs";
 
 const J = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", "X-Robots-Tag": "noindex" } });
 
@@ -24,7 +24,8 @@ export default async (req) => {
       statsConfigured() ? dashboardStats({ days }).catch(() => ({})) : {},
       stripeConfigured() ? stripeStats({ days }).catch((e) => ({ error: String(e.message || e).slice(0, 80) })) : null,
     ]);
-    return J({ generatedAt: new Date().toISOString(), ...base, stripe: stripe && !stripe.error ? stripe : null, stripeError: stripe?.error || (stripe ? null : "STRIPE_SECRET_KEY not set") });
+    const visits = await visitorStats({ days }).catch(() => null);
+    return J({ generatedAt: new Date().toISOString(), ...base, visits, stripe: stripe && !stripe.error ? stripe : null, stripeError: stripe?.error || (stripe ? null : "STRIPE_SECRET_KEY not set") });
   } catch (e) {
     return J({ error: "failed" }, 500);
   }

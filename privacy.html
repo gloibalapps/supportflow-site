@@ -60,7 +60,7 @@
     'allow_ad_personalization_signals': false
   });
 </script>
-</head>
+<script src="/visit.js" defer></script></head>
 <body>
   <div class="top">
     <img src="./icon-192.png" alt="" />
@@ -163,6 +163,8 @@
 <h3>Public website analytics</h3>
 <p>The public SupportFlow website uses Google Analytics 4 to understand basic website usage, such as page visits, sessions, general device/browser information and how visitors move through the public website. This analytics tagging is not included in the private SupportFlow app workspace, admin area, market page or tester-management pages.</p>
 <p>SupportFlow configures Google Analytics for measurement only and disables Google Signals and advertising-personalisation signals in the website tag. Participant records, progress notes, invoice contents, NDIS numbers, locally stored app records and encrypted backup contents are not intentionally sent to Google Analytics.</p>
+<h3>Website visit counter</h3>
+<p>The public website also counts page visits with our own cookie-free counter. It records the page, the referring website, any link tags (utm), the date, and your approximate country and state from our host's network data. Your IP address and browser details are never stored: they are combined with a secret value that changes every day and turned into a one-way code, used only to count unique visitors per day. The counter honours your browser's Do Not Track setting and is not used in the app, admin or tester pages.</p>
 <h3>Licence and billing records</h3>
 <p>To run the free trial and the Lifetime licence, the following information is stored in a secure server-side database (Supabase, operated by Supabase Inc. and hosted on Amazon Web Services infrastructure):</p>
 <ul>
