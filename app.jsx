@@ -127,15 +127,16 @@ html,body{overscroll-behavior-y:none;background:#14150F;height:100%;overflow-x:h
 .creditnotice{margin-top:10px;padding:11px 13px;border-radius:11px;border:1px solid rgba(200,145,58,.45);background:rgba(200,145,58,.09);font-size:12.5px;line-height:1.55;color:var(--tx-2)}
 .creditnotice a{color:var(--brass-lift);font-weight:700;text-decoration:none;white-space:nowrap}
 .creditnotice a:hover{text-decoration:underline}
+@media(max-width:420px){.creditpill .lbl{display:none}}
+/* Checkout return toast */
 .checkout-toast{position:fixed;bottom:84px;left:50%;transform:translateX(-50%);z-index:300;max-width:360px;width:calc(100% - 32px);padding:13px 16px;border-radius:14px;display:flex;align-items:flex-start;gap:11px;font-size:13.5px;box-shadow:0 4px 28px rgba(0,0,0,.45);animation:toastIn .22s ease}
 .checkout-toast[data-type=success]{background:#192517;border:1px solid rgba(78,160,106,.45);color:#8BD5A6}
 .checkout-toast[data-type=cancelled]{background:#261E14;border:1px solid rgba(194,112,59,.35);color:#F2EFE4}
-.checkout-toast .ti{font-size:18px;line-height:1;flex-shrink:0;margin-top:1px}
-.checkout-toast .tm{flex:1;line-height:1.45}
-.checkout-toast .tc{background:none;border:none;color:inherit;opacity:.6;cursor:pointer;font-size:18px;line-height:1;padding:0;flex-shrink:0;margin-top:1px}
+.checkout-toast .ti{font-size:17px;flex-shrink:0;line-height:1.5}
+.checkout-toast .tm{flex:1;line-height:1.5;font-weight:500}
+.checkout-toast .tc{background:none;border:none;color:currentColor;opacity:.55;cursor:pointer;padding:0;font-size:20px;line-height:1;flex-shrink:0;margin-top:-1px}
 .checkout-toast .tc:hover{opacity:1}
-@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(12px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
-@media(max-width:420px){.creditpill .lbl{display:none}}
+@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 .lockwrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;
   justify-content:center;padding:40px 26px;text-align:center;background:var(--bg)}
 .lockmark{margin-bottom:16px;opacity:.95}
@@ -467,7 +468,7 @@ const APP_VERSION = "21";
 
 /* ---------------- device licensing ----------------
    One-off licences owned by a Google account: "One device" (A$49) or
-   "Phone and computer" (A$69, or A$20 upgrade). Everything is decided by the
+   "Phone and computer" (A$69, or A$29 upgrade). Everything is decided by the
    server (netlify/functions/licence.mjs); this side only stores a device id,
    the sign-in session and a signed 7-day offline lease in IndexedDB.
    Nothing here does anything until the owner switch is on -- while it's off
@@ -834,7 +835,7 @@ function LicencePlans({ onBuy, busy }) {
   );
   return <div style={{ width: "100%", maxWidth: 420 }}>
     {card("one", "One device", 49, "One device at a time.",
-      ["Use SupportFlow on one phone, tablet or computer", "Move it to a new device whenever you like", "Upgrade to Phone and computer later for $20", "No subscription, no monthly fees"],
+      ["Use SupportFlow on one phone, tablet or computer", "Move it to a new device whenever you like", "Upgrade to Phone and computer later for $29", "No subscription, no monthly fees"],
       ["Not signed in on two devices at the same time"])}
     {card("two", "Phone and computer", 69, "Phone and computer signed in together.",
       ["Two devices signed in at the same time", "Swap either device whenever you like", "No subscription, no monthly fees"],
@@ -874,7 +875,7 @@ function LicenceDeviceChooser({ info, busy, onActivate, onUpgrade }) {
       <div style={{ fontSize: 12, color: "var(--tx-3)", lineHeight: 1.6, marginTop: 12, maxWidth: 360 }}>
         {d.label || "The other device"} will lock the next time it connects. We'll email your Google address to let you know.
       </div>
-      <button className="btn ghost tiny" style={{ marginTop: 16 }} disabled={busy} onClick={onUpgrade}>Use both at once? Upgrade to Phone and computer &mdash; pay $20 more</button>
+      <button className="btn ghost tiny" style={{ marginTop: 16 }} disabled={busy} onClick={onUpgrade}>Use both at once? Upgrade to Phone and computer &mdash; pay $29 more</button>
     </>;
   }
   return <>
@@ -1010,7 +1011,7 @@ function LicencePanel({ licence, open, onToggle }) {
         </div>
         {info.plan === 1 && (
           <button className="btn" style={{ marginBottom: 12 }} disabled={busy || licence.offline} onClick={() => run(() => licence.checkout("upgrade"))}>
-            Upgrade to Phone and computer &mdash; pay $20 more
+            Upgrade to Phone and computer &mdash; pay $29 more
           </button>
         )}
         <div style={{ fontSize: 12, color: "var(--tx-3)" }}>
@@ -1578,17 +1579,6 @@ function TrashIcon() {
   );
 }
 
-const normalisePlanDate = (value) => {
-  const v = String(value || "").trim();
-  if (!v) return "";
-  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
-  const m = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (!m) return v;
-  const d = Number(m[1]), mo = Number(m[2]), y = Number(m[3]);
-  const dt = new Date(y, mo - 1, d);
-  if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return v;
-  return `${y}-${String(mo).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
-};
 const fmtDate = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString("en-AU", { day: "numeric", month: "short" }) : "—";
 const invTotal = (i) => (i.lines || []).reduce((s, l) => s + Number(l.qty || 0) * Number(l.rate || 0), 0);
 
@@ -2497,7 +2487,9 @@ function App() {
   const [creditExpiresIn, setCreditExpiresIn] = useState(null); // days remaining
   const [freeOffer, setFreeOffer] = useState(null); // new-user offer {remaining, daysLeft}
   const [statusKnown, setStatusKnown] = useState(false);
-  const [checkoutResult, setCheckoutResult] = useState(null);   // "success" | "cancelled"
+
+  // Stripe return state — set when app loads with ?checkout=success / ?checkout=cancelled
+  const [checkoutResult, setCheckoutResult] = useState(null);
   const [checkoutToastOpen, setCheckoutToastOpen] = useState(false);
 
   useEffect(() => {
@@ -2510,13 +2502,16 @@ function App() {
     return () => window.removeEventListener("sf:credits", onCredits);
   }, []);
 
+  // Detect Stripe return after checkout and show a toast.
+  // Stripe redirects to /app?checkout=success or /app?checkout=cancelled.
+  // We also schedule a credit re-fetch 4s later (webhook usually lands in ~1-2s).
   useEffect(() => {
-    // Show a toast when Stripe redirects back with ?checkout=success or =cancelled.
     const params = new URLSearchParams(location.search);
     const result = params.get("checkout");
     if (result === "success" || result === "cancelled") {
       setCheckoutResult(result);
       setCheckoutToastOpen(true);
+      // Strip the param from the URL without a page reload
       const remaining = [...params.entries()].filter(([k]) => k !== "checkout");
       const newSearch = remaining.length
         ? "?" + remaining.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join("&")
@@ -2524,6 +2519,7 @@ function App() {
       history.replaceState(null, "", location.pathname + newSearch + location.hash);
       const dismiss = setTimeout(() => setCheckoutToastOpen(false), 9000);
       if (result === "success") {
+        // Re-fetch credit balance after webhook has had time to land
         const refresh = setTimeout(() => {
           const ref = getDeviceRef();
           fetch(`/.netlify/functions/check-status?ref=${encodeURIComponent(ref)}`)
