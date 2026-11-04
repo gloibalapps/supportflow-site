@@ -770,6 +770,69 @@ Nothing about billing touches your records. They're still only ever on your
 device, same as always, subscribing or not doesn't add a server-side copy of
 anything.
 
+## 14a. Payment tracker (optional add-on)
+
+The Payment tracker lives at **Money → Payment tracker**. It shows who owes you, flags overdue invoices, and, if you switch it on, sends polite reminder emails to the payer at business day 7 and 12. At day 20 (day 15 for NDIA-managed) it prepares a complaint draft for you to review. Nothing is ever filed for you.
+
+### Pricing
+
+- **A$49 once:** the tracker on one computer.
+- **A$29 add-on:** the tracker on a second computer. Only for owners of the A$49 tracker.
+- **A$99 once:** the full tracker on two computers, with all future updates to the tracker. No subscription.
+
+Note that the A$49 tracker plus the A$29 add-on costs A$78, which is less than the A$99 package.
+
+The optional SMS pack below is **separate**. It is not part of the A$99 package or any other tracker purchase.
+
+### SMS alerts (optional, A$4.99 a month)
+
+- **A$4.99 a month for 50 texts** (about 10c each). It's optional, and only Payment tracker owners (A$49 or A$99) can buy it.
+- Texts go **only to your own mobile number**, after you verify it with a 6-digit code. They never go to the NDIA, a plan manager, or anyone you invoice.
+- They are used for the day 7, 12 and 20 overdue alerts and the "your complaint draft is ready" nudge.
+- A short text uses 1 credit. A long text, or one with emoji, may use 2. Credits reset to 50 each month when the pack renews. Unused texts don't roll over.
+- To stop texts, reply **STOP** or use **Stop texts** in Payment tracker → Settings. To cancel the pack, use **Manage or cancel the SMS pack**.
+
+### When you run out of texts
+
+Alerts aren't lost. They are sent as **push notifications** to each device where you turned notifications on. You get one notification saying your texts are used up, and Settings shows "No texts left this month". Push notifications are free, so set them up even if you buy the SMS pack.
+
+### Setting up push notifications
+
+Notifications are turned on **separately on each device**, from **Payment tracker → Settings → Turn on phone notifications**. Tap the button yourself, then choose **Allow** when asked.
+
+**Android (Chrome):**
+1. Open supportflow.work/app in Chrome. Use Chrome's menu → **Install app** (or **Add to Home screen**).
+2. Open SupportFlow from its icon and sign in to the tracker.
+3. Go to Payment tracker → Settings → **Turn on phone notifications**, then choose **Allow**.
+
+**Windows or Mac (Chrome or Edge):**
+1. Open supportflow.work/app and click the **install** icon in the address bar (or menu → Install SupportFlow / Apps → Install).
+2. Open the installed app and sign in to the tracker.
+3. Go to Payment tracker → Settings → **Turn on phone notifications**, then choose **Allow**.
+
+**iPhone or iPad (iOS / iPadOS 16.4 or later):**
+1. Open supportflow.work/app in **Safari**. Tap **Share → Add to Home Screen**, then **Add**.
+2. Open SupportFlow **from the Home Screen icon**, not from Safari.
+3. **Sign in again.** The Home Screen app is kept separate from Safari, so you need to sign in to the tracker there too.
+4. Go to Payment tracker → Settings → **Turn on phone notifications**, then choose **Allow**.
+
+### Checking or turning notifications back on
+
+If you chose "Don't allow" or notifications stopped arriving:
+- **Android:** Settings → Apps → SupportFlow (or Chrome) → Notifications → On. Also check that Do Not Disturb is off.
+- **Windows:** Settings → System → Notifications → make sure notifications are on for Chrome/Edge or SupportFlow. In the browser, open the site settings (padlock icon) → Notifications → Allow.
+- **Mac:** System Settings → Notifications → Google Chrome / Microsoft Edge / SupportFlow → Allow notifications. Also check Focus.
+- **iPhone/iPad:** Settings → Notifications → SupportFlow → Allow Notifications. Also check Focus.
+
+Then open the tracker and tap **Turn on phone notifications** again.
+
+### Limits
+
+- Push delivery **isn't guaranteed**. Battery saving, Do Not Disturb or Focus, being offline, or the phone or browser clearing old subscriptions can delay or drop a notification. Check the tracker regularly as well.
+- On iPhone and iPad, notifications **don't work in a normal Safari tab**. They only work in the Home Screen app on iOS 16.4 or later.
+- Turning notifications on applies to one device only. Turn them on on every device you want alerts on.
+- If you remove the app or clear its data, turn notifications on again.
+
 ---
 
 ## 15. If something looks wrong

@@ -53,10 +53,16 @@ STRICT RULES:
   explanations. Use numbered steps only when genuinely useful.
 - If a step in your answer corresponds to a screen the user can be sent to directly, end your answer
   with one line in exactly this form: [[OPEN:key]] using one of these keys only: invoices, shifts,
-  travel, notes, people, settings, expenses, tax, backup. Omit this line entirely if no single screen
+  travel, notes, people, settings, expenses, tax, backup, tracker. Omit this line entirely if no single screen
   is the clear destination.
 - Never claim to have created, deleted, edited or sent anything. You can only explain and point to a
-  screen, never perform an action yourself.`;
+  screen, never perform an action yourself.
+- Payment tracker, SMS alerts and push notifications are covered in the user manual (USER-MANUAL.md
+  section 14a, and the in-app manual section "Payment tracker, SMS alerts and notifications"). Use only
+  the prices and steps in that content: never promise "unlimited" or "free forever" add-ons, and always
+  say the SMS pack is optional, separate from the A$99 package, and texts only go to the worker's own
+  verified mobile. Say push delivery isn't guaranteed and doesn't work in a plain iPhone Safari tab.
+  Use [[OPEN:tracker]] for Payment tracker screens.`;
 
 export default async (req) => {
   if (req.method !== "POST") {

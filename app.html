@@ -500,6 +500,7 @@ function openAssistantTarget(key, go) {
     expenses: () => go("summary", "expenses"),
     tax: () => go("summary", "position"),
     backup: () => go("settings"),
+    tracker: () => go("summary", "tracker"),
   };
   (map[key] || (() => {}))();
 }
@@ -8463,6 +8464,21 @@ const MANUAL = [
        "Prices change every 1 July, and sometimes mid-year. The app records when its figures were last checked against the published schedule, and once that is more than a year old it says so on the Summary screen and in Settings rather than quietly looking current. Subscribing to the NDIA provider newsletter is the simplest way to hear about a change when it happens."],
       ["Where the numbers come from",
        "Support item codes and prices come from the NDIS Pricing Schedule 2026-27, National column, effective 1 July 2026. The billing rules, time of day, cancellations, travel, come from the Pricing Arrangements and Price Limits 2025-26, the most recent published rules. Prices change every 1 July, so check ndis.gov.au if the year has turned over."],
+    ],
+  },  {
+    t: "Payment tracker, SMS alerts and notifications",
+    d: "The optional Payment tracker add-on: prices, SMS pack and push notifications.",
+    q: [
+      ["What the Payment tracker costs",
+       "The Payment tracker (Money \u2192 Payment tracker) is optional. A$49 once for one computer. A$29 add-on for a second computer, only for owners of the A$49 tracker. A$99 once for the full tracker on two computers with all future updates to the tracker, no subscription. The A$49 tracker plus the A$29 add-on is A$78. The optional SMS pack is separate and not included in any of these."],
+      ["SMS alerts pack",
+       "Optional: A$4.99 a month for 50 texts (about 10c each), only for Payment tracker owners, and not part of the A$99 package. Texts go only to your own mobile after you verify it with a code, never to the NDIA, a plan manager or a payer. They are used for the day 7, 12 and 20 overdue alerts and the complaint-draft-ready nudge. Credits reset to 50 each month and don't roll over. Reply STOP or use Stop texts in Payment tracker \u2192 Settings to stop texts."],
+      ["Out of SMS credits",
+       "When texts run out, alerts are sent as push notifications instead, to every device where you turned notifications on. You get one notification saying texts are used up. Push notifications are free."],
+      ["Turn on push notifications",
+       "Turn them on on each device separately: Payment tracker \u2192 Settings \u2192 Turn on phone notifications, then Allow. Android: install from Chrome's menu (Install app), open from the icon, sign in, then turn on. Windows or Mac: install from the Chrome or Edge address bar install icon, open the app, sign in, then turn on. iPhone/iPad (iOS 16.4 or later): in Safari tap Share \u2192 Add to Home Screen, open SupportFlow from the Home Screen icon, sign in again, then turn on and Allow."],
+      ["Notifications not arriving",
+       "Check the system settings: Android Settings \u2192 Apps \u2192 Notifications; Windows Settings \u2192 System \u2192 Notifications plus the browser's site settings; Mac System Settings \u2192 Notifications; iPhone Settings \u2192 Notifications \u2192 SupportFlow. Check Do Not Disturb or Focus, then tap Turn on phone notifications again. Delivery isn't guaranteed. Notifications don't work in a normal iPhone Safari tab, only in the Home Screen app."],
     ],
   },
 ];
