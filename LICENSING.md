@@ -179,3 +179,13 @@ update licence_devices set revoked_at = now(), revoked_reason = 'owner'
 | `netlify/functions/stripe-webhook.mjs` | Adds licence purchases, refunds and disputes |
 | `netlify/functions/charge-invoice.mjs`, `assist.mjs`, `supportflow-assistant.mjs` | Server-side licence checks |
 | `app.jsx` / `app.html` | Client: device id, heartbeat, lease check, locked/buy/move screens, Settings → Licence & devices |
+
+## Email-granted licences (`email:<address>` rows)
+A licence granted before first sign-in is stored as `google_sub = "email:<lowercased email>"`.
+On a sign-in whose Google email is verified, `evaluate` → `adoptEmailLicence` moves it to the
+numeric Google sub (plan = max of both, payments re-pointed, placeholder deleted). Licence
+checkouts with no `google_sub` are parked under the buyer's email the same way.
+
+Manual test: insert `email:you@x.com` plan 2 active; sign in with Google as you@x.com
+(fresh session, so it carries `ev`); expect state active, cap 2, and the email row gone.
+Repeat sign-in: no change (idempotent).

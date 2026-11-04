@@ -19,7 +19,7 @@
 //   accounts.credit_balance, credit_purchases table, add_credits() RPC.
 
 import crypto from "node:crypto";
-import { supa, recomputeLicence, PRODUCTS } from "../lib/licence.mjs";
+import { supa, recomputeLicence, PRODUCTS, emailSub } from "../lib/licence.mjs";
 
 const TOLERANCE_SECONDS = 300; // reject anything claiming to be older than 5 minutes
 
@@ -242,13 +242,15 @@ async function grantLifetime(accountId) {
 // browser's ?licence=success return never does. See LICENSING.md.
 // ---------------------------------------------------------------------------
 async function handleLicenceSession(session) {
-  const sub = session.metadata?.google_sub || session.client_reference_id;
+  const email = session.customer_details?.email || session.customer_email || null;
+  // No Google sub (e.g. a payment link): park it under "email:<address>"; the
+  // buyer's next verified Google sign-in with that address adopts it.
+  const sub = session.metadata?.google_sub || session.client_reference_id || (email ? emailSub(email) : null);
   const product = session.metadata?.product;
   if (!sub || !PRODUCTS[product]) {
-    console.error(`stripe-webhook: licence session ${session.id} missing google_sub/product`);
+    console.error(`stripe-webhook: licence session ${session.id} missing google_sub/email/product`);
     return;
   }
-  const email = session.customer_details?.email || session.customer_email || null;
   // Make sure the licence row exists (unpaid) so the payment can reference it.
   await supa("licences?on_conflict=google_sub", {
     method: "POST",

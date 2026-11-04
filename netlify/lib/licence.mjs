@@ -131,9 +131,9 @@ export function getLeaseKeys() {
   return leaseKeys;
 }
 
-export function signSession({ sub, email, name }) {
+export function signSession({ sub, email, name, ev }) {
   const now = Date.now();
-  const payload = enc(JSON.stringify({ v: 1, sub, email: email || "", name: name || "", iat: now, exp: now + SESSION_DAYS * DAY }));
+  const payload = enc(JSON.stringify({ v: 1, sub, email: email || "", name: name || "", ev: ev === true, iat: now, exp: now + SESSION_DAYS * DAY }));
   const sig = enc(crypto.createHmac("sha256", subKey("supportflow-session-v1")).update(payload).digest());
   return `${payload}.${sig}`;
 }
@@ -198,7 +198,7 @@ export async function verifyGoogleIdToken(idToken) {
   if (!claims.exp || claims.exp < now - 60) return null;
   if (!claims.sub) return null;
   if (claims.email && claims.email_verified === false) return null;
-  return { sub: String(claims.sub), email: claims.email || "", name: claims.name || "" };
+  return { sub: String(claims.sub), email: claims.email || "", name: claims.name || "", ev: claims.email_verified === true };
 }
 
 /* ---------------- data access ---------------- */
@@ -206,6 +206,46 @@ export async function getLicence(sub) {
   const rows = await supa(`licences?google_sub=eq.${q(sub)}&select=*`);
   return rows?.[0] || null;
 }
+// A licence granted by email before the person first signed in lives under
+// google_sub "email:<lowercased address>". On a verified Google sign-in with
+// that address, move it (plan, payments, devices) onto the real Google sub and
+// delete the placeholder. Idempotent: does nothing once the row is gone.
+export const emailSub = (email) => `email:${String(email || "").trim().toLowerCase()}`;
+export async function adoptEmailLicence(sub, email) {
+  if (!email || String(sub).startsWith("email:")) return null;
+  const from = emailSub(email);
+  const src = await getLicence(from);
+  if (!src) return null;
+  const cur = await getLicence(sub);
+  const curPlan = cur?.status === "active" ? cur.plan : 0;
+  const srcPlan = src.status === "active" ? src.plan : 0;
+  const plan = Math.max(curPlan, srcPlan);
+  await supa("licences?on_conflict=google_sub", {
+    method: "POST",
+    body: {
+      google_sub: sub, email: String(email).trim().toLowerCase(), plan,
+      status: plan >= 1 ? "active" : (cur?.status || src.status),
+      purchased_at: cur?.purchased_at || src.purchased_at,
+      stripe_payment_intent_id: cur?.stripe_payment_intent_id || src.stripe_payment_intent_id,
+      updated_at: new Date().toISOString(),
+    },
+    prefer: "resolution=merge-duplicates,return=minimal",
+  });
+  const moved = (await supa(`licence_payments?google_sub=eq.${q(from)}&select=id`)) || [];
+  if (moved.length) await supa(`licence_payments?google_sub=eq.${q(from)}`, { method: "PATCH", body: { google_sub: sub }, prefer: "return=minimal" });
+  // Placeholder rows normally have no devices; drop any rather than risk a
+  // primary-key clash on (google_sub, device_id).
+  await supa(`licence_devices?google_sub=eq.${q(from)}`, { method: "DELETE", prefer: "return=minimal" });
+  await supa(`licences?google_sub=eq.${q(from)}`, { method: "DELETE", prefer: "return=minimal" });
+  // Moved Stripe payments: let recompute derive the plan, but never below what
+  // was already granted (manual grants have no payment rows).
+  if (moved.length) {
+    const re = await recomputeLicence(sub);
+    if (re && re.plan < plan) await supa(`licences?google_sub=eq.${q(sub)}`, { method: "PATCH", body: { plan, status: "active" }, prefer: "return=minimal" });
+  }
+  return getLicence(sub);
+}
+
 export async function listDevices(sub) {
   return (await supa(`licence_devices?google_sub=eq.${q(sub)}&select=*&order=last_seen.desc`)) || [];
 }
@@ -265,8 +305,11 @@ export async function claimLegacyLifetime(sub, email, legacyRef) {
  *   slots_full    -> show "Move the licence here?" / pick a device to replace
  *   device_removed-> this install was moved/removed; offer to use the licence here
  */
-export async function evaluate({ sub, email, deviceId, label, legacyRef }) {
+export async function evaluate({ sub, email, emailVerified, deviceId, label, legacyRef }) {
   let lic = await getLicence(sub);
+  if (emailVerified && email && (!lic || lic.status !== "active" || lic.plan < 2)) {
+    lic = (await adoptEmailLicence(sub, email).catch((e) => { console.warn("email licence adopt failed", e.message); return null; })) || lic;
+  }
   if ((!lic || lic.status !== "active") && legacyRef) {
     lic = (await claimLegacyLifetime(sub, email, legacyRef).catch((e) => { console.warn("legacy claim failed", e.message); return null; })) || lic;
   }

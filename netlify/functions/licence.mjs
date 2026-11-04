@@ -74,7 +74,7 @@ function deviceArgs(body) {
 
 async function stateFor(session, dev, extra = {}) {
   if (!(await enforcedFor(session.email))) return json({ state: "disabled" });
-  const result = await evaluate({ sub: session.sub, email: session.email, ...dev });
+  const result = await evaluate({ sub: session.sub, email: session.email, emailVerified: session.ev === true, ...dev });
   // Re-issue the session when it's past halfway, so an app in daily use never
   // has to bounce through Google again.
   const fresh = session.exp - Date.now() < 45 * 86400000 ? signSession(session) : undefined;
