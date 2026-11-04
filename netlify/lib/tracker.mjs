@@ -1,23 +1,24 @@
 // Payment tracker add-on: server helpers. See PAYMENT-TRACKER.md.
 //
 // Entitlement: a paid unlock is a row in licence_payments with product
-// "tracker" (one device) and optionally "tracker_second_device", written ONLY by stripe-webhook.mjs (same rule as
+// "tracker_base" (+ optional "tracker_addon") or "tracker_full", written ONLY by stripe-webhook.mjs (same rule as
 // licences: the browser's ?tracker=success return never unlocks anything).
 //
 // Prices and labels are config-driven so the owner can change them without a
-// code change. Owner-confirmed pricing (5 Nov 2026): A$99 for the tracker on
-// one device, plus A$29 to add a second device (e.g. PC + phone), the same
-// device-pairing idea as the main licence.
-//   STRIPE_PRICE_TRACKER                 one-off Price id, A$99
-//   STRIPE_PRICE_TRACKER_SECOND_DEVICE   one-off Price id, A$29 (only sold after the A$99 unlock)
-//   TRACKER_LABEL / TRACKER_SECOND_DEVICE_LABEL, TRACKER_AUD / TRACKER_SECOND_DEVICE_AUD
-//     display only; the Stripe Price is what is charged
+// code change. Owner pricing (5 Nov 2026, latest):
+//   STRIPE_PRICE_TRACKER_BASE   A$49 one-off, tracker on one computer
+//   STRIPE_PRICE_TRACKER_ADDON  A$29 one-off, second computer; ONLY for base owners
+//                               (gated like the licence $29 upgrade)
+//   STRIPE_PRICE_TRACKER_FULL   A$99 one-off, full package (everything, two devices)
+//   NOTE: 49 + 29 = 78 < 99, so the package currently costs more than base + add-on.
+//   TRACKER_{BASE,ADDON,FULL}_LABEL / _AUD override display only; Stripe's Price is what is charged.
 import crypto from "node:crypto";
 import { supa } from "./licence.mjs";
 
 export const TRACKER_PRODUCTS = Object.freeze({
-  tracker: { env: "STRIPE_PRICE_TRACKER", labelEnv: "TRACKER_LABEL", audEnv: "TRACKER_AUD", label: "Payment tracker, one device", aud: 99, devices: 1 },
-  tracker_second_device: { env: "STRIPE_PRICE_TRACKER_SECOND_DEVICE", labelEnv: "TRACKER_SECOND_DEVICE_LABEL", audEnv: "TRACKER_SECOND_DEVICE_AUD", label: "Add a second device (PC + phone)", aud: 29, devices: 2, requires: "tracker" },
+  tracker_base: { env: "STRIPE_PRICE_TRACKER_BASE", labelEnv: "TRACKER_BASE_LABEL", audEnv: "TRACKER_BASE_AUD", label: "Payment tracker, one computer", aud: 49, devices: 1 },
+  tracker_addon: { env: "STRIPE_PRICE_TRACKER_ADDON", labelEnv: "TRACKER_ADDON_LABEL", audEnv: "TRACKER_ADDON_AUD", label: "Add a second computer", aud: 29, devices: 2, requires: "tracker_base" },
+  tracker_full: { env: "STRIPE_PRICE_TRACKER_FULL", labelEnv: "TRACKER_FULL_LABEL", audEnv: "TRACKER_FULL_AUD", label: "Payment tracker, full package", aud: 99, devices: 2 },
 });
 export const isTrackerProduct = (p) => Object.prototype.hasOwnProperty.call(TRACKER_PRODUCTS, p);
 
@@ -32,13 +33,14 @@ export function trackerOffer() {
 }
 
 const q = encodeURIComponent;
-// { product: "tracker", devices: 1|2, secondDevice: bool } or null when not unlocked.
+// { product: "tracker_full"|"tracker_base", devices: 1|2, addon, full } or null when not unlocked.
 export async function trackerUnlock(sub) {
   if (!sub) return null;
-  const rows = (await supa(`licence_payments?google_sub=eq.${q(sub)}&product=in.(tracker,tracker_second_device)&status=eq.paid&select=product,created_at&order=created_at.asc`)) || [];
-  if (!rows.some((r) => r.product === "tracker")) return null; // the A$29 add-on alone unlocks nothing
-  const second = rows.some((r) => r.product === "tracker_second_device");
-  return { product: "tracker", devices: second ? 2 : 1, secondDevice: second };
+  const rows = (await supa(`licence_payments?google_sub=eq.${q(sub)}&product=in.(tracker_base,tracker_addon,tracker_full)&status=eq.paid&select=product,created_at&order=created_at.asc`)) || [];
+  const has = (p) => rows.some((r) => r.product === p);
+  if (has("tracker_full")) return { product: "tracker_full", devices: 2, full: true, addon: has("tracker_addon") };
+  if (!has("tracker_base")) return null; // the A$29 add-on alone unlocks nothing
+  return { product: "tracker_base", devices: has("tracker_addon") ? 2 : 1, full: false, addon: has("tracker_addon") };
 }
 // Device cap, like the main licence: the first N devices to open the tracker
 // hold the seats; a device unseen for 21 days frees its seat.

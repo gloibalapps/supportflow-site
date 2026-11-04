@@ -13,7 +13,7 @@ globalThis.fetch = async (url, opt = {}) => {
   url = String(url); calls.push([opt.method || "GET", url.replace("https://supa.test/rest/v1/", ""), opt.body ? JSON.parse(opt.body) : null]);
   const ok = (b) => new Response(JSON.stringify(b), { status: 200 });
   if (url.includes("tracker_prefs?enabled")) return ok([{ google_sub: "sub1", state: "SA", notify_push: true, worker_enc: T.seal({ replyTo: "jane@w.test", name: "Jane" }) }]);
-  if (url.includes("licence_payments")) return ok([{ product: "tracker" }]);
+  if (url.includes("licence_payments")) return ok([{ product: "tracker_base" }]);
   if (url.includes("tracker_records?google_sub")) return ok([rec(0, "plan", "2026-10-01"), rec(2, "plan", "2026-09-01"), rec(1, "self", "2026-10-20")]);
   if (url.includes("tracker_suppressions")) return ok([]);
   if (url.includes("api.resend.com")) return ok({ id: "em_" + calls.length });

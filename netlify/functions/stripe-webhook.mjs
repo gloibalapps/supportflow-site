@@ -249,7 +249,7 @@ async function handleLicenceSession(session) {
   const sub = session.metadata?.google_sub || session.client_reference_id || (email ? emailSub(email) : null);
   const product = session.metadata?.product;
   // Payment tracker unlocks (metadata.kind = "tracker") are recorded in the
-  // same licence_payments ledger with product tracker / tracker_second_device, so
+  // same licence_payments ledger with product tracker_base / tracker_addon / tracker_full, so
   // refunds and disputes reverse them through handleLicenceReversal below.
   if (!sub || !(PRODUCTS[product] || (session.metadata?.kind === "tracker" && isTrackerProduct(product)))) {
     console.error(`stripe-webhook: licence session ${session.id} missing google_sub/email/product`);

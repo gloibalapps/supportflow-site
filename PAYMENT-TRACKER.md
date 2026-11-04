@@ -3,10 +3,15 @@
 Status: built on the local branch `feature/payment-tracker` only. It has not been pushed or deployed. No Stripe objects exist, no migration has been applied, and no Netlify env vars have been changed.
 Supersedes these decisions in payment-tracker-brief.md: D1 (price) and D2 (one-tap send).
 
-## Pricing (owner-confirmed 5 Nov 2026)
-- **A$99 one-off** unlocks the tracker for one device (`tracker`).
-- **A$29 one-off** adds a second device, for example a PC and a phone (`tracker_second_device`). It is only sold after the A$99 unlock. Seats work like the main licence: the first N devices to open the tracker hold the seats, and a device that hasn't been seen for 21 days frees its seat.
-- The entitlement is per Google account. It is recorded in `licence_payments`, the same ledger as licences, and **only** the Stripe webhook writes it. Refunds and disputes reverse it through the existing `handleLicenceReversal`.
+## Pricing (owner, 5 Nov 2026, latest; all config-driven)
+| Product id | Price | Env var | What it gives |
+|---|---|---|---|
+| `tracker_base` | A$49 one-off | `STRIPE_PRICE_TRACKER_BASE` | Tracker on one computer |
+| `tracker_addon` | A$29 one-off | `STRIPE_PRICE_TRACKER_ADDON` | A second computer. **Only for base owners**, gated server-side like the licence $29 upgrade |
+| `tracker_full` | A$99 one-off | `STRIPE_PRICE_TRACKER_FULL` | Full package: everything, two devices |
+
+**Flag for the owner:** base + add-on = A$78, but the full package is A$99, so the package currently costs A$21 more than buying both. The copy is neutral: it shows each option with its price and claims no savings.
+The entitlement is per Google account, recorded in `licence_payments` (the same ledger as licences). **Only** the Stripe webhook writes it, and refunds and disputes reverse it through `handleLicenceReversal`. Device seats work like the main licence: the first N devices hold seats, and a seat frees after 21 days unseen.
 
 ## What is built
 | Area | Where |
@@ -39,14 +44,14 @@ Supersedes these decisions in payment-tracker-brief.md: D1 (price) and D2 (one-t
 Mail goes `From: "Jane Smith via SupportFlow" <invoices@send.supportflow.work>`, `Reply-To: <worker's email>`. **Sending as the worker's own address isn't feasible.** Resend only sends from domains SupportFlow has verified with SPF/DKIM. Putting a worker's gmail.com/outlook.com address in From fails DMARC (Gmail and Yahoo reject or spam it). The alternative, Gmail/Microsoft send-on-behalf OAuth, needs the restricted `gmail.send` scope, which means a Google CASA security assessment, plus a Microsoft publisher verification. That is weeks of work and an annual cost, so it isn't worth it for v1. Replies still go straight to the worker.
 
 ## Stripe setup (do in TEST mode first; nothing has been created)
-1. Product "SupportFlow Payment tracker", with a one-off Price of **A$99.00 AUD** → set `STRIPE_PRICE_TRACKER`.
-2. Product "Payment tracker: second device", with a one-off Price of **A$29.00 AUD** → set `STRIPE_PRICE_TRACKER_SECOND_DEVICE`.
-3. Optional display overrides: `TRACKER_LABEL`, `TRACKER_AUD`, `TRACKER_SECOND_DEVICE_LABEL`, `TRACKER_SECOND_DEVICE_AUD`.
+1. Product "Payment tracker", one-off Price **A$49.00 AUD** → `STRIPE_PRICE_TRACKER_BASE`.
+2. Product "Payment tracker: second computer", one-off Price **A$29.00 AUD** → `STRIPE_PRICE_TRACKER_ADDON`. Product "Payment tracker: full package", one-off Price **A$99.00 AUD** → `STRIPE_PRICE_TRACKER_FULL`.
+3. Optional display overrides: `TRACKER_{BASE,ADDON,FULL}_LABEL` and `TRACKER_{BASE,ADDON,FULL}_AUD`.
 4. Webhook: reuse the existing `/.netlify/functions/stripe-webhook` endpoint and `STRIPE_WEBHOOK_SECRET`. Make sure it listens for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `charge.refunded`, `charge.dispute.created` and `charge.dispute.closed` (the same events as licences). Checkout sessions carry `metadata.kind=tracker`, `product`, `google_sub` and `device_id`. The `?tracker=success` return never unlocks anything: the app polls `status` until the webhook lands.
 5. Existing env vars that are reused: `STRIPE_SECRET_KEY`, `SITE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `LICENCE_SECRET`, `GOOGLE_CLIENT_ID`, `RESEND_API_KEY`.
 6. New env vars: `TRACKER_DATA_KEY` (`openssl rand -base64 32`; losing it makes the synced records unreadable), `TRACKER_EMAIL_FROM`, `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT` (`npx web-push generate-vapid-keys`), `TRACKER_AUTOSEND_ENABLED` (leave unset), `TRACKER_AUTOSEND_DRY_RUN` (default true).
 7. Apply `TRACKER-MIGRATION.sql` after `LICENSING-MIGRATION.sql`. It widens the `licence_payments.product` check.
-8. Test: a test-mode purchase → webhook row → status unlocked → a second device is blocked until the A$29 purchase → refund re-locks.
+8. Test: a test-mode purchase → webhook row → status unlocked → a second computer is blocked until the A$29 add-on; the add-on is refused without the base; the full package gives two devices → refund re-locks.
 
 Owner testing without paying: `/app?trackerpreview=1` unlocks the screens on that device only (`=0` to clear). It cannot send anything, because the server re-checks the unlock.
 
@@ -72,7 +77,7 @@ Push works only on iOS/iPadOS 16.4+, only after the user adds SupportFlow to the
 ## Launch blockers
 1. **Legal/privacy:** this is the first time invoice and participant-related data leaves the device. PRIVACY-POLICY.md, privacy.html, DATA-SECURITY.md ("no central developer database") and the Terms need updating: what is stored, the purpose, encryption, 30-day deletion, the US-hosted Resend (an APP 8 cross-border disclosure) and Supabase region, and the worker's responsibility for participant consent (NDIS number off by default). Get a privacy-lawyer review.
 2. **Resend domain:** verify `send.supportflow.work` (SPF, DKIM, DMARC with p=none→quarantine), warm it up, and monitor bounces and complaints. Use a separate subdomain so tracker mail can't hurt licence and tester mail.
-3. **Pricing:** confirmed at A$99 + A$29. The Stripe products still need creating, and the pricing page/PRICING.md need the wording.
+3. **Pricing:** A$49 base / A$29 add-on / A$99 full. The package costs more than base + add-on (A$78), so the owner should confirm this is intended and decide what "everything" includes beyond two devices. The Stripe products still need creating, and the pricing page/PRICING.md need the wording.
 4. **iOS push limits** (above). **Public holiday table:** the computed rules need checking against data.gov.au. WA's King's Birthday is approximated as the last Monday in September; part-day/regional holidays are ignored.
 5. **Testing:** Stripe test-mode purchase/refund/second device; a dry-run sender week with `TRACKER_AUTOSEND_DRY_RUN=true`; real devices (Android Chrome, iPhone Home Screen); a deliverability check (mail-tester, Gmail/Outlook inboxes); the migration on a Supabase branch first.
 6. The owner decides on open brief questions 2, 10 and 11 (Commission option, NDIA-managed eligibility, self-managed BD-20).

@@ -11,7 +11,7 @@
 -- 1) Paid unlocks ride on the licence ledger, exactly like licences.
 alter table public.licence_payments drop constraint if exists licence_payments_product_check;
 alter table public.licence_payments add constraint licence_payments_product_check
-  check (product in ('one', 'two', 'upgrade', 'tracker', 'tracker_second_device'));
+  check (product in ('one', 'two', 'upgrade', 'tracker_base', 'tracker_addon', 'tracker_full'));
 
 -- 2) Per-worker auto-send preferences. worker_enc = AES-GCM sealed
 --    { replyTo, name } (TRACKER_DATA_KEY, server-side).
@@ -78,7 +78,7 @@ create table if not exists public.tracker_send_log (
 create index if not exists tracker_send_log_sub_idx on public.tracker_send_log (google_sub, created_at desc);
 alter table public.tracker_send_log enable row level security;
 
--- 5b) Tracker device seats: 1 with the A$99 unlock, 2 with the A$29 second-device add-on.
+-- 5b) Tracker device seats: 1 with base (A$49), 2 with base + add-on (A$29) or the full package (A$99).
 create table if not exists public.tracker_devices (
   google_sub text not null,
   device_id uuid not null,

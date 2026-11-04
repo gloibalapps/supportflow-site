@@ -4338,8 +4338,8 @@ const markPaid = (data, id, { paidAt, amountPaid }) => ({
 });
 
 /* ---------------- Payment tracker access (paywall) ----------------
-   Unlocked = the server says this Google account has a paid "tracker"
-   row, plus a seat for this device (1, or 2 with the A$29 add-on) (written only by the Stripe webhook). The last answer is
+   Unlocked = the server says this Google account has a paid tracker_base
+   or tracker_full row, plus a seat for this device (1 with base; 2 with base + A$29 add-on or full) (written only by the Stripe webhook). The last answer is
    cached so the screens work offline. Server-side auto-send re-checks the
    unlock itself, so editing this cache can't send anything. */
 function useTrackerAccess() {
@@ -4411,9 +4411,9 @@ function useTrackerAccess() {
 }
 
 function TrackerUpsell({ access, owed, count, go }) {
-  // A$99 unlock first; the A$29 second-device add-on only once that's paid
-  // (or when this device is over the one-device limit).
-  const offer = (access.cfg?.offer || []).filter((o) => (o.available || access.preview) && (access.paid ? o.id === "tracker_second_device" : o.id === "tracker"));
+  // Not paid: base (one computer) or the full package. Base owners: only the
+  // $29 second-computer add-on (gated server-side like the licence upgrade).
+  const offer = (access.cfg?.offer || []).filter((o) => (o.available || access.preview) && (access.paid ? o.id === "tracker_addon" : o.id !== "tracker_addon"));
   return (
     <div className="panel" style={{ borderColor: "var(--brass)" }}>
       <div className="eyebrow" style={{ color: "var(--brass)" }}>Payment tracker · paid add-on</div>
@@ -4431,10 +4431,10 @@ function TrackerUpsell({ access, owed, count, go }) {
           {access.cfg?.clientId ? <LicenceGoogleButton clientId={access.cfg.clientId} onCredential={access.signIn} /> : <div style={{ fontSize: 12.5, color: "var(--tx-3)" }}>Sign-in isn't available right now.</div>}
         </div>
       )}
-      {access.phase === "locked" && access.deviceLimit && <div style={{ fontSize: 13, marginTop: 12 }}>Your Payment tracker is already in use on your other device. Add this one too:</div>}
+      {access.phase === "locked" && access.deviceLimit && <div style={{ fontSize: 13, marginTop: 12 }}>Your Payment tracker is already in use on your other computer. Add this one for A$29:</div>}
       {access.phase === "locked" && (offer.length ? offer.map((o) => (
         <button key={o.id} className="btn" style={{ width: "100%", marginTop: 10, minHeight: 48 }} disabled={!!access.busy} onClick={() => access.buy(o.id)}>
-          {access.busy === o.id ? "One moment..." : o.id === "tracker" ? `Unlock on this device · A$${o.priceAud} once` : `Add a second device (PC + phone) · A$${o.priceAud} once`}
+          {access.busy === o.id ? "One moment..." : `${o.label} · A$${o.priceAud} once`}
         </button>
       )) : <div style={{ fontSize: 12.5, color: "var(--tx-3)", marginTop: 12 }}>The Payment tracker isn't on sale yet.</div>)}
       {access.phase === "offline" && <div style={{ fontSize: 12.5, color: "var(--warn)", marginTop: 12 }}>Connect to the internet to unlock the Payment tracker.</div>}

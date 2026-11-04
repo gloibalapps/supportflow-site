@@ -3,7 +3,7 @@
 //   GET  ?action=config                       -> { offer, clientId, autosendServer, vapidPublicKey }
 //   POST { action: "signin",   idToken, deviceId }            Google sign-in (works with licensing off)
 //   POST { action: "status",   session, deviceId }            -> { unlocked, product, prefs }
-//   POST { action: "checkout", session, deviceId, product }   -> { url }  (tracker | tracker_second_device)
+//   POST { action: "checkout", session, deviceId, product }   -> { url }  (tracker_base | tracker_addon | tracker_full)
 //   POST { action: "sync",     session, deviceId, prefs, records[] }   needs unlock
 //   POST { action: "forget",   session, deviceId }            turn auto-send off and delete synced records
 //   POST { action: "log",      session, deviceId }            -> { log: [...] } this worker's send log
@@ -38,9 +38,12 @@ async function checkout(session, deviceId, body) {
   const price = process.env[TRACKER_PRODUCTS[product].env];
   if (!price) return json({ error: "That option isn't available yet." }, 500);
   const have = await trackerUnlock(session.sub);
-  if (product === "tracker" && have) return json({ error: "Payment tracker is already unlocked on this Google account." }, 409);
-  if (product === "tracker_second_device" && !have) return json({ error: "Unlock the Payment tracker first, then add a second device." }, 409);
-  if (product === "tracker_second_device" && have.secondDevice) return json({ error: "This account already covers two devices." }, 409);
+  // Gated like the licence $29 upgrade: the add-on is only for base owners.
+  if (product === "tracker_addon" && (!have || have.full || have.addon)) {
+    return json({ error: !have ? "The $29 add-on is for Payment tracker owners. Buy the tracker first." : "This account already covers two computers." }, 409);
+  }
+  if (product !== "tracker_addon" && have?.full) return json({ error: "This account already has the full package." }, 409);
+  if (product === "tracker_base" && have) return json({ error: "Payment tracker is already unlocked. Add a second computer for $29 instead.", addon: true }, 409);
   const meta = { kind: "tracker", product, google_sub: session.sub, device_id: deviceId };
   const params = {
     mode: "payment",
