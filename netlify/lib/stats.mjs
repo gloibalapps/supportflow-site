@@ -213,7 +213,8 @@ export async function stripeStats({ days = 30 } = {}) {
 
 /* ---------------- Website visits (site_visits) ---------------- */
 export async function visitorStats({ days = 30 } = {}) {
-  const since = new Date(Date.now() - (days - 1) * DAY).toISOString().slice(0, 10);
+  const adl = (t) => new Intl.DateTimeFormat("en-CA", { timeZone: "Australia/Adelaide" }).format(new Date(t)); // visits are bucketed by Adelaide day
+  const since = adl(Date.now() - (days - 1) * DAY);
   let v;
   if (process.env.VISITS_FIXTURE) v = JSON.parse(fs.readFileSync(process.env.VISITS_FIXTURE, "utf8")).filter((r) => r.day >= since);
   else {
@@ -229,14 +230,14 @@ export async function visitorStats({ days = 30 } = {}) {
       if (page.length < 1000) break;
     }
   }
-  const today = new Date().toISOString().slice(0, 10);
-  const d7 = new Date(Date.now() - 6 * DAY).toISOString().slice(0, 10);
+  const today = adl(Date.now());
+  const d7 = adl(Date.now() - 6 * DAY);
   // visitor_hash is per-day, so "unique" = sum of daily uniques (visitor-days).
   const uniq = (rows) => new Set(rows.map((r) => r.day + r.visitor_hash)).size;
   const top = (rows, f, n = 8) => Object.entries(rows.reduce((m, r) => { const key = f(r); if (key) m[key] = (m[key] || 0) + 1; return m; }, {})).sort((a, b) => b[1] - a[1]).slice(0, n);
   const t = v.filter((r) => r.day === today), w = v.filter((r) => r.day >= d7);
   const trend = [];
-  for (let i = days - 1; i >= 0; i--) { const day = new Date(Date.now() - i * DAY).toISOString().slice(0, 10); const rs = v.filter((r) => r.day === day); trend.push({ day, visits: rs.length, unique: uniq(rs) }); }
+  for (let i = days - 1; i >= 0; i--) { const day = adl(Date.now() - i * DAY); const rs = v.filter((r) => r.day === day); trend.push({ day, visits: rs.length, unique: uniq(rs) }); }
   return {
     today: { visits: t.length, unique: uniq(t) }, d7: { visits: w.length, unique: uniq(w) }, d30: { visits: v.length, unique: uniq(v) },
     topPages: top(v, (r) => r.path),

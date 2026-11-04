@@ -1,5 +1,5 @@
 // Privacy-safe page-visit counter. Stores no IP, no user agent, no cookies.
-// visitor_hash = SHA-256(VISIT_SALT + UTC date + IP + UA): unique per day only,
+// visitor_hash = SHA-256(VISIT_SALT + Adelaide date + IP + UA): unique per day only,
 // unlinkable across days. Country/region come from Netlify geo (context.geo).
 import crypto from "node:crypto";
 
@@ -17,7 +17,7 @@ export default async (req, context) => {
   const path = String(b.p || "/").replace(/[^A-Za-z0-9_./-]/g, "").slice(0, 120) || "/";
   if (/^\/(admin|signups|market|\.netlify)/.test(path)) return ok();
   const ip = context?.ip || req.headers.get("x-nf-client-connection-ip") || "";
-  const day = new Date().toISOString().slice(0, 10);
+  const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Australia/Adelaide" }).format(new Date()); // YYYY-MM-DD, Adelaide
   const row = {
     day, path,
     visitor_hash: crypto.createHash("sha256").update(`${salt}|${day}|${ip}|${ua}`).digest("hex"),
