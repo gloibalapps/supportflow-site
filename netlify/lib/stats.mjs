@@ -110,3 +110,77 @@ export async function dashboardStats({ days = 30 } = {}) {
   }
   return out;
 }
+
+/* ---------------- Stripe (read-only GETs) ----------------
+   Uses STRIPE_SECRET_KEY (same var as create-checkout / webhook). Only GET
+   requests are made. The Stripe account predates SupportFlow, so charges are
+   limited to those created on/after STRIPE_STATS_SINCE (else LAUNCH_DATE,
+   else the last 90 days). Local dev: STRIPE_FIXTURE=/path/to/json. */
+export function stripeConfigured() {
+  return !!(process.env.STRIPE_FIXTURE || process.env.STRIPE_SECRET_KEY);
+}
+async function stripeGet(path, params = {}) {
+  const qs = new URLSearchParams(params).toString();
+  const r = await fetch(`https://api.stripe.com/v1/${path}${qs ? "?" + qs : ""}`, {
+    headers: { Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}` },
+  });
+  if (!r.ok) throw new Error(`Stripe GET ${path} ${r.status}`);
+  return r.json();
+}
+export async function stripeStats({ days = 30 } = {}) {
+  const sinceIso = process.env.STRIPE_STATS_SINCE || process.env.LAUNCH_DATE || new Date(Date.now() - 90 * DAY).toISOString();
+  const since = Math.floor(Date.parse(sinceIso) / 1000);
+  let charges, payouts, balance;
+  if (process.env.STRIPE_FIXTURE) {
+    const f = JSON.parse(fs.readFileSync(process.env.STRIPE_FIXTURE, "utf8"));
+    charges = f.charges.filter((c) => c.created >= since); payouts = f.payouts; balance = f.balance;
+  } else {
+    charges = [];
+    let after;
+    for (let page = 0; page < 20; page++) {
+      const p = { limit: 100, "created[gte]": since, "expand[]": "data.balance_transaction" };
+      if (after) p.starting_after = after;
+      const res = await stripeGet("charges", p);
+      charges.push(...res.data);
+      if (!res.has_more) break;
+      after = res.data.at(-1).id;
+    }
+    [payouts, balance] = await Promise.all([stripeGet("payouts", { limit: 5 }).then((r) => r.data), stripeGet("balance")]);
+  }
+  const ok = charges.filter((c) => c.status === "succeeded" && c.paid);
+  const cents = (n) => +(n / 100).toFixed(2);
+  const gross = ok.reduce((s, c) => s + c.amount, 0);
+  const refunds = ok.reduce((s, c) => s + (c.amount_refunded || 0), 0);
+  const haveFees = ok.length > 0 && ok.every((c) => c.balance_transaction && typeof c.balance_transaction === "object");
+  const fees = haveFees ? ok.reduce((s, c) => s + (c.balance_transaction.fee || 0), 0) : null;
+  const today = new Date(new Date().toISOString().slice(0, 10)).getTime();
+  const trend = [];
+  for (let i = days - 1; i >= 0; i--) trend.push({ day: new Date(today - i * DAY).toISOString().slice(0, 10), revenue: 0, count: 0 });
+  const idx = Object.fromEntries(trend.map((t, i) => [t.day, i]));
+  for (const c of ok) {
+    const i = idx[new Date(c.created * 1000).toISOString().slice(0, 10)];
+    if (i !== undefined) { trend[i].revenue = cents(trend[i].revenue * 100 + c.amount - (c.amount_refunded || 0)); trend[i].count++; }
+  }
+  const sum = (arr) => cents((arr || []).filter((b) => b.currency === "aud").reduce((s, b) => s + b.amount, 0));
+  return {
+    since: new Date(since * 1000).toISOString(),
+    currency: "aud",
+    successfulPayments: ok.length,
+    failedPayments: charges.filter((c) => c.status === "failed").length,
+    grossAud: cents(gross),
+    refundsAud: cents(refunds),
+    refundedCount: ok.filter((c) => c.amount_refunded > 0).length,
+    disputes: ok.filter((c) => c.disputed).length,
+    feesAud: fees === null ? null : cents(fees),
+    netAud: cents(gross - refunds - (fees || 0)),
+    netBasis: fees === null ? "gross − refunds (fees not loaded)" : "gross − refunds − Stripe fees",
+    trend,
+    recent: charges.slice(0, 10).map((c) => ({
+      at: new Date(c.created * 1000).toISOString(), amountAud: cents(c.amount), status: c.status,
+      refundedAud: cents(c.amount_refunded || 0), disputed: !!c.disputed,
+      who: maskEmail(c.billing_details?.email || c.receipt_email),
+    })),
+    payouts: (payouts || []).slice(0, 5).map((p) => ({ amountAud: cents(p.amount), status: p.status, arrival: new Date(p.arrival_date * 1000).toISOString().slice(0, 10) })),
+    balance: { availableAud: sum(balance?.available), pendingAud: sum(balance?.pending) },
+  };
+}
