@@ -38,12 +38,19 @@ export function maskEmail(e) {
 
 /** Public, aggregate-only numbers. No personal data. */
 export async function publicStats() {
-  const lic = await rows("licences", "status");
-  const sig = await rows("signup_attribution", "device_ref");
+  // Licences sold = paid, non-refunded Stripe licence charges since
+  // STRIPE_STATS_SINCE; falls back to active Supabase licences.
+  let stripeSold = null;
+  if (stripeConfigured()) {
+    try { stripeSold = (await stripeStats({ days: 7 })).licenceSales.count; } catch { stripeSold = null; }
+  }
+  const lic = statsConfigured() ? await rows("licences", "status").catch(() => null) : null;
+  const sig = statsConfigured() ? await rows("signup_attribution", "device_ref").catch(() => null) : null;
   const min = Number(process.env.PUBLIC_STATS_MIN || 0);
   const show = (n) => (Number.isFinite(n) && n >= min ? n : null);
   return {
-    licencesSold: lic ? show(lic.filter((l) => l.status === "active").length) : null,
+    licencesSold: stripeSold !== null ? show(stripeSold) : lic ? show(lic.filter((l) => l.status === "active").length) : null,
+    licencesSoldSource: stripeSold !== null ? "stripe" : lic ? "supabase" : null,
     appOpens: sig ? show(sig.length) : null,
     // Config-driven: set LAUNCH_DATE (ISO, e.g. 2026-10-11) to show the live timer.
     launchDate: process.env.LAUNCH_DATE || null,
