@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.2" baseProfile="tiny-ps" viewBox="0 0 512 512">
+  <title>SupportFlow</title>
+  <rect width="512" height="512" fill="#ffffff"/>
+  <path d="M 344 118 C 344 118, 300 90, 232 90 C 152 90, 100 132, 100 190 C 100 244, 142 272, 214 284 L 298 298 C 350 306, 380 328, 380 366 C 380 412, 336 442, 264 442 C 190 442, 148 414, 148 414" fill="none" stroke="#D4A03D" stroke-width="72" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
