@@ -779,7 +779,7 @@ The Payment tracker lives at **Money → Payment tracker**. It shows who owes yo
 - **A$49 once:** the tracker on one computer.
 - **A$69 once:** the tracker on two computers.
 - **A$29 once:** upgrade from the A$49 plan to add a second computer. Only for owners of the A$49 one-computer tracker.
-- **A$99 once:** the complete package. The tracker on two computers, plus tracker upgrades for 12 months from the date you buy. No subscription.
+- **A$99 once:** the Premium package: everything in Basic (invoices, shifts, notes, kilometres, expenses and tax), a two-device license and the Payment tracker. No subscription. Upgrades are not included.
 
 The optional SMS pack below is the **only paid add-on**, and it is **separate**. It is not included in the A$99 package or any other tracker purchase.
 

@@ -10,8 +10,8 @@
 //   STRIPE_PRICE_TRACKER_TWO    A$69 one-off, tracker on two computers
 //   STRIPE_PRICE_TRACKER_ADDON  A$29 one-off, upgrade from the A$49 plan to add a second
 //                               computer; ONLY for existing BASE holders (gated server-side)
-//   STRIPE_PRICE_TRACKER_FULL   A$99 one-off, complete package: tracker on two computers
-//                               plus tracker upgrades for 12 months from purchase
+//   STRIPE_PRICE_TRACKER_FULL   A$99 one-off, Premium package: everything in Basic, two-device
+//                               license, Payment tracker (SMS not included)
 //   STRIPE_PRICE_TRACKER_SMS    A$4.99 / month RECURRING (checkout mode=subscription):
 //                               50 SMS alerts per billing period, to the worker only.
 //                               The only paid add-on; NOT included in the A$99 package.
@@ -23,7 +23,7 @@ export const TRACKER_PRODUCTS = Object.freeze({
   tracker_base: { env: "STRIPE_PRICE_TRACKER_BASE", labelEnv: "TRACKER_BASE_LABEL", audEnv: "TRACKER_BASE_AUD", label: "Payment tracker, one computer", aud: 49, devices: 1 },
   tracker_two: { env: "STRIPE_PRICE_TRACKER_TWO", labelEnv: "TRACKER_TWO_LABEL", audEnv: "TRACKER_TWO_AUD", label: "Payment tracker, two computers", aud: 69, devices: 2 },
   tracker_addon: { env: "STRIPE_PRICE_TRACKER_ADDON", labelEnv: "TRACKER_ADDON_LABEL", audEnv: "TRACKER_ADDON_AUD", label: "Upgrade: add a second computer", aud: 29, devices: 2, requires: "tracker_base" },
-  tracker_full: { env: "STRIPE_PRICE_TRACKER_FULL", labelEnv: "TRACKER_FULL_LABEL", audEnv: "TRACKER_FULL_AUD", label: "Complete package, incl. 12 months of upgrades", aud: 99, devices: 2, upgradeMonths: 12 },
+  tracker_full: { env: "STRIPE_PRICE_TRACKER_FULL", labelEnv: "TRACKER_FULL_LABEL", audEnv: "TRACKER_FULL_AUD", label: "Premium package", aud: 99, devices: 2, items: ["Everything in Basic (invoices, shifts, notes, kilometres, expenses and tax)", "Two-device license", "Payment tracker", "SMS notification \u2014 optional (A$4.99 a month for 50 texts, not included in A$99)"] },
   tracker_sms: { env: "STRIPE_PRICE_TRACKER_SMS", labelEnv: "TRACKER_SMS_LABEL", audEnv: "TRACKER_SMS_AUD", label: "SMS alerts, 50 texts a month", aud: 4.99, recurring: "month", requires: "tracker" },
 });
 export const isTrackerProduct = (p) => Object.prototype.hasOwnProperty.call(TRACKER_PRODUCTS, p);
@@ -35,12 +35,13 @@ export function trackerOffer() {
     priceAud: Number(process.env[p.audEnv]) || p.aud,
     devices: p.devices || 0,
     recurring: p.recurring || null,
+    items: p.items || null,
     available: !!process.env[p.env],
   }));
 }
 
 const q = encodeURIComponent;
-// { product: "tracker_full"|"tracker_two"|"tracker_base", devices: 1|2, addon, full, upgradesUntil } or null when not unlocked.
+// { product: "tracker_full"|"tracker_two"|"tracker_base", devices: 1|2, addon, full } or null when not unlocked.
 export async function trackerUnlock(sub) {
   if (!sub) return null;
   // tracker_sms is a subscription, kept in tracker_sms_subscriptions, never here.
@@ -48,10 +49,7 @@ export async function trackerUnlock(sub) {
   const has = (p) => rows.some((r) => r.product === p);
   const fullRow = rows.find((r) => r.product === "tracker_full");
   if (fullRow) {
-    // A$99 includes tracker upgrades for 12 months from purchase (not lifetime).
-    const until = fullRow.created_at ? new Date(fullRow.created_at) : null;
-    if (until) until.setUTCMonth(until.getUTCMonth() + 12);
-    return { product: "tracker_full", devices: 2, full: true, addon: has("tracker_addon"), upgradesUntil: until ? until.toISOString() : null };
+    return { product: "tracker_full", devices: 2, full: true, addon: has("tracker_addon") };
   }
   if (has("tracker_two")) return { product: "tracker_two", devices: 2, full: false, addon: false };
   if (!has("tracker_base")) return null; // the A$29 add-on alone unlocks nothing

@@ -61,12 +61,12 @@ STRICT RULES:
   section 14a, and the in-app manual section "Payment tracker, SMS alerts and notifications"). Use only
   the steps in that content. The ONLY tracker prices you may quote are: A$49 for the tracker on one computer;
   A$69 for the tracker on two computers; A$29 to upgrade the A$49 plan to add a second computer (only for
-  A$49 owners); A$99 for the complete package (tracker on two computers plus tracker upgrades for 12 months
-  from purchase, no subscription); and the optional SMS pack, A$4.99 a month for 50 texts, which is the only
+  A$49 owners); A$99 for the Premium package (everything in Basic, a two-device license and the
+  Payment tracker, one-off, no subscription, no upgrades included); and the optional SMS pack, A$4.99 a month for 50 texts, which is the only
   paid add-on and is NOT included in the A$99 package. Never quote, estimate, compare, add up or calculate
   any other price, per-text cost or saving, even if older content mentions one; if asked about any other
   price, say to check the in-app purchase screen. Never describe any option as lifetime, unlimited or
-  forever, and never promise upgrades beyond the 12 months included with A$99. Always say the SMS pack is
+  forever, and never promise upgrades or updates with any option, including A$99. Always say the SMS pack is
   optional and separate, and texts only go to the worker's own verified mobile. Say push delivery isn't
   guaranteed and doesn't work in a plain iPhone Safari tab.
   Use [[OPEN:tracker]] for Payment tracker screens.`;

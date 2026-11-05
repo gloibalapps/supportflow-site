@@ -33,7 +33,9 @@ as("tracker_two"); assert.equal((await T.trackerUnlock("u1")).devices, 2);
 as("tracker_base"); assert.equal((await T.trackerUnlock("u1")).devices, 1);
 as("tracker_base", "tracker_addon"); assert.equal((await T.trackerUnlock("u1")).devices, 2);
 as("tracker_addon"); assert.equal(await T.trackerUnlock("u1"), null);
-as("tracker_full"); const f = await T.trackerUnlock("u1"); assert.equal(f.devices, 2); assert.equal(f.upgradesUntil, "2027-11-05T00:00:00.000Z");
+as("tracker_full"); const f = await T.trackerUnlock("u1"); assert.equal(f.devices, 2); assert.deepEqual(Object.keys(f).sort(), ["addon", "devices", "full", "product"]);
+assert.deepEqual(T.trackerOffer().find((o) => o.id === "tracker_full").items, ["Everything in Basic (invoices, shifts, notes, kilometres, expenses and tax)", "Two-device license", "Payment tracker", "SMS notification \u2014 optional (A$4.99 a month for 50 texts, not included in A$99)"]);
+assert.doesNotMatch(JSON.stringify(T.trackerOffer()), /upgrades|12 months/i);
 // checkout
 as(); assert.deepEqual(await buy("tracker_base"), { status: 200, price: "p_base" });
 as(); assert.deepEqual(await buy("tracker_two"), { status: 200, price: "p_two" });

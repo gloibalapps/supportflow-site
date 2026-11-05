@@ -49,7 +49,7 @@ async function checkout(session, deviceId, body) {
   if (product === "tracker_addon" && (!have || have.product !== "tracker_base" || have.addon)) {
     return json({ error: !have ? "The A$29 upgrade is for A$49 Payment tracker owners. Buy the tracker first." : "This account already covers two computers." }, 409);
   }
-  if (!isSub && product !== "tracker_addon" && have?.full) return json({ error: "This account already has the complete package." }, 409);
+  if (!isSub && product !== "tracker_addon" && have?.full) return json({ error: "This account already has the Premium package." }, 409);
   if ((product === "tracker_base" || product === "tracker_two") && have) {
     if (have.devices >= 2) return json({ error: "This account already covers two computers." }, 409);
     return json({ error: "Payment tracker is already unlocked. Add a second computer with the A$29 upgrade instead.", addon: true }, 409);
