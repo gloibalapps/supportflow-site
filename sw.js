@@ -1,6 +1,6 @@
 /* SupportFlow™ — service worker
    Bump CACHE when you deploy, or testers will keep the old build. */
-const CACHE = 'supportflow-v29-followups-automated';
+const CACHE = 'supportflow-v30-followups-recipients';
 
 // Everything needed to open the app with no network at all.
 const CORE = [
