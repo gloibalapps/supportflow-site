@@ -2753,7 +2753,14 @@ function App() {
   // Device licensing. phase "off" (switch off) leaves everything as before.
   const licence = useLicence();
   const trackerAccess = useTrackerAccess();
-  const [theme, setTheme] = useState("dark");
+  const [savedTheme, setTheme] = useState("system"); // "system" | "light" | "dark"
+  const [sysLight, setSysLight] = useState(() => { try { return !!window.matchMedia?.("(prefers-color-scheme: light)").matches; } catch (e) { return false; } });
+  useEffect(() => {
+    const mq = window.matchMedia?.("(prefers-color-scheme: light)"); if (!mq) return;
+    const on = (e) => setSysLight(e.matches);
+    mq.addEventListener ? mq.addEventListener("change", on) : mq.addListener(on);
+    return () => { mq.removeEventListener ? mq.removeEventListener("change", on) : mq.removeListener(on); };
+  }, []);
   const [tab, setTab] = useState("home");
   const [sumTab, setSumTab] = useState("invoices");   // invoices | expenses | position | bas
   const [invTab, setInvTab] = useState("shifts");     // shifts | travel | notes
@@ -2804,6 +2811,8 @@ function App() {
   const [creditsExpired, setCreditsExpired] = useState(false);
   // Lifetime licence (A$49 once): check-status returns lifetime:true. Never expires, never needs a top-up.
   const [isLifetime, setLifetime] = useState(false);
+  // Theme: "system" (default, follows prefers-color-scheme live) or a saved light/dark override. Same for everyone.
+  const theme = savedTheme === "system" ? (sysLight ? "light" : "dark") : savedTheme;
   const [creditExpiresIn, setCreditExpiresIn] = useState(null); // days remaining
   const [freeOffer, setFreeOffer] = useState(null); // new-user offer {remaining, daysLeft}
   const [statusKnown, setStatusKnown] = useState(false);
@@ -2990,13 +2999,11 @@ function App() {
           setTab("welcome"); // nothing stored at all, brand new
         }
       } catch (e) { }
-      // Follow the phone's own light/dark setting until the person picks a
-      // theme themselves. Once they choose, that saved choice wins and the
-      // system setting is ignored, changing it in Settings should stick.
+      // Default "system" follows the phone's light/dark setting live; a saved
+      // "light"/"dark" override wins and sticks across reloads.
       try {
         const t = await storage.get("ndis:theme");
-        if (t?.value) setTheme(t.value);
-        else if (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches) setTheme("light");
+        setTheme(t?.value === "light" || t?.value === "dark" ? t.value : "system");
       } catch (e) { }
       setLoaded(true);
     })();
@@ -3014,11 +3021,15 @@ function App() {
     try { await storage.set("ndis:data", JSON.stringify(next)); } catch (e) { console.error(e); }
     if (!skipAutoBackup && next.onboarded) scheduleGoogleAutoBackup(next);
   };
-  const flip = async () => {
-    const n = theme === "dark" ? "light" : "dark";
+  // Everyone: pick "system" | "light" | "dark" (saved as ndis:theme; missing = system).
+  const setThemePref = async (n) => {
+    if (!["system", "light", "dark"].includes(n)) return;
     setTheme(n);
     try { await storage.set("ndis:theme", n); } catch (e) { }
   };
+  const THEME_LABEL = { system: "System", light: "Light", dark: "Dark" };
+  const cycleTheme = () => setThemePref({ system: "light", light: "dark", dark: "system" }[savedTheme] || "system");
+
 
   const m = useMemo(() => {
     const inv = data.invoices.filter((i) => inFY(i.date, fy));
@@ -3466,8 +3477,8 @@ function App() {
                   </button>
                   <button onClick={() => { setMenuOpen(false); setOpenPane(null); go("settings"); }}>Settings</button>
                   <button onClick={() => { setMenuOpen(false); setOpenPane("privacy-security"); go("settings"); }}>Privacy &amp; security</button>
-                  <button onClick={() => { setMenuOpen(false); flip(); }}>
-                    {theme === "dark" ? "Light mode" : "Dark mode"}
+                  <button aria-label="Theme" onClick={() => cycleTheme()}>
+                    Theme: {THEME_LABEL[savedTheme] || "System"}
                   </button>
                   {!!readLock() && (
                     <button onClick={() => { setMenuOpen(false); setLocked(true); }}>Lock now</button>
@@ -3634,7 +3645,7 @@ function App() {
         {tab === "setup" && <Onboarding data={data} save={save} close={() => go("home")} help={() => go("settings")}
           openPrivacy={() => { setOpenPane("privacy"); go("settings"); }} startStep={firstIncompleteStep(data)} />}
 
-        {tab === "settings" && <Settings data={data} save={save} theme={theme} flip={flip} wipeAll={wipeAll} rerun={() => setTab("setup")} startPane={openPane || "settings"} helpInitialView={helpInitialView} />}
+        {tab === "settings" && <Settings data={data} save={save} theme={theme} themePref={savedTheme} setThemePref={setThemePref} wipeAll={wipeAll} rerun={() => setTab("setup")} startPane={openPane || "settings"} helpInitialView={helpInitialView} />}
       </div>
 
       <div className="mob">
@@ -9960,7 +9971,7 @@ function PaymentDetailsFields({ p, setP }) {
   );
 }
 
-function Settings({ data, save, theme, flip, wipeAll, rerun, startPane, helpInitialView }) {
+function Settings({ data, save, theme, themePref, setThemePref, wipeAll, rerun, startPane, helpInitialView }) {
   const [pane, setPane] = useState(startPane || "settings");
   const licence = React.useContext(LicenceContext);
   // The menu can ask for a different pane while Settings is already open.
@@ -10073,9 +10084,14 @@ function Settings({ data, save, theme, flip, wipeAll, rerun, startPane, helpInit
         {openSection === "appearance" && (
           <>
             <div style={{ fontSize: 12, color: "var(--tx-3)", marginBottom: 14 }}>
-              Following your phone's setting unless you pick one here. Currently {theme}.
+              {themePref === "system" ? `System follows your phone's setting (currently ${theme}).` : `Always ${themePref}, whatever your phone is set to.`}
             </div>
-            <button className="btn" onClick={flip}>Switch to {theme === "dark" ? "light" : "dark"} mode</button>
+            <div role="radiogroup" aria-label="Theme" style={{ display: "inline-flex", border: "1px solid var(--line)", borderRadius: 999, overflow: "hidden" }}>
+                {[["system", "System"], ["light", "Light"], ["dark", "Dark"]].map(([k, l]) => (
+                  <button key={k} role="radio" aria-checked={themePref === k} className={"btn tiny" + (themePref === k ? "" : " ghost")}
+                    style={{ borderRadius: 0, border: 0 }} onClick={() => setThemePref(k)}>{l}</button>
+                ))}
+              </div>
           </>
         )}
       </div>
