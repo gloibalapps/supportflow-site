@@ -430,8 +430,45 @@
     <p class="tag rise">Your support work, organised in one place.</p>
     <div class="hero-features rise">Invoices &bull; Shifts &bull; Notes &bull; Kilometres &bull; Expenses &bull; Tax</div>
     <div class="hero-trust rise">Private by design &bull; Works offline</div>
-    <div class="actions rise"><a class="btn" href="./app">Open SupportFlow</a></div>
+    <div class="actions rise"><a class="btn" href="./app">Try it free &mdash; Open SupportFlow</a></div>
+    <p class="try-free rise"><b>Try it for free:</b> 5 invoices free for 30 days. No card needed.</p>
   </main>
+</section>
+
+<section id="plans" class="plans" aria-labelledby="plans-title">
+  <style>
+    .try-free{margin:14px 0 0;font-size:14px;color:var(--muted)}
+    .try-free b{color:var(--brass-lift);font-weight:650}
+    .plans{max-width:1120px;margin:0 auto;padding:clamp(36px,5vw,64px) clamp(20px,3.6vw,40px) 0}
+    .plans h2{font-family:'Fraunces',Georgia,serif;font-weight:400;font-size:clamp(28px,3.6vw,40px);margin:0 0 6px;text-align:center}
+    .plans .sub{text-align:center;color:var(--muted);margin:0 0 clamp(22px,3vw,34px);font-size:15px}
+    .plans .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:clamp(14px,2.4vw,24px);max-width:820px;margin:0 auto}
+    .plan{border:1px solid var(--line);border-radius:18px;padding:26px 24px;background:linear-gradient(180deg,var(--ink-2,#1A1C15),var(--ink));display:flex;flex-direction:column;gap:12px}
+    .plan.feat{border-color:rgba(224,168,63,.55);box-shadow:0 10px 36px rgba(200,145,58,.14)}
+    .plan .name{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--brass)}
+    .plan .price{font-family:'Fraunces',Georgia,serif;font-size:44px;line-height:1;color:var(--brass-lift)}
+    .plan .price small{font-family:inherit;font-size:14px;color:var(--muted)}
+    .plan ul{margin:0;padding-left:18px;color:var(--muted);font-size:14.5px;line-height:1.7;flex:1}
+    .plan .btn{text-align:center}
+    .plans .fine{text-align:center;color:var(--muted);font-size:13px;margin-top:16px}
+  </style>
+  <h2 id="plans-title">Simple, one-off pricing</h2>
+  <p class="sub">Start with 5 free invoices for 30 days. Upgrade when you're ready. No subscription.</p>
+  <div class="grid">
+    <div class="plan">
+      <div class="name">Basic</div>
+      <div class="price">A$49 <small>one-off</small></div>
+      <ul><li>SupportFlow on one device</li><li>Invoices, shifts, notes, kilometres, expenses and tax</li><li>Works offline, private by design</li></ul>
+      <a class="btn" href="./app">Get Basic &mdash; A$49</a>
+    </div>
+    <div class="plan feat">
+      <div class="name">Complete</div>
+      <div class="price">A$99 <small>one-off</small></div>
+      <ul><li>Everything in Basic, on two computers</li><li>Payment tracker</li><li>Payment tracker upgrades for 12 months from purchase</li></ul>
+      <a class="btn" href="./app">Get Complete &mdash; A$99</a>
+    </div>
+  </div>
+  <p class="fine">Prices in Australian dollars, GST inclusive where applicable. Your rights under the Australian Consumer Law are not affected.</p>
 </section>
 
 <!-- Live stats strip. Fed by /.netlify/functions/public-stats (aggregate-only).
