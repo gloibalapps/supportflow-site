@@ -841,7 +841,7 @@ function LicencePlans({ onBuy, busy }) {
     </div>
   );
   return <div style={{ width: "100%", maxWidth: 420 }}>
-    {card("one", "One device", 49, "One device at a time.",
+    {card("one", "One device", 79, "One device at a time.",
       ["Use SupportFlow on one phone, tablet or computer", "Move it to a new device whenever you like", "Upgrade to Phone and computer later for $29", "No subscription, no monthly fees"],
       ["Not signed in on two devices at the same time"])}
     {card("two", "Phone and computer", 69, "Phone and computer signed in together.",
@@ -2552,7 +2552,7 @@ function UpgradeChooser({ licence }) {
         </button>
         {plan === 2 && <div style={{ fontSize: 12, color: "var(--tx-3)", marginBottom: 10 }}>Your licence already covers two devices.</div>}
         <button className="btn" style={{ width: "100%", minHeight: 48, marginBottom: 10 }} disabled={!!busy || licence.offline} onClick={premium}>
-          {busy === "premium" ? "Opening checkout\u2026" : "Upgrade to Premium \u2014 A$99"}
+          {busy === "premium" ? "Opening checkout\u2026" : "Upgrade to Premium \u2014 A$149"}
         </button>
         <div style={{ fontSize: 12, color: "var(--tx-3)", lineHeight: 1.6, marginBottom: 10 }}>Premium adds the Payment tracker and two licenses.</div>
       </>}
@@ -2585,7 +2585,7 @@ function OfferOrUpgradeBanner({ paid, freeOffer, known }) {
   if (!due) return null;
   return <div role="status" style={box}>
     <div style={{ flex: 1 }}><b style={{ color: "#E8C171" }}>Keep invoicing with SupportFlow</b><br />
-      Basic A$49 one-off, or Premium A$99 (everything in Basic, two-device license, Payment tracker; SMS notification optional, A$4.99 a month for 50 texts, not included in A$99).</div>
+      Basic A$79 one-off, or Premium A$149 (everything in Basic, two-device license, Payment tracker; SMS notification optional, A$4.99 a month for 50 texts, not included in A$149).</div>
     <a className="btn" href={BUY_URL} style={{ whiteSpace: "nowrap" }}>See plans</a>
     <button style={btn} onClick={() => hide(true)}>Remind me later</button>
   </div>;
@@ -4405,7 +4405,7 @@ const markPaid = (data, id, { paidAt, amountPaid }) => ({
 
 /* ---------------- Payment tracker access (paywall) ----------------
    Unlocked = the server says this Google account has a paid tracker_base,
-   tracker_two or tracker_full row, plus a seat for this device (1 with A$49 base; 2 with A$69 two-computer, A$49 + A$29 upgrade, or A$99 Premium) (written only by the Stripe webhook). The last answer is
+   tracker_two or tracker_full row, plus a seat for this device (1 with A$49 base; 2 with A$69 two-computer, A$49 + A$29 upgrade, or A$149 Premium) (written only by the Stripe webhook). The last answer is
    cached so the screens work offline. Server-side auto-send re-checks the
    unlock itself, so editing this cache can't send anything. */
 function useTrackerAccess() {
@@ -4477,7 +4477,7 @@ function useTrackerAccess() {
 }
 
 function TrackerUpsell({ access, owed, count, go }) {
-  // Not paid: A$49 one computer, A$69 two computers or the A$99 Premium package.
+  // Not paid: A$49 one computer, A$69 two computers or the A$149 Premium package.
   // A$49 (tracker_base) owners on one computer: only the A$29 upgrade (gated server-side too).
   const baseOwner = access.paid && access.product === "tracker_base" && (access.devices || 0) < 2;
   const offer = (access.cfg?.offer || []).filter((o) => (o.available || access.preview) && (access.paid ? (baseOwner && o.id === "tracker_addon") : o.id !== "tracker_addon") && o.id !== "tracker_sms");
@@ -4494,7 +4494,7 @@ function TrackerUpsell({ access, owed, count, go }) {
         ✓ Shows plan managers who are late again and again, and exports a payment history
       </div>
       <div style={{ fontSize: 13, color: "var(--tx-2)", marginTop: 10 }}>
-        Free: push notifications.{smsOffer ? ` Optional: SMS alerts A$${smsOffer.priceAud}/month for 50 texts, added after you unlock the tracker. Not included in any package, including the A$99 Premium package.` : ""}
+        Free: push notifications.{smsOffer ? ` Optional: SMS alerts A$${smsOffer.priceAud}/month for 50 texts, added after you unlock the tracker. Not included in any package, including the A$149 Premium package.` : ""}
       </div>
       {access.phase === "signedout" && (
         <div style={{ marginTop: 14 }}>
@@ -4510,7 +4510,7 @@ function TrackerUpsell({ access, owed, count, go }) {
       )) : <div style={{ fontSize: 12.5, color: "var(--tx-3)", marginTop: 12 }}>The Payment tracker isn't on sale yet.</div>)}
       {access.phase === "locked" && offer.find((o) => o.items) && (
         <div style={{ fontSize: 13, lineHeight: 1.6, color: "var(--tx-2)", marginTop: 10 }}>
-          <b>Premium A$99 one-off includes:</b>
+          <b>Premium A$149 one-off includes:</b>
           <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>{offer.find((o) => o.items).items.map((t) => <li key={t}>{t}</li>)}</ul>
         </div>
       )}
@@ -8455,9 +8455,9 @@ const MANUAL = [
     d: "The optional Payment tracker add-on: prices, SMS pack and push notifications.",
     q: [
       ["What the Payment tracker costs",
-       "The Payment tracker (Money \u2192 Payment tracker) is optional. A$49 once for the tracker on one computer. A$69 once for the tracker on two computers. A$29 once to upgrade the A$49 plan to add a second computer (only for A$49 owners). A$99 once for the Premium package: everything in Basic (invoices, shifts, notes, kilometres, expenses and tax), a two-device license and the Payment tracker, no subscription. The optional SMS pack (A$4.99 a month for 50 texts) is the only paid add-on and is not included in any of these, including the A$99 package."],
+       "The Payment tracker (Money \u2192 Payment tracker) is optional. A$49 once for the tracker on one computer. A$69 once for the tracker on two computers. A$29 once to upgrade the A$49 plan to add a second computer (only for A$49 owners). A$149 once for the Premium package: everything in Basic (invoices, shifts, notes, kilometres, expenses and tax), a two-device license and the Payment tracker, no subscription. The optional SMS pack (A$4.99 a month for 50 texts) is the only paid add-on and is not included in any of these, including the A$149 package."],
       ["SMS alerts pack",
-       "Optional, only for Payment tracker owners, and not included in the A$99 Premium package. Texts go only to your own mobile after you verify it with a code, never to the NDIA, a plan manager or a payer. They are used for the day 7, 12 and 20 overdue alerts and the complaint-draft-ready nudge. Credits reset to 50 each month and don't roll over. Reply STOP or use Stop texts in Payment tracker \u2192 Settings to stop texts."],
+       "Optional, only for Payment tracker owners, and not included in the A$149 Premium package. Texts go only to your own mobile after you verify it with a code, never to the NDIA, a plan manager or a payer. They are used for the day 7, 12 and 20 overdue alerts and the complaint-draft-ready nudge. Credits reset to 50 each month and don't roll over. Reply STOP or use Stop texts in Payment tracker \u2192 Settings to stop texts."],
       ["Out of SMS credits",
        "When texts run out, alerts are sent as push notifications instead, to every device where you turned notifications on. You get one notification saying texts are used up. Push notifications are free."],
       ["Turn on push notifications",

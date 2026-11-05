@@ -10,7 +10,7 @@
 //   STRIPE_PRICE_TRACKER_TWO    A$69 one-off, tracker on two computers
 //   STRIPE_PRICE_TRACKER_ADDON  A$29 one-off, upgrade from the A$49 plan to add a second
 //                               computer; ONLY for existing BASE holders (gated server-side)
-//   STRIPE_PRICE_TRACKER_FULL   A$99 one-off, Premium package: everything in Basic, two-device
+//   STRIPE_PRICE_TRACKER_FULL   A$149 one-off, Premium package: everything in Basic, two-device
 //                               license, Payment tracker (SMS not included)
 //   STRIPE_PRICE_TRACKER_SMS    A$4.99 / month RECURRING (checkout mode=subscription):
 //                               50 SMS alerts per billing period, to the worker only.
@@ -23,7 +23,7 @@ export const TRACKER_PRODUCTS = Object.freeze({
   tracker_base: { env: "STRIPE_PRICE_TRACKER_BASE", labelEnv: "TRACKER_BASE_LABEL", audEnv: "TRACKER_BASE_AUD", label: "Payment tracker, one computer", aud: 49, devices: 1 },
   tracker_two: { env: "STRIPE_PRICE_TRACKER_TWO", labelEnv: "TRACKER_TWO_LABEL", audEnv: "TRACKER_TWO_AUD", label: "Payment tracker, two computers", aud: 69, devices: 2 },
   tracker_addon: { env: "STRIPE_PRICE_TRACKER_ADDON", labelEnv: "TRACKER_ADDON_LABEL", audEnv: "TRACKER_ADDON_AUD", label: "Upgrade: add a second computer", aud: 29, devices: 2, requires: "tracker_base" },
-  tracker_full: { env: "STRIPE_PRICE_TRACKER_FULL", labelEnv: "TRACKER_FULL_LABEL", audEnv: "TRACKER_FULL_AUD", label: "Premium package", aud: 99, devices: 2, items: ["Everything in Basic (invoices, shifts, notes, kilometres, expenses and tax)", "Two-device license", "Payment tracker", "SMS notification \u2014 optional (A$4.99 a month for 50 texts, not included in A$99)"] },
+  tracker_full: { env: "STRIPE_PRICE_TRACKER_FULL", labelEnv: "TRACKER_FULL_LABEL", audEnv: "TRACKER_FULL_AUD", label: "Premium package", aud: 149, devices: 2, items: ["Everything in Basic (invoices, shifts, notes, kilometres, expenses and tax)", "Two-device license", "Payment tracker", "SMS notification \u2014 optional (A$4.99 a month for 50 texts, not included in A$149)"] },
   tracker_sms: { env: "STRIPE_PRICE_TRACKER_SMS", labelEnv: "TRACKER_SMS_LABEL", audEnv: "TRACKER_SMS_AUD", label: "SMS alerts, 50 texts a month", aud: 4.99, recurring: "month", requires: "tracker" },
 });
 export const isTrackerProduct = (p) => Object.prototype.hasOwnProperty.call(TRACKER_PRODUCTS, p);

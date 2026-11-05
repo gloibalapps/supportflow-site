@@ -4,7 +4,7 @@
 //
 // Model (see LICENSING.md):
 //   * The licence belongs to a Google account (ID-token `sub`), never a key.
-//   * plan 1 = "One device" (A$49), plan 2 = "Phone and computer" (A$69).
+//   * plan 1 = "One device" (A$79), plan 2 = "Phone and computer" (A$69).
 //   * A device is an active signed-in install: { deviceId, label, firstSeen,
 //     lastSeen }. It stops counting after 21 days without a check-in.
 //   * Paid status is written only by the Stripe webhook.
@@ -31,7 +31,7 @@ export const PLAN_NAMES = Object.freeze({ 1: "One device", 2: "Phone and compute
 export const PRODUCTS = Object.freeze({
   // First set env var wins. STRIPE_PRICE_49 / _69 / _UPGRADE are the names
   // configured in Netlify; the older names are kept as fallbacks.
-  one: { plan: 1, amount: 49, env: ["STRIPE_PRICE_49", "STRIPE_PRICE_LICENCE_ONE", "STRIPE_PRICE_LIFETIME"] },
+  one: { plan: 1, amount: 79, env: ["STRIPE_PRICE_49", "STRIPE_PRICE_LICENCE_ONE", "STRIPE_PRICE_LIFETIME"] },
   two: { plan: 2, amount: 69, env: ["STRIPE_PRICE_69", "STRIPE_PRICE_LICENCE_TWO"] },
   upgrade: { plan: 2, amount: 29, env: ["STRIPE_PRICE_UPGRADE", "STRIPE_PRICE_LICENCE_UPGRADE"] },
 });

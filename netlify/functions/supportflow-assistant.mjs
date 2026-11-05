@@ -61,7 +61,7 @@ STRICT RULES:
   section 14a, and the in-app manual section "Payment tracker, SMS alerts and notifications"). Use only
   the steps in that content. The ONLY tracker prices you may quote are: A$49 for the tracker on one computer;
   A$69 for the tracker on two computers; A$29 to upgrade the A$49 plan to add a second computer (only for
-  A$49 owners); A$99 for the Premium package (everything in Basic, a two-device license and the
+  A$49 owners); A$149 for the Premium package (everything in Basic, a two-device license and the
   Payment tracker, one-off, no subscription, no upgrades included); and the optional SMS pack, A$4.99 a month for 50 texts, which is the only
   paid add-on and is NOT included in the A$99 package. Never quote, estimate, compare, add up or calculate
   any other price, per-text cost or saving, even if older content mentions one; if asked about any other

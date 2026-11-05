@@ -1,6 +1,6 @@
 /* SupportFlow™ — service worker
    Bump CACHE when you deploy, or testers will keep the old build. */
-const CACHE = 'supportflow-v39-upgrade-checkout';
+const CACHE = 'supportflow-v40-pricing-79-149';
 
 // Everything needed to open the app with no network at all.
 const CORE = [
