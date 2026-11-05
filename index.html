@@ -478,9 +478,39 @@
     .plan ul{margin:0;padding-left:18px;color:var(--muted);font-size:14.5px;line-height:1.7;flex:1}
     .plan .btn{text-align:center}
     .plans .fine{text-align:center;color:var(--muted);font-size:13px;margin-top:16px}
+    .cmp{max-width:820px;margin:0 auto clamp(22px,3vw,30px);display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+    .cmp-col{border:1px solid var(--line);border-radius:14px;padding:18px 18px 14px;background:var(--ink-2,#1A1C15)}
+    .cmp-col.feat{border-color:rgba(224,168,63,.55)}
+    .cmp-col h3{margin:0 0 10px;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--brass);font-weight:600}
+    .cmp-row{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-top:1px solid var(--line);font-size:14px;color:var(--muted)}
+    .cmp-row:first-of-type{border-top:0}
+    .cmp-row b{color:var(--paper);font-weight:600;white-space:nowrap}
+    .cmp-row.total{color:var(--paper);font-weight:600}
+    .cmp-row.total b{color:var(--brass-lift);font-family:'Fraunces',Georgia,serif;font-size:20px;font-weight:400}
+    .cmp-save{grid-column:1/-1;margin:0;text-align:center;font-size:15px;color:var(--paper)}
+    .cmp-save b{color:var(--brass-lift)}
   </style>
   <h2 id="plans-title">Simple, one-off pricing</h2>
   <p class="sub">Start with 5 free invoices for 30 days. Upgrade when you're ready. No subscription.</p>
+  <div class="cmp" id="price-comparison" aria-label="Price comparison">
+    <div class="cmp-col">
+      <h3>Basic + add-ons</h3>
+      <div class="cmp-row"><span>Basic, one device: invoices, shifts, notes, kilometres, expenses and tax</span><b>A$49</b></div>
+      <div class="cmp-row"><span>Add-on: second computer/device</span><b>+ A$29</b></div>
+      <div class="cmp-row"><span>Add-on: overdue payment tracker</span><b>+ A$29</b></div>
+      <div class="cmp-row total"><span>Total, one-off</span><b>A$107</b></div>
+    </div>
+    <div class="cmp-col feat">
+      <h3>Premium</h3>
+      <div class="cmp-row"><span>Everything in Basic</span><b>&check;</b></div>
+      <div class="cmp-row"><span>Two-device license</span><b>Included</b></div>
+      <div class="cmp-row"><span>Overdue payment tracker</span><b>Included</b></div>
+      <div class="cmp-row"><span>No upgrades needed</span><b>&check;</b></div>
+      <div class="cmp-row"><span>Optional SMS, 50 texts (not included in A$99)</span><b>A$4.99/mo</b></div>
+      <div class="cmp-row total"><span>Total, one-off</span><b>A$99</b></div>
+    </div>
+    <p class="cmp-save">Premium saves you <b>A$8</b> compared with Basic plus both add-ons, and the payment tracker is included, not an extra.</p>
+  </div>
   <div class="grid">
     <div class="plan">
       <div class="name">Basic</div>
