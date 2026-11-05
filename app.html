@@ -28,9 +28,18 @@
     color:#8B8E82;font-family:'Instrument Sans',system-ui,sans-serif;z-index:9999;
     transition:opacity .3s ease}
   #boot.gone{opacity:0;pointer-events:none}
-  #boot .seal{width:46px;height:46px;border-radius:13px;margin:0 auto 16px;background:linear-gradient(148deg,#E0A83F,#C8913A);display:grid;place-items:center;font-family:'Fraunces',serif;font-size:23px;color:#14150F;animation:pulse 1.6s ease-in-out infinite}
+  #boot .seal{width:58px;height:58px;border-radius:16px;margin:0 auto 18px;background:linear-gradient(148deg,#E0A83F,#C8913A);display:grid;place-items:center;font-family:'Fraunces',serif;font-size:29px;color:#14150F;animation:pulse 1.6s ease-in-out infinite}
   #boot p{font-size:13px;text-align:center;margin:0}
   #boot .err{color:#C2703B;max-width:30ch;line-height:1.6}
+  /* Swappable logo slot: replace the .sf-logo-glyph contents with the final mark (e.g. <img src="/logo.svg">) */
+  .sf-logo-glyph{display:block;line-height:1}
+  .sf-logo-glyph img,.sf-logo-glyph svg{width:70%;height:70%;display:block;margin:auto}
+  #boot .loader{display:flex;justify-content:center;gap:7px;margin:0 auto 14px;height:8px}
+  #boot .loader i{width:8px;height:8px;border-radius:50%;background:#E0A83F;animation:sfdot 1.2s ease-in-out infinite}
+  #boot .loader i:nth-child(2){animation-delay:.15s}#boot .loader i:nth-child(3){animation-delay:.3s}
+  #boot.failed .loader{display:none}
+  @keyframes sfdot{0%,80%,100%{transform:scale(.55);opacity:.35}40%{transform:scale(1);opacity:1}}
+  @media (prefers-reduced-motion:reduce){#boot .seal,#boot .loader i{animation:none}#boot .loader i{opacity:.8;transform:none}}
   @keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(.94);opacity:.72}}
 </style>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -66,7 +75,8 @@
 
 <div id="boot">
   <div>
-    <div class="seal">S</div>
+    <div class="seal sf-logo" aria-hidden="true"><span class="sf-logo-glyph">S</span></div>
+    <div class="loader" role="status" aria-label="Loading"><i></i><i></i><i></i></div>
     <p id="bootmsg">Starting up…</p>
   </div>
 </div>
@@ -9494,7 +9504,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
   var boot=document.getElementById('boot');
   var msg=document.getElementById('bootmsg');
 
-  function fail(text){ if(!msg)return; msg.className='err'; msg.textContent=text; }
+  function fail(text){ if(boot)boot.classList.add('failed'); if(!msg)return; msg.className='err'; msg.textContent=text; }
   window.addEventListener('error',function(e){
     if(boot && !boot.classList.contains('gone')) fail('Something went wrong starting up: '+(e.message||'unknown error'));
   });
