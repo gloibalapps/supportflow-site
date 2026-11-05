@@ -444,15 +444,16 @@
     .follow-ups .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;list-style:none;padding:0;margin:0}
     .follow-ups .steps li{border:1px solid var(--line);border-radius:16px;padding:18px 16px;text-align:center}
     .follow-ups .day{font-family:'Fraunces',Georgia,serif;font-size:26px;color:var(--brass-lift)}
+    .follow-ups .day-note{margin:6px 0 0;font-size:14.5px;opacity:.8}
     .follow-ups .bullets{list-style:none;padding:0;margin:18px 0 0;color:var(--muted);font-size:14.5px;line-height:1.8}
     @media (max-width:640px){.follow-ups .steps{grid-template-columns:1fr}}
   </style>
   <h2 id="follow-ups-title">How the automated payment tracker follows up</h2>
   <p class="bullets" style="margin:0 0 18px">The tracker follows up on its own, with no action needed from you.</p>
   <ol class="steps">
-    <li><div class="day">Day 7</div></li>
-    <li><div class="day">Day 12</div></li>
-    <li><div class="day">Day 20</div></li>
+    <li><div class="day">Day 7</div><p class="day-note">Polite reminder email</p></li>
+    <li><div class="day">Day 12</div><p class="day-note">Firmer follow-up email</p></li>
+    <li><div class="day">Day 20</div><p class="day-note">Complaint draft ready</p></li>
   </ol>
 </section>
 
@@ -509,13 +510,13 @@
     <div class="plan">
       <div class="name">Basic</div>
       <div class="price">A$49 <small>one-off</small></div>
-      <ul><li>SupportFlow on one device</li><li>Invoices, shifts, notes, kilometres, expenses and tax</li><li>Works offline, private by design</li></ul>
+      <ul><li>Invoices, shifts, notes, kilometres, expenses and tax</li><li>Works offline, private by design</li><li>One user license</li></ul>
       <a class="btn" href="./app?buy=1">Get Basic &mdash; A$49</a>
     </div>
     <div class="plan feat">
       <div class="name">Premium</div>
       <div class="price">A$99 <small>one-off</small></div>
-      <ul><li>Everything in Basic (invoices, shifts, notes, kilometres, expenses and tax)</li><li>Two-device license</li><li>Payment tracker</li><li>SMS notification &mdash; optional<br><small>(A$4.99 a month for 50 texts, not included in A$99)</small></li></ul>
+      <ul><li>Everything in Basic (invoices, shifts, notes, kilometres, expenses and tax)</li><li>Payment tracker</li><li>SMS notification &mdash; optional<br><small>(A$4.99 a month for 50 texts, not included in A$99)</small></li><li>Two user licenses</li></ul>
       <a class="btn" href="./app?buy=1">Get Premium &mdash; A$99</a>
     </div>
   </div>
