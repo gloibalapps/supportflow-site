@@ -2532,7 +2532,7 @@ function OfferOrUpgradeBanner({ paid, freeOffer, known }) {
   if (!due) return null;
   return <div role="status" style={box}>
     <div style={{ flex: 1 }}><b style={{ color: "#E8C171" }}>Keep invoicing with SupportFlow</b><br />
-      Basic A$49 one-off, or Complete A$99 (2 computers + payment tracker upgrades for 12 months).</div>
+      Basic A$49 one-off, or Premium A$99 (2 computers + payment tracker upgrades for 12 months).</div>
     <a className="btn" href={BUY_URL} style={{ whiteSpace: "nowrap" }}>See plans</a>
     <button style={btn} onClick={() => hide(true)}>Remind me later</button>
   </div>;
