@@ -38,11 +38,11 @@ const recordId = (sub, invoiceId) => crypto.createHmac("sha256", process.env.LIC
 
 async function checkout(session, deviceId, body) {
   const key = process.env.STRIPE_SECRET_KEY, site = process.env.SITE_URL;
-  if (!key || !site) return json({ error: "Payments aren't set up on this site yet." }, 500);
+  if (!key || !site) return json({ error: "Payments aren't set up on this site yet.", comingSoon: true }, 503);
   const product = String(body?.product || "");
   if (!isTrackerProduct(product)) return json({ error: "Choose an option." }, 400);
   const price = process.env[TRACKER_PRODUCTS[product].env];
-  if (!price) return json({ error: "That option isn't available yet." }, 500);
+  if (!price) return json({ error: "That option isn't available yet.", comingSoon: true }, 503);
   const have = await trackerUnlock(session.sub);
   const isSub = product === "tracker_sms";
   // A$29 upgrade: ONLY for existing A$49 (tracker_base) holders on one computer.
@@ -279,6 +279,7 @@ export default async (req) => {
     return json({ error: "Unknown action." }, 400);
   } catch (e) {
     console.error("tracker:", e.message);
+    if (/TRACKER_DATA_KEY/.test(e.message || "")) return json({ error: "The Payment tracker is coming soon.", comingSoon: true }, 503);
     return json({ error: "Something went wrong. Try again." }, 500);
   }
 };
