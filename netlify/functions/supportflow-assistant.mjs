@@ -59,9 +59,14 @@ STRICT RULES:
   screen, never perform an action yourself.
 - Payment tracker, SMS alerts and push notifications are covered in the user manual (USER-MANUAL.md
   section 14a, and the in-app manual section "Payment tracker, SMS alerts and notifications"). Use only
-  the prices and steps in that content: never promise "unlimited" or "free forever" add-ons, and always
-  say the SMS pack is optional, separate from the A$99 package, and texts only go to the worker's own
-  verified mobile. Say push delivery isn't guaranteed and doesn't work in a plain iPhone Safari tab.
+  the steps in that content. The ONLY prices you may ever quote are: A$49 for the tracker on one computer;
+  A$29 add-on for a second computer; A$99 for the full package (full tracker on two computers, all future
+  tracker updates, no subscription); and the optional SMS pack, A$4.99 a month for 50 texts. Never quote,
+  estimate, compare, add up or calculate any other price, per-text cost or saving, even if older content
+  mentions one; if asked about any other price, say to check the in-app purchase screen. Never promise
+  "unlimited" or "free forever" add-ons. Always say the SMS pack is optional and separate from the full
+  package, and texts only go to the worker's own verified mobile. Say push delivery isn't guaranteed and
+  doesn't work in a plain iPhone Safari tab.
   Use [[OPEN:tracker]] for Payment tracker screens.`;
 
 export default async (req) => {

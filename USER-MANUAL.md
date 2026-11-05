@@ -745,30 +745,30 @@ the spot.
 
 ---
 
-## 14. Subscription & billing
+## 14. Licence
 
-The app is free to use for a **trial period**, full access, nothing held
-back. Once that ends, adding new invoices, shifts, trips, expenses,
-participants and plan managers needs an active subscription. Everything
+The app is free to try, with full access and nothing held back. Once the
+free period ends, adding new invoices, shifts, trips, expenses, participants
+and plan managers needs a **SupportFlow Lifetime** licence. Everything you've
 already entered stays visible, and you can still view, edit, back up and
-export it regardless.
+export it either way.
 
-Two plans: **$19.99 a month**, or **$219 a year**. Choose either from the
-prompt that appears once the trial ends, or earlier if you'd rather sort it
-out ahead of time.
+Buy the licence from the prompt that appears when the free period ends, or
+earlier from the profile menu.
 
 ### Restoring on a new device
 
-Got a new phone, or reinstalled the app? You won't automatically be asked to
-pay again. On the subscription prompt, **"Already subscribed on another
-device?"** asks for the email you subscribed with and reconnects this device
-to that same subscription, no need to start a second one.
+Got a new phone, or reinstalled the app? You won't be asked to pay again. On
+the licence prompt, tap **"Already have a licence on another device?"** and
+enter the email you used at checkout. This device reconnects to the licence
+you already own.
 
 ### What this doesn't affect
 
-Nothing about billing touches your records. They're still only ever on your
-device, same as always, subscribing or not doesn't add a server-side copy of
-anything.
+Nothing about the licence touches your records. They're still only ever on
+your device, and buying a licence doesn't add a server-side copy of anything.
+
+---
 
 ## 14a. Payment tracker (optional add-on)
 
@@ -777,16 +777,14 @@ The Payment tracker lives at **Money → Payment tracker**. It shows who owes yo
 ### Pricing
 
 - **A$49 once:** the tracker on one computer.
-- **A$29 add-on:** the tracker on a second computer. Only for owners of the A$49 tracker.
-- **A$99 once:** the full tracker on two computers, with all future updates to the tracker. No subscription.
+- **A$29 add-on:** the tracker on a second computer. Only for owners of the one-computer tracker.
+- **A$99 once:** the full package. The full tracker on two computers, with all future updates to the tracker. No subscription.
 
-Note that the A$49 tracker plus the A$29 add-on costs A$78, which is less than the A$99 package.
+The optional SMS pack below is **separate**. It is not part of the full package or any other tracker purchase.
 
-The optional SMS pack below is **separate**. It is not part of the A$99 package or any other tracker purchase.
+### SMS alerts (optional)
 
-### SMS alerts (optional, A$4.99 a month)
-
-- **A$4.99 a month for 50 texts** (about 10c each). It's optional, and only Payment tracker owners (A$49 or A$99) can buy it.
+- **A$4.99 a month for 50 texts.** It's optional, and only Payment tracker owners can buy it.
 - Texts go **only to your own mobile number**, after you verify it with a 6-digit code. They never go to the NDIA, a plan manager, or anyone you invoice.
 - They are used for the day 7, 12 and 20 overdue alerts and the "your complaint draft is ready" nudge.
 - A short text uses 1 credit. A long text, or one with emoji, may use 2. Credits reset to 50 each month when the pack renews. Unused texts don't roll over.
@@ -869,11 +867,11 @@ in the background, that's normal, not a fault. If you've genuinely forgotten
 the PIN, see [App lock](#13-app-lock), there's no reset, only clearing the
 device and restoring from a backup.
 
-**It's asking me to subscribe.** Your trial period has ended. Everything
-already entered is still there to view, edit, back up and export, adding new
-records needs a subscription. Already paying on another device? Use
-**"Already subscribed on another device?"** rather than starting a second
-subscription, see [Subscription & billing](#14-subscription--billing).
+**It's asking me to buy a licence.** Your free period has ended. Everything
+already entered is still there to view, edit, back up and export. Adding new
+records needs a licence. Already bought one on another device? Use
+**"Already have a licence on another device?"** rather than buying again, see
+[Licence](#14-licence).
 
 ---
 
@@ -904,7 +902,7 @@ rate you set yourself, not an NDIS item.
 **PIN lock**: an optional code asked for before the app opens, see
 [App lock](#13-app-lock). Not the same as encryption.
 
-**Trial**: the period you can use the full app free, before a subscription is
+**Trial**: the period you can use the full app free, before a licence is
 needed to keep adding new records.
 
 ---
