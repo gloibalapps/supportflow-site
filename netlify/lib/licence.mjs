@@ -137,7 +137,8 @@ export function signSession({ sub, email, name, ev }) {
   const sig = enc(crypto.createHmac("sha256", subKey("supportflow-session-v1")).update(payload).digest());
   return `${payload}.${sig}`;
 }
-export function verifySession(token) {
+export const RENEW_GRACE_DAYS = 365;
+export function verifySession(token, { allowExpiredDays = 0 } = {}) {
   if (typeof token !== "string" || token.length > 4000) return null;
   const [payload, sig] = token.split(".");
   if (!payload || !sig) return null;
@@ -146,7 +147,7 @@ export function verifySession(token) {
   if (got.length !== expected.length || !crypto.timingSafeEqual(got, expected)) return null;
   try {
     const p = JSON.parse(dec(payload).toString("utf8"));
-    if (!p.sub || !p.exp || p.exp < Date.now()) return null;
+    if (!p.sub || !p.exp || p.exp + allowExpiredDays * DAY < Date.now()) return null;
     return p;
   } catch { return null; }
 }

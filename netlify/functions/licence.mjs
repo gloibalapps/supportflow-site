@@ -14,7 +14,7 @@
 // exactly as before.
 
 import {
-  json, supa, supaConfigured, licensingSwitchOn, enforcedFor, getLeaseKeys, signSession, verifySession,
+  json, supa, supaConfigured, licensingSwitchOn, enforcedFor, getLeaseKeys, signSession, verifySession, RENEW_GRACE_DAYS,
   verifyGoogleIdToken, evaluate, activateDevice, getLicence, listDevices, isUuid, cleanLabel,
   PLAN_NAMES, PRODUCTS, sendEmail,
 } from "../lib/licence.mjs";
@@ -154,6 +154,18 @@ export default async (req) => {
     }
 
     const session = verifySession(body?.session);
+    // Silent renewal for member devices: an expired (but genuinely signed)
+    // session is renewed on heartbeat ONLY if this exact device is still an
+    // active device on an active licence. No Google prompt needed.
+    if (!session && action === "heartbeat") {
+      const stale = verifySession(body?.session, { allowExpiredDays: RENEW_GRACE_DAYS });
+      if (stale && (await enforcedFor(stale.email))) {
+        const result = await evaluate({ sub: stale.sub, email: stale.email, emailVerified: stale.ev === true, ...dev });
+        if (result?.state === "active") {
+          return json({ ...result, account: { email: stale.email, name: stale.name }, session: signSession(stale) });
+        }
+      }
+    }
     if (!session) {
       if (!(await licensingSwitchOn())) return json({ state: "disabled" });
       return json({ state: "signed_out" }, 401);

@@ -721,6 +721,9 @@ function useLicence() {
       return data;
     }
     if (status === 401 || st === "signed_out") {
+      // Member device whose session could not be renewed silently: fall back
+      // to the stored offline lease; never show Google here.
+      if (isMemberDevice() && !wantsLicenceFlow()) { await offlineDecision(); return data; }
       ref.current.session = null; LICENCE_CTX.session = ""; LICENCE_CTX.active = false;
       await licDel("session"); await licDel("lease");
       setLic((cur) => ({ ...cur, phase: "locked", offline: false, info: { state: "signed_out" }, account: null }));
@@ -729,6 +732,7 @@ function useLicence() {
     if (!st) { await offlineDecision(); return data; } // 5xx / unexpected: fall back to the lease
     if (st === "active") {
       if (data.lease) await licSet("lease", data.lease);
+      try { localStorage.setItem(MEMBER_FLAG, "1"); } catch (e) { }
       LICENCE_CTX.active = true;
       setLic((cur) => ({ ...cur, phase: "ok", offline: false, info: data, account: ref.current.session, error: data.error || "" }));
     } else {
@@ -786,10 +790,14 @@ function useLicence() {
     try {
       const res = await licenceFetch({ action: "signin", idToken, deviceId: ref.current.deviceId, label: licenceDeviceLabel(), legacyRef: legacyRef() }, 15000);
       if (res.status >= 400 && !res.data?.state) return { error: res.data?.error || "Google sign-in didn't work. Try again." };
-      return await apply(res);
+      const out = await apply(res);
+      // New device just linked: ask for a PIN/fingerprint, then never Google again here.
+      if (out?.state === "active") { try { if (!readLock()) localStorage.setItem(ASK_PIN_FLAG, "1"); } catch (e) { } }
+      return out;
     } catch (e) { return { error: "You're offline. Connect to the internet and try again." }; }
   };
   const signOut = async () => {
+    try { localStorage.removeItem(MEMBER_FLAG); } catch (e) { }
     await call("signout");
     ref.current.session = null; LICENCE_CTX.session = ""; LICENCE_CTX.active = false;
     await licDel("session"); await licDel("lease");
@@ -1001,10 +1009,10 @@ function LicenceGate({ licence, theme }) {
   if (state === "signed_out") {
     body = <>
       <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.65, marginBottom: 20, maxWidth: 360 }}>
-        Sign in with Google to open SupportFlow. Your licence belongs to your Google account, so signing in on a new phone or after reinstalling brings it straight back.
+        Sign in with Google to link your purchase, or to find your licence and add this device. You don’t need Google to use the free trial.
       </div>
       <LicenceGoogleButton clientId={licence.clientId} onCredential={signIn} />
-      <div style={{ fontSize: 12, color: "var(--tx-3)", lineHeight: 1.6, marginTop: 16, maxWidth: 340 }}>Signing in links your purchase to your Google account, so you can restore it on a new device.</div>
+      <div style={{ fontSize: 12, color: "var(--tx-3)", lineHeight: 1.6, marginTop: 16, maxWidth: 340 }}>Signing in links your purchase to your Google account. Already a member on a new device? Sign in to find your licence and add this device. You will then set a PIN and won’t need Google again here.</div>
     </>;
   } else if (state === "offline") {
     body = <>
@@ -2241,6 +2249,25 @@ async function verifyBiometric(idB64) {
 }
 
 
+/* ---------------- member device: PIN first, Google never ---------------- */
+// A device that already holds a licence session/lease is a MEMBER device.
+// There, unlock is PIN or fingerprint only and licence checks run silently in
+// the background. Google sign-in is only for (1) linking a new purchase and
+// (2) finding an existing licence on a NEW device (both via /app?buy=1).
+const MEMBER_FLAG = "ndis:memberDevice";
+const ASK_PIN_FLAG = "ndis:askPin";
+function isMemberDevice() { try { return localStorage.getItem(MEMBER_FLAG) === "1"; } catch (e) { return false; } }
+function PinSetupPrompt({ onDone }) {
+  return <div role="dialog" aria-modal="true" aria-label="Set a PIN" style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(10,11,8,.72)", display: "grid", placeItems: "center", padding: 16 }}>
+    <div className="panel" style={{ maxWidth: 440, width: "100%", maxHeight: "90vh", overflow: "auto" }}>
+      <div className="disp" style={{ fontSize: 20, marginBottom: 6 }}>Licence linked to this device</div>
+      <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.6, marginBottom: 12 }}>Set a PIN (or fingerprint) to open SupportFlow from now on. You won't need to sign in with Google again on this device.</div>
+      <LockPanel onChange={(c) => { if (c) onDone(); }} />
+      <button className="btn ghost tiny" style={{ marginTop: 10 }} onClick={onDone}>Later</button>
+    </div>
+  </div>;
+}
+
 /* ---------------- new-user offer banner + upgrade reminder ---------------- */
 // One slot only: while the free offer is active the offer banner shows; the
 // upgrade reminder only appears once the offer has ended/used up, at most once
@@ -2265,6 +2292,7 @@ function OfferOrUpgradeBanner({ paid, freeOffer, known }) {
       <span aria-hidden="true" style={{ fontSize: 18 }}>&#127873;</span>
       <div style={{ flex: 1 }}><b style={{ color: "#E8C171" }}>Free: 5 invoices for 30 days</b><br />
         {freeOffer.remaining} invoice{freeOffer.remaining === 1 ? "" : "s"} left · {freeOffer.daysLeft} day{freeOffer.daysLeft === 1 ? "" : "s"} left</div>
+      <a href={BUY_URL} style={{ ...btn, textDecoration: "underline" }}>Already a member?</a>
       <button style={btn} onClick={() => hide(false)} aria-label="Hide free offer banner">Hide</button>
     </div>;
   }
@@ -2522,6 +2550,7 @@ function App() {
   // Bumped when /rates.json loads so screens re-render with live CAR / TRAVEL_ITEM.
   const [liveRates, setLiveRates] = useState(null);
   const [locked, setLocked] = useState(() => shouldLockNow());
+  const [askPin, setAskPin] = useState(() => { try { return localStorage.getItem(ASK_PIN_FLAG) === "1" || (isMemberDevice() && !readLock()); } catch (e) { return false; } });
   const [claimSeed, setClaimSeed] = useState("");
   const [editing, setEditing] = useState(null);
   const [data, setData] = useState(BLANK);
@@ -3064,13 +3093,7 @@ function App() {
 
   if (!loaded) return <div className="sl" data-theme="dark" style={{ padding: 60 }}><div className="eyebrow">Loading…</div></div>;
 
-  if (licence.phase === "checking") return <LicenceChecking theme={theme} />;
-  // Google sign-in is only for linking a PAID licence. A signed-out visitor on
-  // the free trial (5 invoices / 30 days, tracked by anonymous device ref) is
-  // never shown the sign-in gate; it appears only when they choose to buy or
-  // restore (?buy=1, set by plan buttons, the upgrade reminder and paywall).
-  if (licence.phase === "locked" && !(licence.info?.state === "signed_out" && !wantsLicenceFlow())) return <LicenceGate licence={licence} theme={theme} />;
-
+  // PIN / fingerprint comes first on every open; licence checks run behind it.
   if (locked) return (
     <LockScreen
       onUnlock={() => setLocked(false)}
@@ -3081,6 +3104,14 @@ function App() {
       }}
     />
   );
+
+  if (licence.phase === "checking" && !isMemberDevice()) return <LicenceChecking theme={theme} />;
+  // Google sign-in is only for linking a PAID licence. A signed-out visitor on
+  // the free trial (5 invoices / 30 days, tracked by anonymous device ref) is
+  // never shown the sign-in gate; it appears only when they choose to buy or
+  // restore (?buy=1, set by plan buttons, the upgrade reminder and paywall).
+  if (licence.phase === "locked" && !(licence.info?.state === "signed_out" && !wantsLicenceFlow())
+      && !(isMemberDevice() && licence.info?.state === "offline")) return <LicenceGate licence={licence} theme={theme} />;
 
   return (
     <LicenceContext.Provider value={licence}>
@@ -3358,6 +3389,7 @@ function App() {
         ))}
       </div>
 
+      {askPin && licence.phase === "ok" && !readLock() && <PinSetupPrompt onDone={() => { try { localStorage.removeItem(ASK_PIN_FLAG); } catch (e) { } setAskPin(false); }} />}
       <OfferOrUpgradeBanner paid={licence.phase === "ok" || isLifetime} freeOffer={freeOffer} known={statusKnown} />
 
       {showTrialNotice && <TrialEndedNotice startInRestore={trialNoticeRestore} onClose={() => { setShowTrialNotice(false); setTrialNoticeRestore(false); }} />}
