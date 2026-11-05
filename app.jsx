@@ -916,7 +916,7 @@ function LicenceGate({ licence, theme }) {
         Sign in with Google to open SupportFlow. Your licence belongs to your Google account, so signing in on a new phone or after reinstalling brings it straight back.
       </div>
       <LicenceGoogleButton clientId={licence.clientId} onCredential={signIn} />
-      <div style={{ fontSize: 12, color: "var(--tx-3)", lineHeight: 1.6, marginTop: 16, maxWidth: 340 }}>New to SupportFlow? Sign in first, then choose a plan.</div>
+      <div style={{ fontSize: 12, color: "var(--tx-3)", lineHeight: 1.6, marginTop: 16, maxWidth: 340 }}>Signing in links your purchase to your Google account, so you can restore it on a new device.</div>
     </>;
   } else if (state === "offline") {
     body = <>
@@ -2170,6 +2170,8 @@ async function verifyBiometric(idB64) {
 // per session and then not again for 3 days after "Remind me later".
 // Never shown to paid users (device licence or lifetime).
 const REMIND_KEY = "ndis:upgradeRemindAt";
+const BUY_URL = "/app?buy=1";
+function wantsLicenceFlow() { try { return new URLSearchParams(location.search).get("buy") === "1"; } catch (e) { return false; } }
 function OfferOrUpgradeBanner({ paid, freeOffer, known }) {
   const [hidden, setHidden] = useState(() => { try { return sessionStorage.getItem("ndis:bannerHidden") === "1"; } catch (e) { return false; } });
   if (paid || hidden || !known) return null;
@@ -2194,7 +2196,7 @@ function OfferOrUpgradeBanner({ paid, freeOffer, known }) {
   return <div role="status" style={box}>
     <div style={{ flex: 1 }}><b style={{ color: "#E8C171" }}>Keep invoicing with SupportFlow</b><br />
       Basic A$49 one-off, or Complete A$99 (2 computers + payment tracker upgrades for 12 months).</div>
-    <a className="btn" href={PRICING_URL} style={{ whiteSpace: "nowrap" }}>See plans</a>
+    <a className="btn" href={BUY_URL} style={{ whiteSpace: "nowrap" }}>See plans</a>
     <button style={btn} onClick={() => hide(true)}>Remind me later</button>
   </div>;
 }
@@ -2980,7 +2982,11 @@ function App() {
   if (!loaded) return <div className="sl" data-theme="dark" style={{ padding: 60 }}><div className="eyebrow">Loading…</div></div>;
 
   if (licence.phase === "checking") return <LicenceChecking theme={theme} />;
-  if (licence.phase === "locked") return <LicenceGate licence={licence} theme={theme} />;
+  // Google sign-in is only for linking a PAID licence. A signed-out visitor on
+  // the free trial (5 invoices / 30 days, tracked by anonymous device ref) is
+  // never shown the sign-in gate; it appears only when they choose to buy or
+  // restore (?buy=1, set by plan buttons, the upgrade reminder and paywall).
+  if (licence.phase === "locked" && !(licence.info?.state === "signed_out" && !wantsLicenceFlow())) return <LicenceGate licence={licence} theme={theme} />;
 
   if (locked) return (
     <LockScreen
@@ -4313,7 +4319,7 @@ async function chargeInvoiceCredit(invoiceNumber) {
 
 function CreditNotice({ kind }) {
   if (kind === "no_credits") return <div className="creditnotice">
-    You've used your free invoices. <a href={PRICING_URL}>Get SupportFlow for life — A$49 →</a>
+    Your free invoices have ended. <a href={BUY_URL}>Get SupportFlow — A$49 one-off →</a>
   </div>;
   if (kind === "error") return <div className="creditnotice">
     Couldn't check your invoice credits. Check your connection and try again.
