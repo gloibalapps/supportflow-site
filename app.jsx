@@ -4000,12 +4000,13 @@ function InvoiceList({ data, m, fy, save, newInvoice, open, go, billTick, setBil
               {unpaid.map((i) => {
                 const overdue = i.due && i.due < today();
                 return (
-                  <div className="row" key={i.id}>
+                  <div className="row" key={i.id} style={overdue ? { borderLeft: "4px solid var(--req)", paddingLeft: 10, background: "rgba(192,57,43,.10)", borderRadius: 8 } : undefined}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                         {resolve(i, data).client || "Untitled"}
                       </div>
-                      <div style={{ fontSize: 11, color: overdue ? "var(--req)" : "var(--tx-3)", marginTop: 2 }}>
+                      <div style={{ fontSize: overdue ? 12 : 11, fontWeight: overdue ? 700 : 400, color: overdue ? "var(--req)" : "var(--tx-3)", marginTop: 2 }}>
+                        {overdue && <span className="pill overdue" role="img" aria-label="Warning: overdue" style={{ marginRight: 6, border: "1px solid var(--req)" }}>&#9888; Overdue</span>}
                         {overdue ? "Overdue since " : "Due "}{fmtDate(i.due)}
                       </div>
                     </div>
