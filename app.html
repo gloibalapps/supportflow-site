@@ -4521,7 +4521,7 @@ function TrackerUpsell({ access, owed, count, go }) {
       {access.phase === "signedout" && (
         <div style={{ marginTop: 14 }}>
           <div style={{ fontSize: 13, marginBottom: 8 }}>Sign in with Google so the unlock stays with you on every device.</div>
-          {access.cfg?.clientId ? <LicenceGoogleButton clientId={access.cfg.clientId} onCredential={access.signIn} /> : <div style={{ fontSize: 12.5, color: "var(--tx-3)" }}>Sign-in isn't available right now.</div>}
+          <a className="btn" style={{ display: "inline-flex", minHeight: 44, alignItems: "center" }} href={BUY_URL}>Sign in to unlock</a>
         </div>
       )}
       {access.phase === "locked" && access.deviceLimit && <div style={{ fontSize: 13, marginTop: 12 }}>Your Payment tracker is already in use on your other computer.{baseOwner ? " Add this one with the A$29 upgrade:" : ""}</div>}
