@@ -1,20 +1,21 @@
 # Payment tracker add-on: build notes, setup and launch blockers
 
-Tests: `node payment-tracker-rules.test.mjs`, `node netlify/tracker-sender.test.mjs`, `node netlify/tracker-sms.test.mjs` (need `web-push` installed), `node netlify/tracker-migration.test.mjs` (needs `@electric-sql/pglite`).
+Tests: `node payment-tracker-rules.test.mjs`, `node netlify/tracker-sender.test.mjs`, `node netlify/tracker-checkout.test.mjs`, `node netlify/tracker-sms.test.mjs` (need `web-push` installed), `node netlify/tracker-migration.test.mjs` (needs `@electric-sql/pglite`).
 
-Status: built on the local branch `feature/payment-tracker` only. It has not been pushed or deployed. No Stripe objects exist, no migration has been applied, and no Netlify env vars have been changed.
+Status: built on the local branch `feature/payment-tracker` only. It has not been pushed or deployed. The five live Stripe Prices exist (IDs below and in `.env.example`), but no migration has been applied and no Netlify env vars have been changed.
 Supersedes these decisions in payment-tracker-brief.md: D1 (price) and D2 (one-tap send).
 
-## Pricing (owner, 5 Nov 2026, latest; all config-driven)
-| Product id | Price | Env var | What it gives |
-|---|---|---|---|
-| `tracker_base` | A$49 one-off | `STRIPE_PRICE_TRACKER_BASE` | Tracker on one computer |
-| `tracker_addon` | A$29 one-off | `STRIPE_PRICE_TRACKER_ADDON` | A second computer. **Only for base owners**, gated server-side like the licence $29 upgrade |
-| `tracker_full` | A$99 one-off | `STRIPE_PRICE_TRACKER_FULL` | Full package: everything, two devices |
+## Pricing (owner, 5 Nov 2026, final; supersedes all earlier prices; all config-driven)
+| Product id | Price | Env var | Live Stripe Price | What it gives |
+|---|---|---|---|---|
+| `tracker_base` | A$49 one-off | `STRIPE_PRICE_TRACKER_BASE` | `price_1UYEAkKJKDCaYKVvbgsLjrPy` | Tracker on one computer |
+| `tracker_two` | A$69 one-off | `STRIPE_PRICE_TRACKER_TWO` | `price_1UYEArKJKDCaYKVvC9C8mZAS` | Tracker on two computers |
+| `tracker_addon` | A$29 one-off | `STRIPE_PRICE_TRACKER_ADDON` | `price_1UYEAtKJKDCaYKVv1CMXV428` | Upgrade from the A$49 plan to add a second computer. **Only for existing `tracker_base` holders** on one computer (refused server-side otherwise) |
+| `tracker_full` | A$99 one-off | `STRIPE_PRICE_TRACKER_FULL` | `price_1UYEAxKJKDCaYKVvaGWJkoSO` | Complete package: two computers plus tracker upgrades for 12 months from purchase (not lifetime) |
 
-| `tracker_sms` | **A$4.99 / month, recurring** | `STRIPE_PRICE_TRACKER_SMS` | **Optional** SMS alerts, 50 texts per billing period, to the worker's own mobile. **Not included in any package (including the A$99 full package).** Only tracker owners (base or full) can buy it, one active pack per account |
+| `tracker_sms` | **A$4.99 / month, recurring** | `STRIPE_PRICE_TRACKER_SMS` | `price_1UYEAyKJKDCaYKVvPWR5MQ3R` | **Optional** SMS alerts, 50 texts per billing period, to the worker's own mobile. The only paid add-on. **Not included in the A$99 package.** Only tracker owners can buy it, one active pack per account |
 
-**Flag for the owner:** base + add-on = A$78, but the full package is A$99, so the package currently costs A$21 more than buying both. The copy is neutral: it shows each option with its price and claims no savings.
+Copy rule (Australian Consumer Law caution): never call any option lifetime, unlimited or forever; A$99 includes upgrades for 12 months only. The copy shows each option with its price and claims no savings.
 The entitlement is per Google account, recorded in `licence_payments` (the same ledger as licences). **Only** the Stripe webhook writes it, and refunds and disputes reverse it through `handleLicenceReversal`. Device seats work like the main licence: the first N devices hold seats, and a seat frees after 21 days unseen.
 
 ## What is built
@@ -58,16 +59,16 @@ The entitlement is per Google account, recorded in `licence_payments` (the same 
 Mail goes `From: "Jane Smith via SupportFlow" <invoices@send.supportflow.work>`, `Reply-To: <worker's email>`. **Sending as the worker's own address isn't feasible.** Resend only sends from domains SupportFlow has verified with SPF/DKIM. Putting a worker's gmail.com/outlook.com address in From fails DMARC (Gmail and Yahoo reject or spam it). The alternative, Gmail/Microsoft send-on-behalf OAuth, needs the restricted `gmail.send` scope, which means a Google CASA security assessment, plus a Microsoft publisher verification. That is weeks of work and an annual cost, so it isn't worth it for v1. Replies still go straight to the worker.
 
 ## Stripe setup (do in TEST mode first; nothing has been created)
-1. Product "Payment tracker", one-off Price **A$49.00 AUD** → `STRIPE_PRICE_TRACKER_BASE`.
-2. Product "Payment tracker: second computer", one-off Price **A$29.00 AUD** → `STRIPE_PRICE_TRACKER_ADDON`. Product "Payment tracker: full package", one-off Price **A$99.00 AUD** → `STRIPE_PRICE_TRACKER_FULL`.
-3. Optional display overrides: `TRACKER_{BASE,ADDON,FULL}_LABEL` and `TRACKER_{BASE,ADDON,FULL}_AUD`.
+1. One-off Price **A$49.00 AUD** → `STRIPE_PRICE_TRACKER_BASE` (live: `price_1UYEAkKJKDCaYKVvbgsLjrPy`).
+2. One-off Price **A$69.00 AUD** → `STRIPE_PRICE_TRACKER_TWO` (live: `price_1UYEArKJKDCaYKVvC9C8mZAS`). One-off Price **A$29.00 AUD** → `STRIPE_PRICE_TRACKER_ADDON` (live: `price_1UYEAtKJKDCaYKVv1CMXV428`). One-off Price **A$99.00 AUD** → `STRIPE_PRICE_TRACKER_FULL` (live: `price_1UYEAxKJKDCaYKVvaGWJkoSO`). Live prices are created; create matching TEST-mode prices for testing.
+3. Optional display overrides: `TRACKER_{BASE,TWO,ADDON,FULL,SMS}_LABEL` and `TRACKER_{BASE,TWO,ADDON,FULL,SMS}_AUD`.
 4. Webhook: reuse the existing `/.netlify/functions/stripe-webhook` endpoint and `STRIPE_WEBHOOK_SECRET`. Make sure it listens for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `charge.refunded`, `charge.dispute.created` and `charge.dispute.closed` (the same events as licences). Checkout sessions carry `metadata.kind=tracker`, `product`, `google_sub` and `device_id`. The `?tracker=success` return never unlocks anything: the app polls `status` until the webhook lands.
-4b. **SMS pack:** Product "Payment tracker SMS alerts", **recurring monthly Price A$4.99 AUD** → `STRIPE_PRICE_TRACKER_SMS` (`TRACKER_SMS_LABEL` / `TRACKER_SMS_AUD` for display). Checkout uses `mode=subscription`, with metadata on both the session and `subscription_data`. **Add these webhook events:** `invoice.paid`, `customer.subscription.updated`, `customer.subscription.deleted` (in addition to `charge.refunded` and `charge.dispute.created`, which already cover SMS refunds and disputes). Configure the **Customer portal** (Settings → Billing → Customer portal: allow cancel). Test: subscribe → `invoice.paid` → 50 credits; test-clock renewal → reset to 50; cancel → 0; refund → 0.
+4b. **SMS pack:** Product "Payment tracker SMS alerts", **recurring monthly Price A$4.99 AUD** → `STRIPE_PRICE_TRACKER_SMS` (live: `price_1UYEAyKJKDCaYKVvPWR5MQ3R`; `TRACKER_SMS_LABEL` / `TRACKER_SMS_AUD` for display). Checkout uses `mode=subscription`, with metadata on both the session and `subscription_data`. **Add these webhook events:** `invoice.paid`, `customer.subscription.updated`, `customer.subscription.deleted` (in addition to `charge.refunded` and `charge.dispute.created`, which already cover SMS refunds and disputes). Configure the **Customer portal** (Settings → Billing → Customer portal: allow cancel). Test: subscribe → `invoice.paid` → 50 credits; test-clock renewal → reset to 50; cancel → 0; refund → 0.
 5. Existing env vars that are reused: `STRIPE_SECRET_KEY`, `SITE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `LICENCE_SECRET`, `GOOGLE_CLIENT_ID`, `RESEND_API_KEY`.
 6. New env vars: `TRACKER_DATA_KEY` (`openssl rand -base64 32`; losing it makes the synced records unreadable), `TRACKER_EMAIL_FROM`, `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT` (`npx web-push generate-vapid-keys`), `TRACKER_AUTOSEND_ENABLED` (leave unset), `TRACKER_AUTOSEND_DRY_RUN` (default true).
    SMS: `STRIPE_PRICE_TRACKER_SMS`, `TRACKER_SMS_LABEL`, `TRACKER_SMS_AUD`, `TRACKER_SMS_ENABLED` (leave unset = off), `TRACKER_SMS_DRY_RUN` (default true), `TRACKER_SMS_PROVIDER` (twilio | telnyx), `TRACKER_SMS_CREDITS` (default 50), `TRACKER_SMS_ONE_WAY`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM` (registered sender ID or AU number), `TELNYX_API_KEY`, `TELNYX_FROM`. Point the Twilio number's inbound webhook at `/.netlify/functions/tracker-sms-inbound`.
 7. Apply `TRACKER-MIGRATION.sql` after `LICENSING-MIGRATION.sql`. It widens the `licence_payments.product` check.
-8. Test: a test-mode purchase → webhook row → status unlocked → a second computer is blocked until the A$29 add-on; the add-on is refused without the base; the full package gives two devices → refund re-locks.
+8. Test: a test-mode A$49 purchase → webhook row → status unlocked → a second computer is blocked until the A$29 upgrade; the upgrade is refused without A$49 base (and for A$69 / A$99 holders); A$69 and A$99 each give two computers → refund re-locks.
 
 Owner testing without paying: `/app?trackerpreview=1` unlocks the screens on that device only (`=0` to clear). It cannot send anything, because the server re-checks the unlock.
 
@@ -93,7 +94,7 @@ Push works only on iOS/iPadOS 16.4+, only after the user adds SupportFlow to the
 ## Launch blockers
 1. **Legal/privacy:** this is the first time invoice and participant-related data leaves the device. PRIVACY-POLICY.md, privacy.html, DATA-SECURITY.md ("no central developer database") and the Terms need updating: what is stored, the purpose, encryption, 30-day deletion, the US-hosted Resend (an APP 8 cross-border disclosure) and Supabase region, and the worker's responsibility for participant consent (NDIS number off by default). Get a privacy-lawyer review.
 2. **Resend domain:** verify `send.supportflow.work` (SPF, DKIM, DMARC with p=none→quarantine), warm it up, and monitor bounces and complaints. Use a separate subdomain so tracker mail can't hurt licence and tester mail.
-3. **Pricing:** A$49 base / A$29 add-on / A$99 full. The package costs more than base + add-on (A$78), so the owner should confirm this is intended and decide what "everything" includes beyond two devices. The Stripe products still need creating, and the pricing page/PRICING.md need the wording.
+3. **Pricing:** final: A$49 one computer / A$69 two computers / A$29 upgrade (A$49 owners) / A$99 complete package incl. 12 months of upgrades / SMS A$4.99 a month for 50 texts. Live Stripe Prices exist; Netlify env vars are not set; pricing.html / PRICING.md don't mention the tracker yet.
 4. **iOS push limits** (above). **Public holiday table:** the computed rules need checking against data.gov.au. WA's King's Birthday is approximated as the last Monday in September; part-day/regional holidays are ignored.
 5. **Testing:** Stripe test-mode purchase/refund/second device; a dry-run sender week with `TRACKER_AUTOSEND_DRY_RUN=true`; real devices (Android Chrome, iPhone Home Screen); a deliverability check (mail-tester, Gmail/Outlook inboxes); the migration on a Supabase branch first.
 6. **SMS (only if the add-on ships):** (a) **ACMA SMS Sender ID Register**: from 1 Jul 2026, an alphanumeric sender (e.g. "SupportFlw") must be registered by SupportFlow's ABN through the provider, or texts show "Unverified". Alphanumeric senders are one-way, so to receive STOP replies use a dedicated AU number (Twilio ~US$8.25/month) or set `TRACKER_SMS_ONE_WAY=true`. (b) **Spam Act:** alerts to the worker about their own invoices are factual service messages, not marketing. They still identify SupportFlow, keep STOP/in-app opt-out working at once, and must never carry promotion. Record express opt-in (`opt_in_at`). (c) Privacy: the worker's mobile is stored sealed; add it to the privacy policy. (d) Provider account and spend caps (Twilio balance alerts), plus SMS pumping protection for the code endpoint (rate limits are in place).

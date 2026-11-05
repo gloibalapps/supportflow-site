@@ -3,7 +3,7 @@
 //   GET  ?action=config                       -> { offer, clientId, autosendServer, vapidPublicKey }
 //   POST { action: "signin",   idToken, deviceId }            Google sign-in (works with licensing off)
 //   POST { action: "status",   session, deviceId }            -> { unlocked, product, prefs }
-//   POST { action: "checkout", session, deviceId, product }   -> { url }  (tracker_base | tracker_addon | tracker_full)
+//   POST { action: "checkout", session, deviceId, product }   -> { url }  (tracker_base | tracker_two | tracker_addon | tracker_full | tracker_sms)
 //   POST { action: "sync",     session, deviceId, prefs, records[] }   needs unlock
 //   POST { action: "forget",   session, deviceId }            turn auto-send off and delete synced records
 //   POST { action: "log",      session, deviceId }            -> { log: [...] } this worker's send log
@@ -44,14 +44,17 @@ async function checkout(session, deviceId, body) {
   const price = process.env[TRACKER_PRODUCTS[product].env];
   if (!price) return json({ error: "That option isn't available yet." }, 500);
   const have = await trackerUnlock(session.sub);
-  // Gated like the licence $29 upgrade: the add-on is only for base owners.
-  if (product === "tracker_addon" && (!have || have.full || have.addon)) {
-    return json({ error: !have ? "The $29 add-on is for Payment tracker owners. Buy the tracker first." : "This account already covers two computers." }, 409);
-  }
-  if (product !== "tracker_addon" && product !== "tracker_sms" && have?.full) return json({ error: "This account already has the full package." }, 409);
-  if (product === "tracker_base" && have && !isSub) return json({ error: "Payment tracker is already unlocked. Add a second computer for $29 instead.", addon: true }, 409);
-  const meta = { kind: "tracker", product, google_sub: session.sub, device_id: deviceId };
   const isSub = product === "tracker_sms";
+  // A$29 upgrade: ONLY for existing A$49 (tracker_base) holders on one computer.
+  if (product === "tracker_addon" && (!have || have.product !== "tracker_base" || have.addon)) {
+    return json({ error: !have ? "The A$29 upgrade is for A$49 Payment tracker owners. Buy the tracker first." : "This account already covers two computers." }, 409);
+  }
+  if (!isSub && product !== "tracker_addon" && have?.full) return json({ error: "This account already has the complete package." }, 409);
+  if ((product === "tracker_base" || product === "tracker_two") && have) {
+    if (have.devices >= 2) return json({ error: "This account already covers two computers." }, 409);
+    return json({ error: "Payment tracker is already unlocked. Add a second computer with the A$29 upgrade instead.", addon: true }, 409);
+  }
+  const meta = { kind: "tracker", product, google_sub: session.sub, device_id: deviceId };
   if (isSub) {
     // Optional SMS pack: tracker owners (base or full) only, one active pack per account.
     if (!have) return json({ error: "SMS alerts are an option for Payment tracker owners. Unlock the tracker first." }, 409);
@@ -236,7 +239,7 @@ export default async (req) => {
       const p = (await supa(`tracker_prefs?google_sub=eq.${q(session.sub)}&select=enabled,state,notify_push,notify_email`))?.[0] || null;
       return json({ sms: await smsStatus(session.sub), unlocked: !!unlock, paid: !!paid, devices: paid?.devices || 0, deviceLimit: !!paid && !seat, product: paid?.product || null, prefs: p, autosendServer: autosendEnabled() });
     }
-    if (!unlock) return json({ error: paid ? "Your Payment tracker is in use on another device. Add a second device for A$29." : "Payment tracker isn't unlocked on this Google account.", locked: true, deviceLimit: !!paid }, 402);
+    if (!unlock) return json({ error: paid ? "Your Payment tracker is in use on another device. Add a second computer with the A$29 upgrade." : "Payment tracker isn't unlocked on this Google account.", locked: true, deviceLimit: !!paid }, 402);
 
     if (action === "sync") return await sync(session, body);
     if (action === "sms-start") return await smsStart(session, body);

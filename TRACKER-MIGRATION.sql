@@ -11,7 +11,7 @@
 -- 1) Paid unlocks ride on the licence ledger, exactly like licences.
 alter table public.licence_payments drop constraint if exists licence_payments_product_check;
 alter table public.licence_payments add constraint licence_payments_product_check
-  check (product in ('one', 'two', 'upgrade', 'tracker_base', 'tracker_addon', 'tracker_full'));
+  check (product in ('one', 'two', 'upgrade', 'tracker_base', 'tracker_two', 'tracker_addon', 'tracker_full'));
 
 -- 2) Per-worker auto-send preferences. worker_enc = AES-GCM sealed
 --    { replyTo, name } (TRACKER_DATA_KEY, server-side).

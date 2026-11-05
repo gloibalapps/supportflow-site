@@ -4339,8 +4339,8 @@ const markPaid = (data, id, { paidAt, amountPaid }) => ({
 });
 
 /* ---------------- Payment tracker access (paywall) ----------------
-   Unlocked = the server says this Google account has a paid tracker_base
-   or tracker_full row, plus a seat for this device (1 with base; 2 with base + A$29 add-on or full) (written only by the Stripe webhook). The last answer is
+   Unlocked = the server says this Google account has a paid tracker_base,
+   tracker_two or tracker_full row, plus a seat for this device (1 with A$49 base; 2 with A$69 two-computer, A$49 + A$29 upgrade, or A$99 complete) (written only by the Stripe webhook). The last answer is
    cached so the screens work offline. Server-side auto-send re-checks the
    unlock itself, so editing this cache can't send anything. */
 function useTrackerAccess() {
@@ -4412,9 +4412,10 @@ function useTrackerAccess() {
 }
 
 function TrackerUpsell({ access, owed, count, go }) {
-  // Not paid: base (one computer) or the full package. Base owners: only the
-  // $29 second-computer add-on (gated server-side like the licence upgrade).
-  const offer = (access.cfg?.offer || []).filter((o) => (o.available || access.preview) && (access.paid ? o.id === "tracker_addon" : o.id !== "tracker_addon") && o.id !== "tracker_sms");
+  // Not paid: A$49 one computer, A$69 two computers or the A$99 complete package.
+  // A$49 (tracker_base) owners on one computer: only the A$29 upgrade (gated server-side too).
+  const baseOwner = access.paid && access.product === "tracker_base" && (access.devices || 0) < 2;
+  const offer = (access.cfg?.offer || []).filter((o) => (o.available || access.preview) && (access.paid ? (baseOwner && o.id === "tracker_addon") : o.id !== "tracker_addon") && o.id !== "tracker_sms");
   const smsOffer = (access.cfg?.offer || []).find((o) => o.id === "tracker_sms");
   return (
     <div className="panel" style={{ borderColor: "var(--brass)" }}>
@@ -4428,7 +4429,7 @@ function TrackerUpsell({ access, owed, count, go }) {
         ✓ Shows plan managers who are late again and again, and exports a payment history
       </div>
       <div style={{ fontSize: 13, color: "var(--tx-2)", marginTop: 10 }}>
-        Free: push notifications.{smsOffer ? ` Optional: SMS alerts A$${smsOffer.priceAud}/month for 50 texts, added after you unlock the tracker. Not included in any package.` : ""}
+        Free: push notifications.{smsOffer ? ` Optional: SMS alerts A$${smsOffer.priceAud}/month for 50 texts, added after you unlock the tracker. Not included in any package, including the A$99 complete package.` : ""}
       </div>
       {access.phase === "signedout" && (
         <div style={{ marginTop: 14 }}>
@@ -4436,7 +4437,7 @@ function TrackerUpsell({ access, owed, count, go }) {
           {access.cfg?.clientId ? <LicenceGoogleButton clientId={access.cfg.clientId} onCredential={access.signIn} /> : <div style={{ fontSize: 12.5, color: "var(--tx-3)" }}>Sign-in isn't available right now.</div>}
         </div>
       )}
-      {access.phase === "locked" && access.deviceLimit && <div style={{ fontSize: 13, marginTop: 12 }}>Your Payment tracker is already in use on your other computer. Add this one for A$29:</div>}
+      {access.phase === "locked" && access.deviceLimit && <div style={{ fontSize: 13, marginTop: 12 }}>Your Payment tracker is already in use on your other computer.{baseOwner ? " Add this one with the A$29 upgrade:" : ""}</div>}
       {access.phase === "locked" && (offer.length ? offer.map((o) => (
         <button key={o.id} className="btn" style={{ width: "100%", marginTop: 10, minHeight: 48 }} disabled={!!access.busy} onClick={() => access.buy(o.id)}>
           {access.busy === o.id ? "One moment..." : `${o.label} · A$${o.priceAud} once`}
@@ -8383,9 +8384,9 @@ const MANUAL = [
     d: "The optional Payment tracker add-on: prices, SMS pack and push notifications.",
     q: [
       ["What the Payment tracker costs",
-       "The Payment tracker (Money \u2192 Payment tracker) is optional. A$49 once for the tracker on one computer. A$29 add-on for a second computer, only for owners of the one-computer tracker. A$99 once for the full package: the full tracker on two computers, all future tracker updates, no subscription. The optional SMS pack (A$4.99 a month for 50 texts) is separate and not part of any of these."],
+       "The Payment tracker (Money \u2192 Payment tracker) is optional. A$49 once for the tracker on one computer. A$69 once for the tracker on two computers. A$29 once to upgrade the A$49 plan to add a second computer (only for A$49 owners). A$99 once for the complete package: the tracker on two computers plus tracker upgrades for 12 months from purchase, no subscription. The optional SMS pack (A$4.99 a month for 50 texts) is the only paid add-on and is not included in any of these, including the A$99 package."],
       ["SMS alerts pack",
-       "Optional, only for Payment tracker owners, and not part of the full package. Texts go only to your own mobile after you verify it with a code, never to the NDIA, a plan manager or a payer. They are used for the day 7, 12 and 20 overdue alerts and the complaint-draft-ready nudge. Credits reset to 50 each month and don't roll over. Reply STOP or use Stop texts in Payment tracker \u2192 Settings to stop texts."],
+       "Optional, only for Payment tracker owners, and not included in the A$99 complete package. Texts go only to your own mobile after you verify it with a code, never to the NDIA, a plan manager or a payer. They are used for the day 7, 12 and 20 overdue alerts and the complaint-draft-ready nudge. Credits reset to 50 each month and don't roll over. Reply STOP or use Stop texts in Payment tracker \u2192 Settings to stop texts."],
       ["Out of SMS credits",
        "When texts run out, alerts are sent as push notifications instead, to every device where you turned notifications on. You get one notification saying texts are used up. Push notifications are free."],
       ["Turn on push notifications",

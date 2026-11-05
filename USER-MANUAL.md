@@ -777,10 +777,11 @@ The Payment tracker lives at **Money → Payment tracker**. It shows who owes yo
 ### Pricing
 
 - **A$49 once:** the tracker on one computer.
-- **A$29 add-on:** the tracker on a second computer. Only for owners of the one-computer tracker.
-- **A$99 once:** the full package. The full tracker on two computers, with all future updates to the tracker. No subscription.
+- **A$69 once:** the tracker on two computers.
+- **A$29 once:** upgrade from the A$49 plan to add a second computer. Only for owners of the A$49 one-computer tracker.
+- **A$99 once:** the complete package. The tracker on two computers, plus tracker upgrades for 12 months from the date you buy. No subscription.
 
-The optional SMS pack below is **separate**. It is not part of the full package or any other tracker purchase.
+The optional SMS pack below is the **only paid add-on**, and it is **separate**. It is not included in the A$99 package or any other tracker purchase.
 
 ### SMS alerts (optional)
 
