@@ -749,12 +749,43 @@ the spot.
 
 The app is free to try, with full access and nothing held back. Once the
 free period ends, adding new invoices, shifts, trips, expenses, participants
-and plan managers needs a **SupportFlow Lifetime** licence. Everything you've
+and plan managers needs a paid SupportFlow licence. Everything you've
 already entered stays visible, and you can still view, edit, back up and
 export it either way.
 
 Buy the licence from the prompt that appears when the free period ends, or
 earlier from the profile menu.
+
+### Plans and licenses
+
+The pricing cards on the SupportFlow home page (supportflow.work, **Plans**)
+show two one-off plans:
+
+- **Basic, A$49:** invoices, shifts, notes, kilometres, expenses and tax.
+  The card shows **One license**.
+- **Premium, A$99:** everything in Basic plus the Payment tracker (optional
+  SMS notification is extra, A$4.99 a month for 50 texts). The card shows
+  **Two licenses**.
+
+Your current plan and how many devices it covers are shown in the app under
+**Settings → Licence & devices**.
+
+### Upgrading from Basic
+
+Next to **One license** on the Basic card there's an **Upgrade** button. It
+opens SupportFlow in a **new tab** (supportflow.work/app?buy=upgrade):
+
+1. If this device isn't signed in yet, sign in with the Google account you
+   bought Basic with.
+2. An **Upgrade SupportFlow** box appears. Choose the option you want:
+   - **Add a second device, A$29:** your Basic licence then covers two
+     devices. Only available on a one-device (Basic) licence.
+   - **Upgrade to Premium, A$99:** adds the Payment tracker and two licenses.
+3. You're taken to **Stripe Checkout** to pay. When payment finishes you come
+   back to the app and the upgrade is applied automatically.
+
+Tap **Not now** to close the box without buying anything. Basic owners can
+also add a second device from **Settings → Licence & devices**.
 
 ### Restoring on a new device
 
@@ -779,7 +810,7 @@ The Payment tracker lives at **Money → Payment tracker**. It shows who owes yo
 - **A$49 once:** the tracker on one computer.
 - **A$69 once:** the tracker on two computers.
 - **A$29 once:** upgrade from the A$49 plan to add a second computer. Only for owners of the A$49 one-computer tracker.
-- **A$99 once:** the Premium package: everything in Basic (invoices, shifts, notes, kilometres, expenses and tax), a two-device license and the Payment tracker. No subscription. Upgrades are not included.
+- **A$99 once:** the Premium package: everything in Basic (invoices, shifts, notes, kilometres, expenses and tax), two licenses and the Payment tracker. No subscription.
 
 The optional SMS pack below is the **only paid add-on**, and it is **separate**. It is not included in the A$99 package or any other tracker purchase.
 

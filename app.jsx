@@ -2507,7 +2507,60 @@ function PinSetupPrompt({ onDone }) {
 // Never shown to paid users (device licence or lifetime).
 const REMIND_KEY = "ndis:upgradeRemindAt";
 const BUY_URL = "/app?buy=1";
-function wantsLicenceFlow() { try { return new URLSearchParams(location.search).get("buy") === "1"; } catch (e) { return false; } }
+function wantsLicenceFlow() { try { const b = new URLSearchParams(location.search).get("buy"); return b === "1" || b === "upgrade"; } catch (e) { return false; } }
+function wantsUpgradeChooser() { try { return new URLSearchParams(location.search).get("buy") === "upgrade"; } catch (e) { return false; } }
+// /app?buy=upgrade (Basic card "Upgrade" button, opens in a new tab): after
+// Google sign-in / licence restore, pick an upgrade and go to Stripe Checkout.
+function UpgradeChooser({ licence }) {
+  const [open, setOpen] = useState(() => wantsUpgradeChooser());
+  const [busy, setBusy] = useState(null);
+  const [err, setErr] = useState("");
+  if (!open) return null;
+  const close = () => {
+    try { const sp = new URLSearchParams(location.search); sp.delete("buy"); history.replaceState(null, "", location.pathname + (sp.toString() ? "?" + sp : "") + location.hash); } catch (e) { }
+    setOpen(false);
+  };
+  const plan = licence.info?.plan;
+  const signedIn = !!licence.account;
+  const addDevice = async () => {
+    setBusy("upgrade"); setErr("");
+    const r = await licence.checkout("upgrade");
+    if (r?.error) { setErr(r.error); setBusy(null); }
+  };
+  const premium = async () => {
+    setBusy("premium"); setErr("");
+    try {
+      const session = await licGet("session");
+      const deviceId = await licenceDeviceId();
+      const r = await fetch(TRACKER_API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "checkout", product: "tracker_full", session: session?.token, deviceId }) });
+      const d = await r.json().catch(() => ({}));
+      if (d.url) { location.href = d.url; return; }
+      setErr(d.error || "Couldn't start checkout.");
+    } catch (e) { setErr("You're offline. Connect and try again."); }
+    setBusy(null);
+  };
+  return <div role="dialog" aria-modal="true" aria-label="Upgrade" style={{ position: "fixed", inset: 0, zIndex: 90, background: "rgba(10,11,8,.72)", display: "grid", placeItems: "center", padding: 16 }}>
+    <div className="panel" style={{ maxWidth: 440, width: "100%", maxHeight: "90vh", overflow: "auto" }}>
+      <div className="disp" style={{ fontSize: 20, marginBottom: 6 }}>Upgrade SupportFlow</div>
+      <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.6, marginBottom: 14 }}>Choose the option you want. You'll pay securely on Stripe Checkout.</div>
+      {!signedIn ? <>
+        <div style={{ fontSize: 13, color: "var(--tx-2)", lineHeight: 1.6, marginBottom: 12 }}>Sign in with the Google account you bought Basic with first.</div>
+        <LicenceGoogleButton clientId={licence.clientId} onCredential={(c) => licence.signIn(c)} />
+      </> : <>
+        <button className="btn" style={{ width: "100%", minHeight: 48, marginBottom: 10 }} disabled={!!busy || licence.offline || plan !== 1} onClick={addDevice}>
+          {busy === "upgrade" ? "Opening checkout\u2026" : "Add a second device \u2014 A$29"}
+        </button>
+        {plan === 2 && <div style={{ fontSize: 12, color: "var(--tx-3)", marginBottom: 10 }}>Your licence already covers two devices.</div>}
+        <button className="btn" style={{ width: "100%", minHeight: 48, marginBottom: 10 }} disabled={!!busy || licence.offline} onClick={premium}>
+          {busy === "premium" ? "Opening checkout\u2026" : "Upgrade to Premium \u2014 A$99"}
+        </button>
+        <div style={{ fontSize: 12, color: "var(--tx-3)", lineHeight: 1.6, marginBottom: 10 }}>Premium adds the Payment tracker and two licenses.</div>
+      </>}
+      {err && <div style={{ fontSize: 12.5, color: "var(--warn)", marginBottom: 10 }}>{err}</div>}
+      <button className="btn ghost tiny" onClick={close}>Not now</button>
+    </div>
+  </div>;
+}
 function OfferOrUpgradeBanner({ paid, freeOffer, known }) {
   const [hidden, setHidden] = useState(() => { try { return sessionStorage.getItem("ndis:bannerHidden") === "1"; } catch (e) { return false; } });
   if (paid || hidden || !known) return null;
@@ -3363,6 +3416,7 @@ function App() {
 
   return (
     <LicenceContext.Provider value={licence}>
+    <UpgradeChooser licence={licence} />
     {licence.notice && (
       <div className="checkout-toast" data-type={licence.notice.type === "cancelled" ? "cancelled" : "success"} role="status" aria-live="polite">
         <span className="ti">{licence.notice.type === "cancelled" ? "\u2715" : "\u2713"}</span>
