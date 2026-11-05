@@ -26,7 +26,7 @@
     padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
   #boot{position:fixed;inset:0;display:grid;place-items:center;background:#12140E;
     color:#8B8E82;font-family:'Instrument Sans',system-ui,sans-serif;z-index:9999;
-    transition:opacity .3s ease}
+    transition:opacity .6s ease}
   #boot.gone{opacity:0;pointer-events:none}
   #boot .seal{width:96px;height:96px;border-radius:22px;margin:0 auto 26px;background:transparent;overflow:hidden;display:grid;place-items:center;font-family:'Fraunces',serif;font-size:29px;color:#14150F;animation:pulse 1.6s ease-in-out infinite}
   #boot p{font-size:13px;text-align:center;margin:0}
@@ -9581,9 +9581,25 @@ ReactDOM.createRoot(document.getElementById("root")).render(
   var boot=document.getElementById('boot');
   var msg=document.getElementById('bootmsg');
 
+  // Splash minimum: on a COLD open (first load in this browser session) keep the
+  // splash up ~5s from page start so the logo and loader can be seen, then fade.
+  // Refreshes within the same session skip the wait. Slow loads hide as soon as
+  // ready; startup errors show immediately (fail() never waits).
+  var BOOT_MIN_MS=5000, bootCold=true, bootReady=false;
+  try{ bootCold=!sessionStorage.getItem('sf:booted'); }catch(e){}
+  function hideBoot(){
+    bootReady=true; // app is running; later errors are not startup errors
+    try{ sessionStorage.setItem('sf:booted','1'); }catch(e){}
+    var now=(window.performance&&performance.now)?performance.now():BOOT_MIN_MS;
+    var wait=bootCold?Math.max(0,BOOT_MIN_MS-now):0;
+    setTimeout(function(){
+      if(!boot||boot.classList.contains('failed'))return;
+      boot.classList.add('gone');setTimeout(function(){try{boot.remove();}catch(e){}},650);
+    },wait);
+  }
   function fail(text){ if(boot)boot.classList.add('failed'); if(!msg)return; msg.className='err'; msg.textContent=text; }
   window.addEventListener('error',function(e){
-    if(boot && !boot.classList.contains('gone')) fail('Something went wrong starting up: '+(e.message||'unknown error'));
+    if(boot && !bootReady && !boot.classList.contains('gone')) fail('Something went wrong starting up: '+(e.message||'unknown error'));
   });
 
   var hosts=['https://unpkg.com/','https://cdn.jsdelivr.net/npm/'];
@@ -9621,7 +9637,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
       var out=Babel.transform(src,{presets:['react']}).code;
       var s=document.createElement('script'); s.textContent=out; document.body.appendChild(s);
       launched=true;
-      if(boot){boot.classList.add('gone');setTimeout(function(){try{boot.remove();}catch(e){}},320);}
+      hideBoot();
     }catch(e){ fail("Couldn't start the app: "+(e&&e.message?e.message:e)); }
   }
   function maybeLaunch(){
