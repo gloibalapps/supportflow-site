@@ -1,6 +1,6 @@
 /* SupportFlow™ — service worker
    Bump CACHE when you deploy, or testers will keep the old build. */
-const CACHE = 'supportflow-v31-theme-system-light-dark';
+const CACHE = 'supportflow-v32-hero-simplify';
 
 // Everything needed to open the app with no network at all.
 const CORE = [
