@@ -3,25 +3,25 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>NDIS Support Worker Software | SupportFlow</title>
+<title>NDIS Invoicing App for Support Workers | SupportFlow</title>
 <link rel="manifest" href="./manifest.webmanifest" />
 <meta name="theme-color" content="#12140E" />
-<meta name="description" content="Shifts, invoices, notes, kilometres, expenses and tax records for independent Australian NDIS support workers, in one private, offline-friendly app." />
+<meta name="description" content="From shift to invoice: NDIS invoices with item codes, kilometres, notes and late-payment reminders. Offline, private, one-off A$79. Try 5 invoices free." />
 <link rel="canonical" href="https://supportflow.work/" />
 <meta name="robots" content="index, follow, max-image-preview:large" />
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="SupportFlow™" />
-<meta property="og:title" content="NDIS Support Worker Software | SupportFlow" />
-<meta property="og:description" content="Manage shifts, invoices, notes, kilometres, expenses and tax records in one private, offline-friendly app for independent Australian support workers." />
+<meta property="og:title" content="NDIS Invoicing App for Support Workers | SupportFlow" />
+<meta property="og:description" content="From shift to invoice: NDIS invoices with item codes, kilometres, notes and late-payment reminders. Offline, private, one-off A$79. Try 5 invoices free." />
 <meta property="og:url" content="https://supportflow.work/" />
 <meta property="og:locale" content="en_AU" />
 <meta property="og:image" content="https://supportflow.work/og-image.png" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
-<meta property="og:image:alt" content="NDIS SupportFlow — admin software for independent Australian support workers" />
+<meta property="og:image:alt" content="SupportFlow — NDIS invoicing app for independent Australian support workers" />
 <meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:title" content="NDIS Support Worker Software | SupportFlow" />
-<meta name="twitter:description" content="Manage shifts, invoices, notes, kilometres, expenses and tax records in one private, offline-friendly app." />
+<meta name="twitter:title" content="NDIS Invoicing App for Support Workers | SupportFlow" />
+<meta name="twitter:description" content="From shift to invoice: NDIS invoices with item codes, kilometres, notes and late-payment reminders. Offline, private, one-off A$79. Try 5 invoices free." />
 <meta name="twitter:image" content="https://supportflow.work/og-image.png" />
 <script type="application/ld+json">
 {
@@ -48,13 +48,13 @@
       "url": "https://supportflow.work/",
       "applicationCategory": "BusinessApplication",
       "operatingSystem": "Web",
-      "description": "Admin software for independent Australian NDIS support workers to manage shifts, invoices, notes, kilometres, expenses and tax records.",
+      "description": "From shift to invoice: NDIS invoices with item codes, kilometres, notes and late-payment reminders for independent Australian support workers. Offline and private. One-off from A$79. Try 5 invoices free.",
       "audience": {
         "@type": "Audience",
         "audienceType": "Independent Australian NDIS support workers"
       },
       "isAccessibleForFree": false,
-        "offers": [{ "@type": "Offer", "price": "79.00", "priceCurrency": "AUD", "description": "One licence, one-off payment" }, { "@type": "Offer", "price": "69.00", "priceCurrency": "AUD", "description": "Two licences (phone and computer), one-off payment" }],
+        "offers": [{ "@type": "Offer", "name": "Basic", "price": "79.00", "priceCurrency": "AUD", "description": "Basic, one device, one-off payment" }, { "@type": "Offer", "name": "Premium", "price": "149.00", "priceCurrency": "AUD", "description": "Premium, two devices and payment tracker, one-off payment" }],
       "inLanguage": "en-AU"
     }
 ,
@@ -75,7 +75,7 @@
           "name": "What happens if I lose or change my phone?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Your records live on that device only. If you have backed up using an encrypted file with a passphrase only you know, you can restore on a new device. If you haven't backed up, that data is genuinely gone."
+            "text": "Your records live on that device only. If you've backed up, an encrypted file with a passphrase only you know, you restore it on a new device and you're back. If you haven't backed up, that data is genuinely gone, the same as any other file on a lost phone."
           }
         },
         {
@@ -83,7 +83,7 @@
           "name": "Does it work without internet?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Once you've opened it successfully one time, the core app keeps working with no connection at all. A few features that genuinely need the internet, like sending an email, wait until you're back online."
+            "text": "Once you've opened it successfully one time, the core app keeps working with no connection at all. A few features that genuinely need the internet, like sending an email or the optional deduction checker, wait until you're back online."
           }
         },
         {
@@ -91,7 +91,7 @@
           "name": "How do I get started?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Open SupportFlow and complete the setup for your business, passcode and encrypted backup."
+            "text": "Open SupportFlow and try 5 free invoices for 30 days, no card needed. Then complete the setup for your business, passcode and encrypted backup."
           }
         }
       ]
@@ -169,6 +169,9 @@
      font-size:clamp(46px,9vw,108px);line-height:.94;letter-spacing:-.035em;
      margin-bottom:24px;transform-style:preserve-3d}
   h1 .line{display:block;transform-style:preserve-3d;white-space:nowrap}
+  h1 .h1-kicker{display:block;margin:18px auto 0;max-width:22em;font-family:'Instrument Sans',system-ui,sans-serif;
+    font-size:clamp(16px,2.2vw,22px);font-weight:500;letter-spacing:0;line-height:1.35;
+    color:var(--muted);white-space:normal;text-wrap:balance}
   h1 .ch{display:inline-block;transform-style:preserve-3d;will-change:transform,opacity;
     opacity:0;
     transform:translate3d(var(--x),var(--y),var(--z)) rotateX(var(--rx)) rotateY(var(--ry)) rotateZ(var(--rz));
@@ -427,7 +430,7 @@
   </header>
   <main id="main-content" class="block">
     <div class="kicker rise">For independent support workers</div>
-    <h1 id="title" class="rise" aria-label="From shift to invoice with SupportFlow"><span class="line">From shift</span><span class="line">to invoice</span></h1>
+    <h1 id="title" class="rise" aria-label="From shift to invoice: the NDIS invoicing app for independent support workers"><span class="line">From shift</span><span class="line">to invoice</span><span class="h1-kicker">the NDIS invoicing app for independent support workers</span></h1>
     <div class="hero-features rise">Shifts &bull; Kilometres &bull; Notes &bull; Invoices &bull; Tax &bull; Overdue payment tracker &bull; Expenses</div>
     <div class="actions rise"><a class="btn" href="./app">Try 5 free invoices</a></div>
     <p class="try-free rise">Includes five invoices for 30 days, no payment required</p>
@@ -517,7 +520,7 @@
       <div class="name">Premium</div>
       <div class="price">A$149 <small>one-off</small></div>
       <ul><li>Everything in Basic (invoices, shifts, notes, kilometres, expenses and tax)</li><li>Two-device license</li><li>Payment tracker<br><small>Keeps an eye on unpaid invoices and chases them for you: a polite nudge email after 7 business days, a firmer follow-up at 12, and a complaint draft at 20. You can edit every email, and it works for self-managed, plan-managed and NDIA-managed participants.</small></li><li>SMS notification &mdash; optional<br><small>(A$4.99 a month for 50 texts, not included in A$149)</small></li></ul>
-      <a class="btn" href="./app?buy=1">Get Premium &mdash; A$149</a>
+      <a class="btn" href="./app?buy=upgrade">Get Premium &mdash; A$149</a>
     </div>
   </div>
   <p class="fine">Prices in Australian dollars, GST inclusive where applicable. Your rights under the Australian Consumer Law are not affected.</p>
@@ -699,7 +702,7 @@
     </div>
     <div class="tcard">
       <b>How do I get started?</b>
-      <span>Open SupportFlow and complete the setup for your business, passcode and encrypted backup.</span>
+      <span>Open SupportFlow and try 5 free invoices for 30 days, no card needed. Then complete the setup for your business, passcode and encrypted backup.</span>
     </div>
   </div>
 </section>

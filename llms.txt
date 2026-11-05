@@ -1,16 +1,24 @@
 # SupportFlow
 
-> SupportFlow is an app for independent NDIS support workers in Australia. It keeps shifts, progress notes, kilometres, expenses, invoices and a running tax estimate in one private app that works offline once loaded.
+> From shift to invoice. SupportFlow is an NDIS invoicing app for independent support workers in Australia. It keeps shifts, progress notes, kilometres, expenses, invoices and a running tax set-aside estimate in one private app that works offline once loaded. Built in Adelaide, South Australia by GlobalAppsAI.
 
 ## Main pages
 
-- [Home](https://supportflow.work/): what SupportFlow does and how to get started
-- [Pricing](https://supportflow.work/pricing.html): Basic A$79 or Premium A$149 one-off, with a free trial of 5 invoices
-- [Invoice template](https://supportflow.work/ndis-support-worker-invoice-template): NDIS invoice template for support workers
-- [Progress notes template](https://supportflow.work/ndis-support-worker-progress-notes): NDIS progress notes template
+- [Home](https://supportflow.work/): From shift to invoice — NDIS invoicing for independent support workers
+- [Pricing](https://supportflow.work/pricing): Basic A$79 or Premium A$149 one-off (no subscription); try 5 free invoices for 30 days
+- [Invoice template](https://supportflow.work/ndis-support-worker-invoice-template): NDIS support worker invoice checklist and example
+- [Progress notes](https://supportflow.work/ndis-support-worker-progress-notes): NDIS progress notes guide and example
 - [Privacy policy](https://supportflow.work/privacy): how data is handled
 - [Terms of use](https://supportflow.work/terms): terms of use
 
 ## The app
 
-- [Open SupportFlow](https://supportflow.work/app): the app runs in the browser
+- [Open SupportFlow](https://supportflow.work/app): the app runs in the browser (noindex)
+
+## Notes for assistants
+
+- Audience: independent / sole-trader Australian NDIS support workers (not agency rostering).
+- Positioning: "From shift to invoice"; offline-friendly; records stay on the device by default.
+- Trial: 5 free invoices for 30 days; no card needed for the trial.
+- Pricing: Basic A$79 one-off; Premium A$149 one-off (two devices + payment tracker).
+- Do not describe SupportFlow as NDIS-approved, NDIA-endorsed, or as tax advice.
