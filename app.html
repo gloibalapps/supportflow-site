@@ -2241,6 +2241,41 @@ async function verifyBiometric(idB64) {
 }
 
 
+/* ---------------- new-user offer banner + upgrade reminder ---------------- */
+// One slot only: while the free offer is active the offer banner shows; the
+// upgrade reminder only appears once the offer has ended/used up, at most once
+// per session and then not again for 3 days after "Remind me later".
+// Never shown to paid users (device licence or lifetime).
+const REMIND_KEY = "ndis:upgradeRemindAt";
+function OfferOrUpgradeBanner({ paid, freeOffer, known }) {
+  const [hidden, setHidden] = useState(() => { try { return sessionStorage.getItem("ndis:bannerHidden") === "1"; } catch (e) { return false; } });
+  if (paid || hidden || !known) return null;
+  const hide = (later) => {
+    try { sessionStorage.setItem("ndis:bannerHidden", "1"); if (later) localStorage.setItem(REMIND_KEY, String(Date.now() + 3 * 86400000)); } catch (e) { }
+    setHidden(true);
+  };
+  const box = { position: "fixed", left: 12, right: 12, bottom: "calc(76px + env(safe-area-inset-bottom))", zIndex: 60, maxWidth: 560, margin: "0 auto",
+    display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 14, background: "#1C1E17", color: "#EDE6D6",
+    border: "1px solid rgba(224,168,63,.45)", boxShadow: "0 10px 30px rgba(0,0,0,.35)", fontSize: 13.5, lineHeight: 1.45 };
+  const btn = { background: "none", border: 0, color: "#C9C2B0", fontSize: 12.5, cursor: "pointer", padding: 6, whiteSpace: "nowrap" };
+  if (freeOffer && freeOffer.remaining > 0) {
+    return <div role="status" style={box}>
+      <span aria-hidden="true" style={{ fontSize: 18 }}>&#127873;</span>
+      <div style={{ flex: 1 }}><b style={{ color: "#E8C171" }}>Free: 5 invoices for 30 days</b><br />
+        {freeOffer.remaining} invoice{freeOffer.remaining === 1 ? "" : "s"} left · {freeOffer.daysLeft} day{freeOffer.daysLeft === 1 ? "" : "s"} left</div>
+      <button style={btn} onClick={() => hide(false)} aria-label="Hide free offer banner">Hide</button>
+    </div>;
+  }
+  let due = true; try { due = Number(localStorage.getItem(REMIND_KEY) || 0) <= Date.now(); } catch (e) { }
+  if (!due) return null;
+  return <div role="status" style={box}>
+    <div style={{ flex: 1 }}><b style={{ color: "#E8C171" }}>Keep invoicing with SupportFlow</b><br />
+      Basic A$49 one-off, or Complete A$99 (2 computers + payment tracker upgrades for 12 months).</div>
+    <a className="btn" href={PRICING_URL} style={{ whiteSpace: "nowrap" }}>See plans</a>
+    <button style={btn} onClick={() => hide(true)}>Remind me later</button>
+  </div>;
+}
+
 /* ---------------- trial ended notice ---------------- */
 function TrialEndedNotice({ onClose, startInRestore = false }) {
   const [busy, setBusy] = useState(false);
@@ -2506,6 +2541,8 @@ function App() {
   // Lifetime licence (A$49 once): check-status returns lifetime:true. Never expires, never needs a top-up.
   const [isLifetime, setLifetime] = useState(false);
   const [creditExpiresIn, setCreditExpiresIn] = useState(null); // days remaining
+  const [freeOffer, setFreeOffer] = useState(null); // new-user offer {remaining, daysLeft}
+  const [statusKnown, setStatusKnown] = useState(false);
 
   // Stripe return state — set when app loads with ?checkout=success / ?checkout=cancelled
   const [checkoutResult, setCheckoutResult] = useState(null);
@@ -2547,7 +2584,7 @@ function App() {
               if (d.status === "ok" || d.status === "none") {
                 setCreditBalance(Number(d.credits) || 0);
                 setLifetime(!!d.lifetime);
-                setCreditsExpired(!d.lifetime && !!d.expired);
+                setCreditsExpired(!d.lifetime && !!d.expired); setFreeOffer(d.freeOffer || null); setStatusKnown(true);
                 if (d.expiresAt) {
                   const exp = new Date(d.expiresAt).getTime();
                   const now = Date.now();
@@ -2587,7 +2624,7 @@ function App() {
           if (d.status === "ok" || d.status === "none") {
             setCreditBalance(Number(d.credits) || 0);
             setLifetime(!!d.lifetime);
-            setCreditsExpired(!d.lifetime && !!d.expired);
+            setCreditsExpired(!d.lifetime && !!d.expired); setFreeOffer(d.freeOffer || null); setStatusKnown(true);
             if (d.expiresAt) {
               const exp = new Date(d.expiresAt).getTime();
               const now = Date.now();
@@ -3314,6 +3351,8 @@ function App() {
           </button>
         ))}
       </div>
+
+      <OfferOrUpgradeBanner paid={licence.phase === "ok" || isLifetime} freeOffer={freeOffer} known={statusKnown} />
 
       {showTrialNotice && <TrialEndedNotice startInRestore={trialNoticeRestore} onClose={() => { setShowTrialNotice(false); setTrialNoticeRestore(false); }} />}
 

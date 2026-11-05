@@ -18,6 +18,7 @@
 //   { status: "none", credits: 5 }            no account yet (new user)
 //   { status: "unconfigured" | "error", credits: N }
 
+import { hashIp, clientIp, offerState, FREE_OFFER } from "../lib/free-offer.mjs";
 const FREE_STARTER_CREDITS = 5; // matches invoice-credit-rules.js
 
 const json = (obj) =>
@@ -49,7 +50,24 @@ export default async (req) => {
     );
     if (!resp.ok) throw new Error(`Supabase ${resp.status}`);
     const account = (await resp.json())?.[0];
-    if (!account) return json({ status: "none", credits: FREE_STARTER_CREDITS });
+    if (!account) {
+      // New-user offer: start the 5-invoice / 30-day window on FIRST OPEN via
+      // start_free_offer (FREE-OFFER-MIGRATION.sql, capped per hashed IP).
+      // If that RPC isn't deployed yet, keep the old behaviour.
+      try {
+        const r = await fetch(`${process.env.SUPABASE_URL}/rest/v1/rpc/start_free_offer`, {
+          method: "POST",
+          headers: { apikey: process.env.SUPABASE_SERVICE_KEY, Authorization: `Bearer ${process.env.SUPABASE_SERVICE_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ p_account_id: deviceRef, p_ip_hash: hashIp(clientIp(req), process.env.FREE_OFFER_IP_SALT || ""), p_max_per_ip: FREE_OFFER.maxGrantsPerIpPer30Days }),
+        });
+        const row = r.ok ? (await r.json())?.[0] : null;
+        if (row) {
+          const credits = (Number(row.credit_balance) || 0) + (Number(row.free_credits_remaining) || 0);
+          return json({ status: "ok", credits, expired: credits <= 0, expiresAt: row.credits_expire_at, freeOffer: offerState(row) });
+        }
+      } catch {}
+      return json({ status: "none", credits: FREE_STARTER_CREDITS, freeOffer: { remaining: FREE_STARTER_CREDITS, daysLeft: FREE_OFFER.days, expiresAt: null } });
+    }
 
     const expiresAt = account.credits_expire_at ? new Date(account.credits_expire_at) : null;
     if (!expiresAt || Number.isNaN(expiresAt.getTime()) || expiresAt.getTime() < Date.now()) {
@@ -65,7 +83,7 @@ export default async (req) => {
     if (balance >= 99999 || (balance >= 90000 && expiresAt.getUTCFullYear() >= 2090)) {
       return json({ status: "ok", credits, expired: false, lifetime: true, expiresAt: null });
     }
-    return json({ status: "ok", credits, expired: false, expiresAt: expiresAt.toISOString() });
+    return json({ status: "ok", credits, expired: false, expiresAt: expiresAt.toISOString(), freeOffer: offerState(account) });
   } catch {
     // A failed check should never brick the app. The caller treats "error"
     // as "couldn't confirm", not as "no credits".
