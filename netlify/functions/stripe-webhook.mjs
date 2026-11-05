@@ -30,7 +30,7 @@ const PACK_CREDITS = Object.freeze({ casual: 10, popular: 30, value: 100, lifeti
 // Fallback only, for sessions created without metadata: full-price amounts
 // in cents. A discounted session without metadata won't match, and is
 // retried/logged rather than guessed at.
-const AMOUNT_TO_PACK = Object.freeze({ 799: "casual", 1999: "popular", 3999: "value", 4900: "lifetime" });
+const AMOUNT_TO_PACK = Object.freeze({ 799: "casual", 1999: "popular", 3999: "value", 4900: "lifetime", 7900: "lifetime" });
 
 // STRIPE_WEBHOOK_SECRET may hold one whsec_ value, or several separated by
 // commas/spaces (e.g. the live and test-mode endpoint secrets, or old + new
@@ -404,7 +404,7 @@ async function handlePaidSession(session) {
     account_id: accountId,
     // credit_purchases.pack only allows casual/popular/value; the hidden test
     // pack is recorded as casual (its 1 credit / A$0.50 tells it apart), and
-    // the lifetime licence as value (its 99999 credits / A$49 tell it apart),
+    // the lifetime licence as value (99999 credits at A$79, or an earlier A$49, tells it apart),
     // so no schema change is needed.
     pack: packName === "test" ? "casual" : packName === "lifetime" ? "value" : packName,
     credits,

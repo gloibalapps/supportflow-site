@@ -48,6 +48,13 @@
   [headers.values]
     Cache-Control = "no-store"
 
+# HTTP → HTTPS is already a platform 301 (Force HTTPS) on supportflow.work and www.
+# Do not add a second http:// → https:// rule here. Netlify applies that redirect
+# before site rules, and a duplicate force rule is a known way to get an empty
+# HTTP 500 from the edge. www → apex stays a second hop on purpose (HSTS: HTTP
+# must redirect to HTTPS on the same host). The rules below only move the old
+# ndissupportflow.com host onto supportflow.work and must keep doing that.
+#
 # Old domain -> canonical domain (301). Marketing pages only: /app is deliberately NOT
 # redirected, because the app stores data in the browser per-origin and an installed
 # copy on ndissupportflow.com would otherwise lose access to its records.
