@@ -7,7 +7,13 @@ New accounts receive **5 free invoices for 30 days**.
 | Option | Price (AUD) | Licences |
 |---|---:|---:|
 | Basic | A$79 once | 1 |
-| Premium | A$149 once | 2 |
+| Second device (add-on, separate from the tracker) | A$29 once | 2 |
+| Payment tracker (add-on, on top of Basic) | A$29 once | The devices the licence already covers |
+| Premium | A$149 once. Charged at A$129 until the end of 31 January 2027 (Australia/Adelaide), then A$149 with no further deploy. A$20 less once, 13% under A$149. | 2, and the Payment tracker |
+
+Optional SMS is A$4.99 a month for 50 texts, only after the tracker is unlocked. It is not included in Basic, the tracker, or Premium.
+
+The A$49 and A$69 tracker prices are not sold. Basic checkout is unchanged.
 
 ---
 

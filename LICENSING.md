@@ -4,9 +4,11 @@ SupportFlow can sell a one-off licence that belongs to a **Google account**:
 
 | Plan | Price (AUD, once) | Devices signed in at the same time |
 |---|---|---|
-| One device | A$49 | 1 |
-| Phone and computer | A$69 | 2 |
-| Upgrade One device → Phone and computer | A$29 | 2 |
+| Basic (one device) | A$79 | 1 |
+| Second device add-on | A$29 | 2 |
+| Premium | A$149 (A$129 until the end of 31 January 2027, Australia/Adelaide) | 2, and includes the Payment tracker |
+
+The buy screen does not sell a separate A$69 two-device bundle. `STRIPE_PRICE_69` remains only so an older checkout name still resolves. Basic checkout still uses `STRIPE_PRICE_49`, which is the A$79 price (the env name is historical).
 
 There are no licence keys, redeem codes, share links, subscriptions or trials.
 Everything sits behind an **owner switch**. While the switch is off, every
@@ -23,9 +25,9 @@ the existing credit packs / Lifetime flow keep working.
    existing table.
 2. **Stripe** (AUD, *one-time* prices, not recurring). Create three prices and
    copy each Price ID (`price_...`):
-   * "SupportFlow: One device" A$49
-   * "SupportFlow: Phone and computer" A$69
-   * "SupportFlow: Upgrade to Phone and computer" A$29
+   * "SupportFlow: Basic" A$79 → `STRIPE_PRICE_49` (historical env name; do not change this checkout)
+   * "SupportFlow: Second device" A$29 → `STRIPE_PRICE_UPGRADE`
+   * Premium is not one of these licence Prices. It is the Payment tracker Premium checkout in [`PAYMENT-TRACKER.md`](PAYMENT-TRACKER.md): A$149, charged at A$129 until the end of 31 January 2027 (Australia/Adelaide).
 3. **Stripe webhook**: on the existing endpoint
    `https://<your-site>/.netlify/functions/stripe-webhook`, make sure these
    events are selected (the first two are already there):
@@ -36,8 +38,8 @@ the existing credit packs / Lifetime flow keep working.
    | Variable | Value |
    |---|---|
    | `LICENCE_SECRET` | A long random string (at least 24 characters, e.g. the output of `openssl rand -base64 48`). Signs sign-in sessions and the 7-day offline leases. Changing it signs everyone out once and makes old leases invalid. |
-   | `STRIPE_PRICE_49` | Price ID of the A$49 price. (Fallbacks: `STRIPE_PRICE_LICENCE_ONE`, then the existing `STRIPE_PRICE_LIFETIME`.) |
-   | `STRIPE_PRICE_69` | Price ID of the A$69 price (fallback name `STRIPE_PRICE_LICENCE_TWO`) |
+   | `STRIPE_PRICE_49` | Price ID of the Basic A$79 price. The env name is historical. (Fallbacks: `STRIPE_PRICE_LICENCE_ONE`, then the existing `STRIPE_PRICE_LIFETIME`.) |
+   | `STRIPE_PRICE_69` | Not offered on the buy screen. Fallback name `STRIPE_PRICE_LICENCE_TWO` if an older two-device Price still exists. |
    | `STRIPE_PRICE_UPGRADE` | Price ID of the A$29 price (fallback name `STRIPE_PRICE_LICENCE_UPGRADE`) |
    | `LICENCE_EMAIL_FROM` | Optional. Sender for the "licence moved" email, e.g. `SupportFlow <no-reply@supportflow.work>` (must be a Resend-verified domain). |
    | `LICENSING_TEST_EMAILS` | Optional. Comma-separated Google addresses that get the licensing experience while the switch is still off, for testing. |
@@ -127,13 +129,13 @@ server stays the source of truth: AI features (`assist`,
 `supportflow-assistant`) return 402 without an active licensed device once the
 switch is on, and `charge-invoice` only waives credits for a licensed device.
 
-**One device (A$49).** A second device sees the current device (label, last
+**Basic, one device (A$79).** A second device sees the current device (label, last
 used) and "Move the licence here?". Confirming revokes the old device and
 activates this one in one atomic database call; the old device locks on its
 next check (or when its lease expires, at most 7 days). An email goes to the
 Google account's address each time the licence moves.
 
-**Phone and computer (A$69).** Up to two at once. A third device lists both
+**Two devices (A$29 add-on, or Premium).** Up to two at once. A third device lists both
 and the user taps the one to replace.
 
 **Payments.** The app asks the server for a Stripe Checkout session
@@ -143,8 +145,9 @@ records a payment (`licence_payments`) and sets the licence
 stripe_payment_intent_id`). The `?licence=success` return only makes the app
 poll until the webhook has landed. Unpaid / expired sessions write nothing.
 A full refund or a dispute marks that payment and recomputes the licence: a
-refunded A$49/A$69 → `revoked` (locks on next check); a refunded A$29 upgrade
-→ back to One device. A dispute that is won restores it.
+refunded Basic purchase, or a refunded Premium purchase with no other licence
+payment, locks on the next check; a refunded A$29 second-device add-on goes
+back to one device. A dispute that is won restores it.
 
 **Earlier Lifetime buyers.** People who bought the old A$49 Lifetime (keyed to
 the browser's `ndis:deviceRef`) are carried over automatically as **One

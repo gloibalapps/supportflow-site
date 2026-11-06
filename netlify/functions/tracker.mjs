@@ -3,7 +3,9 @@
 //   GET  ?action=config                       -> { offer, clientId, autosendServer, vapidPublicKey }
 //   POST { action: "signin",   idToken, deviceId }            Google sign-in (works with licensing off)
 //   POST { action: "status",   session, deviceId }            -> { unlocked, product, prefs }
-//   POST { action: "checkout", session, deviceId, product }   -> { url }  (tracker_base | tracker_two | tracker_addon | tracker_full | tracker_sms)
+//   POST { action: "checkout", session, deviceId, product }   -> { url }
+//        sold: tracker (A$29) | tracker_full (Premium) | tracker_sms
+//        refused: tracker_base | tracker_two | tracker_addon
 //   POST { action: "sync",     session, deviceId, prefs, records[] }   needs unlock
 //   POST { action: "forget",   session, deviceId }            turn auto-send off and delete synced records
 //   POST { action: "log",      session, deviceId }            -> { log: [...] } this worker's send log
@@ -17,7 +19,8 @@
 // when TRACKER_AUTOSEND_ENABLED=true.
 import crypto from "node:crypto";
 import { json, supa, supaConfigured, signSession, verifySession, verifyGoogleIdToken, isUuid } from "../lib/licence.mjs";
-import { TRACKER_PRODUCTS, isTrackerProduct, trackerOffer, trackerUnlock, trackerDeviceOk, autosendEnabled, seal, emailHash } from "../lib/tracker.mjs";
+import { TRACKER_PRODUCTS, isTrackerProduct, isRetiredTrackerProduct, trackerOffer, trackerUnlock, trackerDeviceOk, autosendEnabled, seal, emailHash } from "../lib/tracker.mjs";
+import { premiumCheckoutSelection, premiumPublic } from "../lib/premium-window.mjs";
 import { TRACKER_STATES } from "../../payment-tracker-rules.js";
 import { normaliseAuMobile, maskPhone, rawSend, smsEnabled, smsDryRun } from "../lib/sms.mjs";
 import { open as openSealed } from "../lib/tracker.mjs";
@@ -40,23 +43,27 @@ async function checkout(session, deviceId, body) {
   const key = process.env.STRIPE_SECRET_KEY, site = process.env.SITE_URL;
   if (!key || !site) return json({ error: "Payments aren't set up on this site yet.", comingSoon: true }, 503);
   const product = String(body?.product || "");
+  // The client may send a product name only. Amount, coupon and price id are chosen here.
+  if (isRetiredTrackerProduct(product)) {
+    return json({ error: "That option is no longer sold. The Payment tracker is A$29 once, on top of Basic. A second device is a separate A$29 add-on." }, 410);
+  }
   if (!isTrackerProduct(product)) return json({ error: "Choose an option." }, 400);
-  const price = process.env[TRACKER_PRODUCTS[product].env];
-  if (!price) return json({ error: "That option isn't available yet.", comingSoon: true }, 503);
   const have = await trackerUnlock(session.sub);
   const isSub = product === "tracker_sms";
-  // A$29 upgrade: ONLY for existing A$49 (tracker_base) holders on one computer.
-  if (product === "tracker_addon" && (!have || have.product !== "tracker_base" || have.addon)) {
-    return json({ error: !have ? "The A$29 upgrade is for A$49 Payment tracker owners. Buy the tracker first." : "This account already covers two computers." }, 409);
+  let price = process.env[TRACKER_PRODUCTS[product].env];
+  let coupon = null;
+  if (product === "tracker_full") {
+    const sel = premiumCheckoutSelection();
+    if (sel.error) return json({ error: sel.error, comingSoon: true }, 503);
+    price = sel.price;
+    coupon = sel.coupon;
   }
-  if (!isSub && product !== "tracker_addon" && have?.full) return json({ error: "This account already has the Premium package." }, 409);
-  if ((product === "tracker_base" || product === "tracker_two") && have) {
-    if (have.devices >= 2) return json({ error: "This account already covers two computers." }, 409);
-    return json({ error: "Payment tracker is already unlocked. Add a second computer with the A$29 upgrade instead.", addon: true }, 409);
-  }
+  if (!price) return json({ error: "That option isn't available yet.", comingSoon: true }, 503);
+  if (!isSub && have) return json({ error: have.full ? "This account already has Premium." : "This account already has the Payment tracker." }, 409);
   const meta = { kind: "tracker", product, google_sub: session.sub, device_id: deviceId };
   if (isSub) {
-    // Optional SMS pack: tracker owners (base or full) only, one active pack per account.
+    // Optional SMS pack: tracker owners only, one active pack per account.
+    // Not included in Basic, the A$29 tracker, or Premium.
     if (!have) return json({ error: "SMS alerts are an option for Payment tracker owners. Unlock the tracker first." }, 409);
     const cur = await supa(`tracker_sms_subscriptions?google_sub=eq.${q(session.sub)}&status=in.(active,trialing,past_due)&select=stripe_subscription_id`);
     if (cur?.length) return json({ error: "SMS alerts are already active on this account." }, 409);
@@ -69,6 +76,7 @@ async function checkout(session, deviceId, body) {
     success_url: `${site}/app?tracker=success`,
     cancel_url: `${site}/app?tracker=cancelled`,
   };
+  if (coupon) params["discounts[0][coupon]"] = coupon;
   if (!isSub) params.customer_creation = "always"; // subscription mode always creates a customer
   if (session.email) params.customer_email = session.email;
   const metaKey = isSub ? "subscription_data[metadata]" : "payment_intent_data[metadata]";
@@ -207,6 +215,7 @@ export default async (req) => {
     if (req.method === "GET") {
       return json({
         offer: trackerOffer(),
+        premium: premiumPublic(),
         clientId: process.env.GOOGLE_CLIENT_ID || "",
         autosendServer: autosendEnabled(),
         vapidPublicKey: process.env.VAPID_PUBLIC_KEY || "",
@@ -239,7 +248,7 @@ export default async (req) => {
       const p = (await supa(`tracker_prefs?google_sub=eq.${q(session.sub)}&select=enabled,state,notify_push,notify_email`))?.[0] || null;
       return json({ sms: await smsStatus(session.sub), unlocked: !!unlock, paid: !!paid, devices: paid?.devices || 0, deviceLimit: !!paid && !seat, product: paid?.product || null, prefs: p, autosendServer: autosendEnabled() });
     }
-    if (!unlock) return json({ error: paid ? "Your Payment tracker is in use on another device. Add a second computer with the A$29 upgrade." : "Payment tracker isn't unlocked on this Google account.", locked: true, deviceLimit: !!paid }, 402);
+    if (!unlock) return json({ error: paid ? "Your Payment tracker is in use on another device. A second device is a separate A$29 add-on." : "Payment tracker isn't unlocked on this Google account.", locked: true, deviceLimit: !!paid }, 402);
 
     if (action === "sync") return await sync(session, body);
     if (action === "sms-start") return await smsStart(session, body);

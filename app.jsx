@@ -494,8 +494,9 @@ async function askModel(prompt, opts) {
 const APP_VERSION = "21";
 
 /* ---------------- device licensing ----------------
-   One-off licences owned by a Google account: "One device" (A$49) or
-   "Phone and computer" (A$69, or A$29 upgrade). Everything is decided by the
+   One-off licences owned by a Google account. Basic is A$79 for one device.
+   A second device is a separate A$29 add-on. The buy screen does not sell
+   the old A$69 two-device bundle. Everything is decided by the
    server (netlify/functions/licence.mjs); this side only stores a device id,
    the sign-in session and a signed 7-day offline lease in IndexedDB.
    Nothing here does anything until the owner switch is on -- while it's off
@@ -845,28 +846,61 @@ function LicenceGoogleButton({ clientId, onCredential }) {
   </div>;
 }
 
-function LicencePlans({ onBuy, busy }) {
-  const tick = (t, no) => <div style={{ display: "flex", gap: 8, fontSize: 12.5, color: no ? "var(--tx-3)" : "var(--tx-2)", lineHeight: 1.5, marginTop: 5 }}>
-    <span style={{ color: no ? "var(--tx-3)" : "var(--good)", fontWeight: 700, flexShrink: 0 }}>{no ? "\u2715" : "\u2713"}</span><span>{t}</span></div>;
-  const card = (id, name, price, line, yes, no) => (
-    <div className="panel" style={{ textAlign: "left", borderColor: id === "two" ? "var(--brass)" : undefined }}>
-      <div className="eyebrow" style={{ color: "var(--brass)" }}>{name}</div>
-      <div className="disp" style={{ fontSize: 28, margin: "6px 0 2px" }}>A${price} <span style={{ fontSize: 13, color: "var(--tx-3)", fontFamily: "inherit" }}>once</span></div>
-      <div style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 8 }}>{line}</div>
-      {yes.map((t) => <React.Fragment key={t}>{tick(t)}</React.Fragment>)}
-      {no.map((t) => <React.Fragment key={t}>{tick(t, true)}</React.Fragment>)}
-      <button className="btn" style={{ marginTop: 14, width: "100%" }} disabled={!!busy} onClick={() => onBuy(id)}>
-        {busy === id ? "One moment..." : `Buy ${name} \u2014 A$${price}`}
+function premiumQuoteFrom(cfg) {
+  const server = cfg && cfg.premium;
+  if (server && server.listAud) return server;
+  const full = ((cfg && cfg.offer) || []).find((o) => o.id === "tracker_full");
+  if (full && full.listAud) {
+    return {
+      listAud: full.listAud, chargeAud: full.priceAud, windowOpen: !!full.windowOpen,
+      savingAud: full.savingAud, savingPercent: full.savingPercent,
+      windowUntil: full.windowUntil || "31 January 2027", timezone: full.timezone || "Australia/Adelaide",
+    };
+  }
+  const local = typeof SupportFlowPremium !== "undefined" ? SupportFlowPremium : null;
+  if (local) {
+    const open = local.windowOpen();
+    const s = local.saving();
+    return { listAud: local.listAud, chargeAud: local.chargeAud(), windowOpen: open, savingAud: s.amount, savingPercent: s.percent, windowUntil: local.untilLabel, timezone: local.tz };
+  }
+  const amount = 149 - 129;
+  return { listAud: 149, chargeAud: 129, windowOpen: true, savingAud: amount, savingPercent: Math.round((amount / 149) * 100), windowUntil: "31 January 2027", timezone: "Australia/Adelaide" };
+}
+function PremiumWindowCopy({ q }) {
+  if (!q) return null;
+  if (!q.windowOpen) return <>Premium is A${q.listAud}, paid once.</>;
+  return <>Premium is A${q.listAud}, paid once. Until {q.windowUntil} ({q.timezone === "Australia/Adelaide" ? "Adelaide time" : q.timezone}) you pay A${q.chargeAud} — A${q.savingAud} less once ({q.savingPercent}% under A${q.listAud}). Cash-flow relief on a one-off licence.</>;
+}
+function LicencePlans({ onBuy, onPremium, busy, premium }) {
+  const q = premium || premiumQuoteFrom(null);
+  const tick = (t) => <div style={{ display: "flex", gap: 8, fontSize: 12.5, color: "var(--tx-2)", lineHeight: 1.5, marginTop: 5 }}>
+    <span style={{ color: "var(--good)", fontWeight: 700, flexShrink: 0 }}>{"\u2713"}</span><span>{t}</span></div>;
+  return <div style={{ width: "100%", maxWidth: 420 }}>
+    <div className="panel" style={{ textAlign: "left" }}>
+      <div className="eyebrow" style={{ color: "var(--brass)" }}>Basic</div>
+      <div className="disp" style={{ fontSize: 28, margin: "6px 0 2px" }}>A$79 <span style={{ fontSize: 13, color: "var(--tx-3)", fontFamily: "inherit" }}>once</span></div>
+      <div style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 8 }}>One device. Pay once.</div>
+      {tick("Invoices, shifts, notes, kilometres, expenses and tax")}
+      {tick("A second device is a separate A$29 add-on")}
+      {tick("The Payment tracker is A$29 once, on top of Basic")}
+      {tick("No subscription on Basic")}
+      <button className="btn" style={{ marginTop: 14, width: "100%" }} disabled={!!busy} onClick={() => onBuy("one")}>
+        {busy === "one" ? "One moment..." : "Get Basic \u2014 A$79"}
       </button>
     </div>
-  );
-  return <div style={{ width: "100%", maxWidth: 420 }}>
-    {card("one", "One device", 79, "One device at a time.",
-      ["Use SupportFlow on one phone, tablet or computer", "Move it to a new device whenever you like", "Upgrade to Phone and computer later for $29", "No subscription, no monthly fees"],
-      ["Not signed in on two devices at the same time"])}
-    {card("two", "Phone and computer", 69, "Phone and computer signed in together.",
-      ["Two devices signed in at the same time", "Swap either device whenever you like", "No subscription, no monthly fees"],
-      ["Not for sharing with another person \u2014 one Google account, one licence"])}
+    <div className="panel" style={{ textAlign: "left", borderColor: "var(--brass)" }}>
+      <div className="eyebrow" style={{ color: "var(--brass)" }}>Premium</div>
+      {q.windowOpen && <div style={{ display: "inline-block", margin: "8px 0 4px", fontSize: 13, fontWeight: 700, color: "#14150F", background: "var(--brass-lift)", borderRadius: 999, padding: "3px 10px" }}>{q.savingPercent}% less until {q.windowUntil}</div>}
+      <div className="disp" style={{ fontSize: 28, margin: "6px 0 2px" }}>A${q.listAud} <span style={{ fontSize: 13, color: "var(--tx-3)", fontFamily: "inherit" }}>once</span></div>
+      <div style={{ fontSize: 13.5, lineHeight: 1.55, marginBottom: 8 }}><PremiumWindowCopy q={q} /></div>
+      {tick("Everything in Basic")}
+      {tick("Two-device license")}
+      {tick("Payment tracker included")}
+      {tick("Optional SMS, A$4.99 a month for 50 texts, not included in Premium")}
+      <button className="btn" style={{ marginTop: 14, width: "100%" }} disabled={!!busy} onClick={onPremium}>
+        {busy === "premium" ? "One moment..." : `Get Premium \u2014 A$${q.chargeAud}`}
+      </button>
+    </div>
     <div style={{ fontSize: 11.5, color: "var(--tx-3)", lineHeight: 1.6, marginTop: 12, textAlign: "center" }}>
       Prices in AUD. Your licence belongs to your Google account. Your records stay on your device and back up to your own Google Drive, as now.
     </div>
@@ -902,7 +936,7 @@ function LicenceDeviceChooser({ info, busy, onActivate, onUpgrade }) {
       <div style={{ fontSize: 12, color: "var(--tx-3)", lineHeight: 1.6, marginTop: 12, maxWidth: 360 }}>
         {d.label || "The other device"} will lock the next time it connects. We'll email your Google address to let you know.
       </div>
-      <button className="btn ghost tiny" style={{ marginTop: 16 }} disabled={busy} onClick={onUpgrade}>Use both at once? Upgrade to Phone and computer &mdash; pay $29 more</button>
+      <button className="btn ghost tiny" style={{ marginTop: 16 }} disabled={busy} onClick={onUpgrade}>Use both at once? Add a second device &mdash; A$29</button>
     </>;
   }
   return <>
@@ -943,7 +977,22 @@ function LicenceGate({ licence, theme }) {
     return r;
   });
   const buy = (product) => run(async () => { setBusy(product); return licence.checkout(product); });
+  const buyPremium = () => run(async () => {
+    setBusy("premium");
+    const session = await licGet("session");
+    const deviceId = await licenceDeviceId();
+    const r = await fetch(TRACKER_API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "checkout", product: "tracker_full", session: session?.token, deviceId }) });
+    const d = await r.json().catch(() => ({}));
+    if (d.url) { location.href = d.url; return {}; }
+    return { error: d.error || "Couldn't start checkout." };
+  });
   const signIn = (cred) => run(() => licence.signIn(cred));
+  const [premium, setPremium] = useState(() => premiumQuoteFrom(null));
+  useEffect(() => {
+    let gone = false;
+    fetch(TRACKER_API + "?action=config", { cache: "no-store" }).then((r) => r.json()).then((d) => { if (!gone) setPremium(premiumQuoteFrom(d)); }).catch(() => {});
+    return () => { gone = true; };
+  }, []);
 
   let body;
   if (state === "signed_out") {
@@ -967,7 +1016,7 @@ function LicenceGate({ licence, theme }) {
         {info.revoked ? "The purchase on this Google account was refunded, so it no longer has a licence. " : ""}
         Choose how you'll use SupportFlow. Pay once &mdash; no subscription.
       </div>
-      <LicencePlans busy={busy} onBuy={buy} />
+      <LicencePlans busy={busy} onBuy={buy} onPremium={buyPremium} premium={premium} />
     </>;
   } else if (state === "slots_full" || state === "device_removed") {
     body = <LicenceDeviceChooser info={info} busy={!!busy} onActivate={activate} onUpgrade={() => buy("upgrade")} />;
@@ -1038,7 +1087,7 @@ function LicencePanel({ licence, open, onToggle }) {
         </div>
         {info.plan === 1 && (
           <button className="btn" style={{ marginBottom: 12 }} disabled={busy || licence.offline} onClick={() => run(() => licence.checkout("upgrade"))}>
-            Upgrade to Phone and computer &mdash; pay $29 more
+            Add a second device &mdash; A$29
           </button>
         )}
         <div style={{ fontSize: 12, color: "var(--tx-3)" }}>
@@ -3194,6 +3243,12 @@ function UpgradeChooser({ licence }) {
   const [open, setOpen] = useState(() => wantsUpgradeChooser());
   const [busy, setBusy] = useState(null);
   const [err, setErr] = useState("");
+  const [premiumQuote, setPremiumQuote] = useState(() => premiumQuoteFrom(null));
+  useEffect(() => {
+    let gone = false;
+    fetch(TRACKER_API + "?action=config", { cache: "no-store" }).then((r) => r.json()).then((d) => { if (!gone) setPremiumQuote(premiumQuoteFrom(d)); }).catch(() => {});
+    return () => { gone = true; };
+  }, []);
   if (!open) return null;
   const close = () => {
     try { const sp = new URLSearchParams(location.search); sp.delete("buy"); history.replaceState(null, "", location.pathname + (sp.toString() ? "?" + sp : "") + location.hash); } catch (e) { }
@@ -3206,7 +3261,7 @@ function UpgradeChooser({ licence }) {
     const r = await licence.checkout("upgrade");
     if (r?.error) { setErr(r.error); setBusy(null); }
   };
-  const premium = async () => {
+  const buyPremium = async () => {
     setBusy("premium"); setErr("");
     try {
       const session = await licGet("session");
@@ -3230,10 +3285,13 @@ function UpgradeChooser({ licence }) {
           {busy === "upgrade" ? "Opening checkout\u2026" : "Add a second device \u2014 A$29"}
         </button>
         {plan === 2 && <div style={{ fontSize: 12, color: "var(--tx-3)", marginBottom: 10 }}>Your licence already covers two devices.</div>}
-        <button className="btn" style={{ width: "100%", minHeight: 48, marginBottom: 10 }} disabled={!!busy || licence.offline} onClick={premium}>
-          {busy === "premium" ? "Opening checkout\u2026" : "Upgrade to Premium \u2014 A$149"}
+        <button className="btn" style={{ width: "100%", minHeight: 48, marginBottom: 10 }} disabled={!!busy || licence.offline} onClick={buyPremium}>
+          {busy === "premium" ? "Opening checkout\u2026" : `Upgrade to Premium \u2014 A$${premiumQuote.chargeAud}`}
         </button>
-        <div style={{ fontSize: 12, color: "var(--tx-3)", lineHeight: 1.6, marginBottom: 10 }}>Premium adds the Payment tracker and two licenses.</div>
+        <div style={{ fontSize: 12, color: "var(--tx-3)", lineHeight: 1.6, marginBottom: 10 }}>
+          {premiumQuote.windowOpen && <div style={{ display: "inline-block", marginBottom: 6, fontWeight: 700, color: "#14150F", background: "var(--brass-lift)", borderRadius: 999, padding: "2px 8px" }}>{premiumQuote.savingPercent}% less until {premiumQuote.windowUntil}</div>}
+          <div><PremiumWindowCopy q={premiumQuote} /> Premium adds the Payment tracker and a two-device licence. SMS is A$4.99 a month for 50 texts and is not included.</div>
+        </div>
       </>}
       {err && <div style={{ fontSize: 12.5, color: "var(--warn)", marginBottom: 10 }}>{err}</div>}
       <button className="btn ghost tiny" onClick={close}>Not now</button>
@@ -3264,7 +3322,7 @@ function OfferOrUpgradeBanner({ paid, freeOffer, known }) {
   if (!due) return null;
   return <div role="status" style={box}>
     <div style={{ flex: 1 }}><b style={{ color: "#E8C171" }}>Keep invoicing with SupportFlow</b><br />
-      Basic A$79 one-off, or Premium A$149 (everything in Basic, two-device license, Payment tracker; SMS notification optional, A$4.99 a month for 50 texts, not included in A$149).</div>
+      Basic A$79 one-off, or Premium {(() => { const q = premiumQuoteFrom(null); return q.windowOpen ? `A$${q.listAud} (A$${q.chargeAud} until ${q.windowUntil}, ${q.savingPercent}% under A$${q.listAud})` : `A$${q.listAud}`; })()}. Everything in Basic, a two-device licence and the Payment tracker. A second device or the tracker on Basic is A$29 each. SMS is optional, A$4.99 a month for 50 texts, and is not included.</div>
     <a className="btn" href={BUY_URL} style={{ whiteSpace: "nowrap" }}>See plans</a>
     <button style={btn} onClick={() => hide(true)}>Remind me later</button>
   </div>;
@@ -3335,12 +3393,12 @@ function TrialEndedNotice({ onClose, startInRestore = false }) {
         borderColor: "var(--brass)" }} onClick={(e) => e.stopPropagation()}>
         <div className="disp" style={{ fontSize: 20, marginBottom: 8 }}>{startInRestore ? "Restore your licence" : "SupportFlow Lifetime"}</div>
         <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.7, marginBottom: 16 }}>
-          A$49 once, yours for life. Unlimited invoices on any phone or PC. Everything you've
+          Basic is A$79, paid once. Unlimited invoices on any phone or PC. Everything you've
           already entered stays here, you can view, edit, back up and export all of it.
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
           <button className="btn" onClick={() => subscribe("lifetime")} disabled={busy}>
-            {busy ? "One moment..." : "Buy Lifetime \u2014 A$49"}
+            {busy ? "One moment..." : "Get Basic \u2014 A$79"}
           </button>
         </div>
         {err && <div style={{ fontSize: 12.5, color: "var(--warn)", marginBottom: 10 }}>{err}</div>}
@@ -3382,9 +3440,9 @@ function TrialEndingBanner({ daysLeft, onSubscribe }) {
     <div className="band">
       <div className="callout" style={{ borderColor: "var(--brass)" }}>
         <b>{daysLeft === 0 ? "Your trial ends today." : `Your trial ends in ${daysLeft} day${daysLeft === 1 ? "" : "s"}.`}</b>{" "}
-        Buy Lifetime (A$49 once) to keep creating new invoices, shifts and records without limit.
+        Get Basic (A$79 once) to keep creating new invoices, shifts and records without limit.
         <div style={{ marginTop: 10 }}>
-          <button className="btn tiny" onClick={onSubscribe}>Buy Lifetime — A$49</button>
+          <button className="btn tiny" onClick={onSubscribe}>Get Basic — A$79</button>
         </div>
       </div>
     </div>
@@ -4222,8 +4280,8 @@ function App() {
                         {creditsExpired
                           ? <><b style={{ color: "var(--warn)" }}>Credits expired</b><br/><span style={{ fontSize: 11, color: "var(--tx-3)" }}>Buy Lifetime to keep invoicing</span></>
                           : typeof creditBalance === "number"
-                            ? <><span style={{ fontSize: 16, fontWeight: 700, color: "var(--ink)", lineHeight: 1.2, display: "block" }}>{creditBalance} credits</span><span style={{ fontSize: 11, color: creditExpiresIn !== null && creditExpiresIn <= 3 ? "var(--warn)" : "var(--tx-3)" }}>{creditExpiresIn !== null ? `Expires in ${creditExpiresIn} day${creditExpiresIn === 1 ? "" : "s"}` : `Buy Lifetime — A$49`}</span></>
-                            : <b>Buy Lifetime — A$49</b>}
+                            ? <><span style={{ fontSize: 16, fontWeight: 700, color: "var(--ink)", lineHeight: 1.2, display: "block" }}>{creditBalance} credits</span><span style={{ fontSize: 11, color: creditExpiresIn !== null && creditExpiresIn <= 3 ? "var(--warn)" : "var(--tx-3)" }}>{creditExpiresIn !== null ? `Expires in ${creditExpiresIn} day${creditExpiresIn === 1 ? "" : "s"}` : `Get Basic — A$79`}</span></>
+                            : <b>Get Basic — A$79</b>}
                       </span>
                     </button>
                   )}
@@ -5161,8 +5219,10 @@ const markPaid = (data, id, { paidAt, amountPaid }) => ({
 });
 
 /* ---------------- Payment tracker access (paywall) ----------------
-   Unlocked = the server says this Google account has a paid tracker_base,
-   tracker_two or tracker_full row, plus a seat for this device (1 with A$49 base; 2 with A$69 two-computer, A$49 + A$29 upgrade, or A$149 Premium) (written only by the Stripe webhook). The last answer is
+   Unlocked = the server says this Google account has a paid tracker
+   (A$29 add-on, Premium, or an older tracker purchase), plus a seat for
+   this device. A second device is the separate A$29 licence add-on, not a
+   tracker price. Written only by the Stripe webhook. The last answer is
    cached so the screens work offline. Server-side auto-send re-checks the
    unlock itself, so editing this cache can't send anything. */
 function useTrackerAccess() {
@@ -5234,11 +5294,15 @@ function useTrackerAccess() {
 }
 
 function TrackerUpsell({ access, owed, count, go }) {
-  // Not paid: A$49 one computer, A$69 two computers or the A$149 Premium package.
-  // A$49 (tracker_base) owners on one computer: only the A$29 upgrade (gated server-side too).
-  const baseOwner = access.paid && access.product === "tracker_base" && (access.devices || 0) < 2;
-  const offer = (access.cfg?.offer || []).filter((o) => (o.available || access.preview) && (access.paid ? (baseOwner && o.id === "tracker_addon") : o.id !== "tracker_addon") && o.id !== "tracker_sms");
+  // Not paid: Payment tracker A$29 once (on top of Basic), or Premium.
+  // A$49 and A$69 tracker options are not sold. A second device is a separate A$29 add-on.
+  // SMS is offered only after the tracker is unlocked.
+  const offer = (access.cfg?.offer || []).filter((o) => !o.retired && o.id !== "tracker_sms" && (o.available || access.preview));
   const smsOffer = (access.cfg?.offer || []).find((o) => o.id === "tracker_sms");
+  const premiumOffer = offer.find((o) => o.id === "tracker_full");
+  const tracker = offer.find((o) => o.id === "tracker");
+  const canBuy = access.phase === "locked" && !access.paid && !access.deviceLimit;
+  const smsPrice = smsOffer ? smsOffer.priceAud : "4.99";
   return (
     <div className="panel" style={{ borderColor: "var(--brass)" }}>
       <div className="eyebrow" style={{ color: "var(--brass)" }}>Payment tracker · paid add-on</div>
@@ -5250,8 +5314,9 @@ function TrackerUpsell({ access, owed, count, go }) {
         ✓ At day 20, emails you a ready-to-file NDIA complaint draft. Nothing is filed for you<br />
         ✓ Shows plan managers who are late again and again, and exports a payment history
       </div>
-      <div style={{ fontSize: 13, color: "var(--tx-2)", marginTop: 10 }}>
-        Free: push notifications.{smsOffer ? ` Optional: SMS alerts A$${smsOffer.priceAud}/month for 50 texts, added after you unlock the tracker. Not included in any package, including the A$149 Premium package.` : ""}
+      <div style={{ fontSize: 13, color: "var(--tx-2)", marginTop: 10, lineHeight: 1.55 }}>
+        The Payment tracker is <b>A$29 once</b>, on top of Basic. A second device is a separate <b>A$29</b> add-on, not part of the tracker price.
+        <br />Free: push notifications. Optional SMS alerts are A${smsPrice} a month for 50 texts, offered after the tracker is unlocked. Not included in any package, including Premium.
       </div>
       {access.phase === "signedout" && (
         <div style={{ marginTop: 14 }}>
@@ -5259,18 +5324,20 @@ function TrackerUpsell({ access, owed, count, go }) {
           <a className="btn" style={{ display: "inline-flex", minHeight: 44, alignItems: "center" }} href={BUY_URL}>Sign in to unlock</a>
         </div>
       )}
-      {access.phase === "locked" && access.deviceLimit && <div style={{ fontSize: 13, marginTop: 12 }}>Your Payment tracker is already in use on your other computer.{baseOwner ? " Add this one with the A$29 upgrade:" : ""}</div>}
-      {access.phase === "locked" && (offer.length ? offer.map((o) => (
-        <button key={o.id} className="btn" style={{ width: "100%", marginTop: 10, minHeight: 48 }} disabled={!!access.busy} onClick={() => access.buy(o.id)}>
-          {access.busy === o.id ? "One moment..." : `${o.label} · A$${o.priceAud} once`}
-        </button>
-      )) : <div style={{ fontSize: 12.5, color: "var(--tx-3)", marginTop: 12 }}>The Payment tracker isn't on sale yet.</div>)}
-      {access.phase === "locked" && offer.find((o) => o.items) && (
-        <div style={{ fontSize: 13, lineHeight: 1.6, color: "var(--tx-2)", marginTop: 10 }}>
-          <b>Premium A$149 one-off includes:</b>
-          <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>{offer.find((o) => o.items).items.map((t) => <li key={t}>{t}</li>)}</ul>
-        </div>
-      )}
+      {access.phase === "locked" && access.deviceLimit && <div style={{ fontSize: 13, marginTop: 12 }}>Your Payment tracker is already in use on your other device. A second device is a separate A$29 add-on, from Settings → Licence &amp; devices.</div>}
+      {canBuy && (offer.length ? <>
+        {tracker && <button className="btn" style={{ width: "100%", marginTop: 10, minHeight: 48 }} disabled={!!access.busy} onClick={() => access.buy(tracker.id)}>
+          {access.busy === tracker.id ? "One moment..." : `Payment tracker · A$${tracker.priceAud} once`}
+        </button>}
+        {premiumOffer && <>
+          {premiumOffer.windowOpen && <div style={{ marginTop: 12, display: "inline-block", fontWeight: 700, fontSize: 13, color: "#14150F", background: "var(--brass-lift)", borderRadius: 999, padding: "3px 10px" }}>{premiumOffer.savingPercent}% less until {premiumOffer.windowUntil}</div>}
+          <div style={{ fontSize: 13, lineHeight: 1.55, color: "var(--tx-2)", marginTop: 8 }}><PremiumWindowCopy q={premiumQuoteFrom({ premium: { listAud: premiumOffer.listAud, chargeAud: premiumOffer.priceAud, windowOpen: premiumOffer.windowOpen, savingAud: premiumOffer.savingAud, savingPercent: premiumOffer.savingPercent, windowUntil: premiumOffer.windowUntil, timezone: premiumOffer.timezone } })} /></div>
+          <button className="btn" style={{ width: "100%", marginTop: 10, minHeight: 48 }} disabled={!!access.busy} onClick={() => access.buy(premiumOffer.id)}>
+            {access.busy === premiumOffer.id ? "One moment..." : `Premium · A$${premiumOffer.priceAud} once`}
+          </button>
+          {premiumOffer.items && <ul style={{ margin: "8px 0 0", paddingLeft: 18, fontSize: 13, lineHeight: 1.6, color: "var(--tx-2)" }}>{premiumOffer.items.map((t) => <li key={t}>{t}</li>)}</ul>}
+        </>}
+      </> : <div style={{ fontSize: 12.5, color: "var(--tx-3)", marginTop: 12 }}>The Payment tracker isn't available to buy yet.</div>)}
       {access.phase === "offline" && <div style={{ fontSize: 12.5, color: "var(--warn)", marginTop: 12 }}>Connect to the internet to unlock the Payment tracker.</div>}
       {access.phase === "loading" && <div style={{ fontSize: 12.5, color: "var(--tx-3)", marginTop: 12 }}>Checking…</div>}
       {access.error && <div style={{ fontSize: 12.5, color: "var(--warn)", marginTop: 10 }}>{access.error}</div>}
@@ -5586,10 +5653,10 @@ function SmsAlertsPanel({ access }) {
     <div className="panel">
       <div className="eyebrow" style={{ marginBottom: 6 }}>Alerts</div>
       <div style={{ fontSize: 13.5, lineHeight: 1.6, marginBottom: 10 }}>
-        Free: push notifications.{offer ? <> Optional: SMS alerts A${offer.priceAud}/month for 50 texts.</> : null}<br />
-        <span style={{ color: "var(--tx-3)", fontSize: 12.5 }}>Texts go only to your own mobile, at day 7, 12 and 20 and when a complaint draft is ready. They never go to the NDIA, a plan manager or anyone you invoice. Each text uses 1 credit (2 if it's long). Unused texts don't roll over. If you run out, alerts continue as notifications.</span>
+        Free: push notifications. Optional: SMS alerts A${offer ? offer.priceAud : "4.99"}/month for 50 texts. Not included in any package, including Premium.<br />
+        <span style={{ color: "var(--tx-3)", fontSize: 12.5 }}>Offered after the Payment tracker is unlocked. Texts go only to your own mobile, at day 7, 12 and 20 and when a complaint draft is ready. They never go to the NDIA, a plan manager or anyone you invoice. Each text uses 1 credit (2 if it's long). Unused texts don't roll over. If you run out, alerts continue as notifications.</span>
       </div>
-      {!active && offer && (
+      {!active && offer && (offer.available || access.preview) && (
         <button className="btn ghost" style={{ minHeight: 44, width: "100%" }} disabled={!!access.busy} onClick={() => access.buy("tracker_sms")}>
           {access.busy === "tracker_sms" ? "One moment..." : `Add SMS alerts · A$${offer.priceAud}/month`}
         </button>
@@ -6063,7 +6130,7 @@ async function chargeInvoiceCredit(invoiceNumber) {
 
 function CreditNotice({ kind }) {
   if (kind === "no_credits") return <div className="creditnotice">
-    Your free invoices have ended. <a href={BUY_URL}>Get SupportFlow — A$49 one-off →</a>
+    Your free invoices have ended. <a href={BUY_URL}>Get Basic — A$79 one-off →</a>
   </div>;
   if (kind === "error") return <div className="creditnotice">
     Couldn't check your invoice credits. Check your connection and try again.
@@ -9216,7 +9283,7 @@ const MANUAL = [
     d: "The optional Payment tracker add-on: prices, SMS pack and push notifications.",
     q: [
       ["What the Payment tracker costs",
-       "The Payment tracker (Money \u2192 Payment tracker) is optional. A$49 once for the tracker on one computer. A$69 once for the tracker on two computers. A$29 once to upgrade the A$49 plan to add a second computer (only for A$49 owners). A$149 once for the Premium package: everything in Basic (invoices, shifts, notes, kilometres, expenses and tax), a two-device license and the Payment tracker, no subscription. The optional SMS pack (A$4.99 a month for 50 texts) is the only paid add-on and is not included in any of these, including the A$149 package."],
+       "The Payment tracker (Money \u2192 Payment tracker) is optional. It is A$29 once, on top of Basic. A second device is a separate A$29 add-on, not a tracker price. Premium is A$149 once and includes everything in Basic, a two-device licence and the Payment tracker. Until the end of 31 January 2027 (Adelaide time) Premium is charged at A$129, which is A$20 less once, 13% under A$149. That is cash-flow relief on a one-off licence. From 1 February 2027 Premium is charged at A$149. The optional SMS pack (A$4.99 a month for 50 texts) is offered after the tracker is unlocked and is not included in any package, including Premium."],
       ["SMS alerts pack",
        "Optional, only for Payment tracker owners, and not included in the A$149 Premium package. Texts go only to your own mobile after you verify it with a code, never to the NDIA, a plan manager or a payer. They are used for the day 7, 12 and 20 overdue alerts and the complaint-draft-ready nudge. Credits reset to 50 each month and don't roll over. Reply STOP or use Stop texts in Payment tracker \u2192 Settings to stop texts."],
       ["Out of SMS credits",

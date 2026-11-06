@@ -4,56 +4,98 @@
 // "tracker_base" (+ optional "tracker_addon"), "tracker_two" or "tracker_full", written ONLY by stripe-webhook.mjs (same rule as
 // licences: the browser's ?tracker=success return never unlocks anything).
 //
-// Prices and labels are config-driven so the owner can change them without a
-// code change. Owner pricing (5 Nov 2026, final; supersedes all earlier prices):
-//   STRIPE_PRICE_TRACKER_BASE   A$49 one-off, tracker on one computer
-//   STRIPE_PRICE_TRACKER_TWO    A$69 one-off, tracker on two computers
-//   STRIPE_PRICE_TRACKER_ADDON  A$29 one-off, upgrade from the A$49 plan to add a second
-//                               computer; ONLY for existing BASE holders (gated server-side)
-//   STRIPE_PRICE_TRACKER_FULL   A$149 one-off, Premium package: everything in Basic, two-device
-//                               license, Payment tracker (SMS not included)
-//   STRIPE_PRICE_TRACKER_SMS    A$4.99 / month RECURRING (checkout mode=subscription):
-//                               50 SMS alerts per billing period, to the worker only.
-//                               The only paid add-on; NOT included in the A$99 package.
-//   TRACKER_{BASE,TWO,ADDON,FULL,SMS}_LABEL / _AUD override display only; Stripe's Price is what is charged.
+// Prices (homepage structure, November 2026):
+//   STRIPE_PRICE_TRACKER         A$29 one-off Payment tracker, on top of Basic.
+//                                A second device is NOT part of this price. It is
+//                                the separate licence add-on (STRIPE_PRICE_UPGRADE, A$29).
+//   STRIPE_PRICE_TRACKER_FULL    A$149 one-off Premium (the real price): everything in
+//                                Basic, two-device licence, Payment tracker. SMS is not included.
+//   STRIPE_COUPON_PREMIUM_129    A$20 off that A$149 Price, applied by the server only
+//                                until the end of 31 January 2027 (Australia/Adelaide).
+//   STRIPE_PRICE_PREMIUM_129     Optional A$129 one-off Price, used only in that window
+//                                when the coupon is not set.
+//   STRIPE_PRICE_TRACKER_SMS     A$4.99 / month, 50 texts, only after the tracker is unlocked.
+//                                Not included in Basic, the tracker, or Premium.
+// Retired, still recognised so older payments keep their unlock, never sold:
+//   tracker_base A$49, tracker_two A$69, tracker_addon (old second-computer upgrade).
 import crypto from "node:crypto";
 import { supa } from "./licence.mjs";
+import { PREMIUM_LIST_AUD, premiumCheckoutSelection, premiumPublic } from "./premium-window.mjs";
+
+const PREMIUM_ITEMS = [
+  "Everything in Basic (invoices, shifts, notes, kilometres, expenses and tax)",
+  "Two-device license",
+  "Payment tracker",
+  "SMS notification \u2014 optional (A$4.99 a month for 50 texts, not included in any package, including Premium)",
+];
 
 export const TRACKER_PRODUCTS = Object.freeze({
-  tracker_base: { env: "STRIPE_PRICE_TRACKER_BASE", labelEnv: "TRACKER_BASE_LABEL", audEnv: "TRACKER_BASE_AUD", label: "Payment tracker, one computer", aud: 49, devices: 1 },
-  tracker_two: { env: "STRIPE_PRICE_TRACKER_TWO", labelEnv: "TRACKER_TWO_LABEL", audEnv: "TRACKER_TWO_AUD", label: "Payment tracker, two computers", aud: 69, devices: 2 },
-  tracker_addon: { env: "STRIPE_PRICE_TRACKER_ADDON", labelEnv: "TRACKER_ADDON_LABEL", audEnv: "TRACKER_ADDON_AUD", label: "Upgrade: add a second computer", aud: 29, devices: 2, requires: "tracker_base" },
-  tracker_full: { env: "STRIPE_PRICE_TRACKER_FULL", labelEnv: "TRACKER_FULL_LABEL", audEnv: "TRACKER_FULL_AUD", label: "Premium package", aud: 149, devices: 2, items: ["Everything in Basic (invoices, shifts, notes, kilometres, expenses and tax)", "Two-device license", "Payment tracker", "SMS notification \u2014 optional (A$4.99 a month for 50 texts, not included in A$149)"] },
-  tracker_sms: { env: "STRIPE_PRICE_TRACKER_SMS", labelEnv: "TRACKER_SMS_LABEL", audEnv: "TRACKER_SMS_AUD", label: "SMS alerts, 50 texts a month", aud: 4.99, recurring: "month", requires: "tracker" },
+  // Sold.
+  tracker: { env: "STRIPE_PRICE_TRACKER", label: "Payment tracker", aud: 29, devices: 1 },
+  tracker_full: { env: "STRIPE_PRICE_TRACKER_FULL", label: "Premium", aud: PREMIUM_LIST_AUD, devices: 2, items: PREMIUM_ITEMS },
+  tracker_sms: { env: "STRIPE_PRICE_TRACKER_SMS", label: "SMS alerts, 50 texts a month", aud: 4.99, recurring: "month", requires: "tracker" },
+  // Retired. Kept so a paid row still unlocks. Checkout refuses them.
+  tracker_base: { env: "STRIPE_PRICE_TRACKER_BASE", label: "Payment tracker, one computer", aud: 49, devices: 1, retired: true },
+  tracker_two: { env: "STRIPE_PRICE_TRACKER_TWO", label: "Payment tracker, two computers", aud: 69, devices: 2, retired: true },
+  tracker_addon: { env: "STRIPE_PRICE_TRACKER_ADDON", label: "Upgrade: add a second computer", aud: 29, devices: 2, requires: "tracker_base", retired: true },
 });
+export const RETIRED_TRACKER_PRODUCTS = Object.freeze(["tracker_base", "tracker_two", "tracker_addon"]);
 export const isTrackerProduct = (p) => Object.prototype.hasOwnProperty.call(TRACKER_PRODUCTS, p);
+export const isRetiredTrackerProduct = (p) => RETIRED_TRACKER_PRODUCTS.includes(p);
 
 export function trackerOffer() {
-  return Object.entries(TRACKER_PRODUCTS).map(([id, p]) => ({
-    id,
-    label: process.env[p.labelEnv] || p.label,
-    priceAud: Number(process.env[p.audEnv]) || p.aud,
-    devices: p.devices || 0,
-    recurring: p.recurring || null,
-    items: p.items || null,
-    available: !!process.env[p.env],
-  }));
+  const premium = premiumPublic();
+  const premiumCharge = premiumCheckoutSelection();
+  return ["tracker", "tracker_full", "tracker_sms"].map((id) => {
+    const p = TRACKER_PRODUCTS[id];
+    const row = {
+      id,
+      label: p.label,
+      priceAud: p.aud,
+      listAud: p.aud,
+      devices: p.devices || 0,
+      recurring: p.recurring || null,
+      items: p.items || null,
+      available: !!process.env[p.env],
+      retired: false,
+    };
+    if (id === "tracker_full") {
+      row.listAud = premium.listAud;
+      row.priceAud = premium.chargeAud;
+      row.windowOpen = premium.windowOpen;
+      row.windowUntil = premium.windowUntil;
+      row.timezone = premium.timezone;
+      row.savingAud = premium.savingAud;
+      row.savingPercent = premium.savingPercent;
+      row.available = !premiumCharge.error;
+    }
+    return row;
+  });
 }
 
 const q = encodeURIComponent;
-// { product: "tracker_full"|"tracker_two"|"tracker_base", devices: 1|2, addon, full } or null when not unlocked.
+// A second device is the separate licence add-on (plan 2), not a tracker SKU.
+async function licenceDeviceCap(sub) {
+  try {
+    const row = (await supa(`licences?google_sub=eq.${q(sub)}&select=plan,status`))?.[0];
+    return row?.status === "active" && Number(row.plan) >= 2 ? 2 : 1;
+  } catch {
+    return 1;
+  }
+}
+// { product, devices: 1|2, addon, full } or null when not unlocked.
+// tracker_sms lives in tracker_sms_subscriptions, never here.
 export async function trackerUnlock(sub) {
   if (!sub) return null;
-  // tracker_sms is a subscription, kept in tracker_sms_subscriptions, never here.
-  const rows = (await supa(`licence_payments?google_sub=eq.${q(sub)}&product=in.(tracker_base,tracker_two,tracker_addon,tracker_full)&status=eq.paid&select=product,created_at&order=created_at.asc`)) || [];
+  const rows = (await supa(`licence_payments?google_sub=eq.${q(sub)}&product=in.(tracker,tracker_base,tracker_two,tracker_addon,tracker_full)&status=eq.paid&select=product,created_at&order=created_at.asc`)) || [];
   const has = (p) => rows.some((r) => r.product === p);
-  const fullRow = rows.find((r) => r.product === "tracker_full");
-  if (fullRow) {
-    return { product: "tracker_full", devices: 2, full: true, addon: has("tracker_addon") };
-  }
+  if (has("tracker_full")) return { product: "tracker_full", devices: 2, full: true, addon: has("tracker_addon") };
   if (has("tracker_two")) return { product: "tracker_two", devices: 2, full: false, addon: false };
-  if (!has("tracker_base")) return null; // the A$29 add-on alone unlocks nothing
-  return { product: "tracker_base", devices: has("tracker_addon") ? 2 : 1, full: false, addon: has("tracker_addon") };
+  const cap = async (base) => Math.max(base, await licenceDeviceCap(sub));
+  if (has("tracker")) return { product: "tracker", devices: await cap(1), full: false, addon: false };
+  if (!has("tracker_base")) return null; // a retired second-computer row alone unlocks nothing
+  const addon = has("tracker_addon");
+  return { product: "tracker_base", devices: await cap(addon ? 2 : 1), full: false, addon };
 }
 // Device cap, like the main licence: the first N devices to open the tracker
 // hold the seats; a device unseen for 21 days frees its seat.

@@ -4,7 +4,7 @@
 //
 // Model (see LICENSING.md):
 //   * The licence belongs to a Google account (ID-token `sub`), never a key.
-//   * plan 1 = "One device" (A$79), plan 2 = "Phone and computer" (A$69).
+//   * plan 1 = Basic, one device (A$79). plan 2 = two devices (A$29 add-on, or Premium).
 //   * A device is an active signed-in install: { deviceId, label, firstSeen,
 //     lastSeen }. It stops counting after 21 days without a check-in.
 //   * Paid status is written only by the Stripe webhook.
@@ -357,6 +357,8 @@ export async function recomputeLicence(sub) {
   if (paid.some((p) => p.product === "one")) plan = Math.max(plan, 1);
   if (paid.some((p) => p.product === "two")) plan = 2;
   if (plan >= 1 && paid.some((p) => p.product === "upgrade")) plan = 2;
+  // Premium is the two-device licence plus the Payment tracker, one payment.
+  if (paid.some((p) => p.product === "tracker_full")) plan = Math.max(plan, 2);
   const base = paid.find((p) => p.product === "two") || paid.find((p) => p.product === "one");
   const upg = paid.find((p) => p.product === "upgrade");
   const row = {

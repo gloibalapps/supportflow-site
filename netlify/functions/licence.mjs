@@ -43,10 +43,9 @@ async function config(req) {
     staleDays: 21,
     leaseDays: 7,
     plans: [
-      { id: "one", plan: 1, name: PLAN_NAMES[1], priceAud: 49 },
-      { id: "two", plan: 2, name: PLAN_NAMES[2], priceAud: 69 },
+      { id: "one", plan: 1, name: "Basic", priceAud: PRODUCTS.one.amount },
     ],
-    upgradeAud: 29,
+    upgradeAud: PRODUCTS.upgrade.amount,
   });
 }
 
