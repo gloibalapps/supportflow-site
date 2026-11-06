@@ -81,7 +81,7 @@ SupportFlow now uses four fixed navigation areas at the bottom of every main scr
 | **Money** | Opens the Money shortcut page: Invoices · Expenses · Tax · BAS (when GST registered) |
 | **Participants** | Opens the Participants shortcut page: Participants · Add participant · Plan managers · Service agreements |
 
-The **top header is fixed** as well. Use **?** for Manual & Help, and use your profile initial at the top right for Settings and other account/device options.
+The **top header is fixed** as well. The **Light mode / Dark mode** pill, immediately left of **?**, switches the app between light and dark. Use **?** for Manual & Help, and use your profile initial at the top right for Settings and other account/device options. Until you use that pill, the app follows your phone's light or dark setting.
 
 ### Home and Quick Start
 
@@ -673,7 +673,6 @@ scroll of settings.
 
 | Panel | For |
 |---|---|
-| **Appearance** | Follow your phone's setting, or pick light/dark yourself |
 | **Lock the app** | PIN and biometric unlock, see [App lock](#13-app-lock) |
 | **Business & invoice details** | Name, ABN, GST status, contact, these print on invoices |
 | **Bank details** | BSB and account, these print on invoices for payment |
@@ -693,7 +692,7 @@ than their own panel.
 
 ## 13. App lock
 
-**Settings → Lock the app**, near the top, just under Appearance.
+**Settings → Lock the app**, near the top of Settings. Light and dark mode are the pill in the top header, immediately left of **?**, not a Settings panel.
 
 Turns it on and it asks for a **PIN before the app opens**, 4 or 6 digits, your
 choice. Worth having if you use participant details on a phone that gets left

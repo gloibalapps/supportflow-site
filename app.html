@@ -191,6 +191,26 @@ html,body{overscroll-behavior-y:none;background:#14150F;height:100%;overflow-x:h
   font-family:'Fraunces',serif;font-size:15px;font-weight:600;cursor:pointer;
   display:flex;align-items:center;justify-content:center;transition:all .18s ease;padding:0}
 .helpbtn:hover{border-color:var(--brass);color:var(--brass-lift)}
+.topactions{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+/* Header light/dark pill. Fixed colours so the control itself reads as the
+   mode it switches, beside the app theme tokens. Knob sits on the right
+   for light and on the left for dark. */
+.themetoggle{position:relative;z-index:46;height:32px;border:0;border-radius:999px;padding:0;display:inline-flex;align-items:center;cursor:pointer;font-family:inherit;font-size:8.5px;font-weight:700;letter-spacing:.08em;line-height:1;text-transform:uppercase;white-space:nowrap;flex:0 0 auto;transition:background .22s ease,color .22s ease,box-shadow .22s ease}
+.themetoggle[data-mode="light"]{background:#fff;color:#8A9098;box-shadow:0 1px 2px rgba(20,24,32,.08), 0 1px 3px rgba(20,24,32,.05), inset 0 0 0 1px #E2E4E8;padding:0 32px 0 11px}
+.themetoggle[data-mode="dark"]{background:#2A3B50;color:#F7F8FA;box-shadow:0 2px 8px rgba(16,24,40,.28), inset 0 0 0 1px rgba(255,255,255,.06);padding:0 11px 0 32px}
+.themetoggle-label{display:block;min-width:62px;text-align:center}
+.themetoggle .knob{position:absolute;top:3px;width:26px;height:26px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(20,24,32,.18), 0 0 0 1px rgba(20,24,32,.05);transition:left .22s ease}
+.themetoggle[data-mode="dark"] .knob{left:3px}
+.themetoggle[data-mode="light"] .knob{left:calc(100% - 29px)}
+.themetoggle:hover{filter:brightness(1.04)}
+.themetoggle:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+@media(max-width:420px){
+  .topactions{gap:6px}
+  .themetoggle{letter-spacing:.045em;font-size:7.5px}
+  .themetoggle-label{min-width:54px}
+  .themetoggle[data-mode="light"]{padding-left:8px}
+  .themetoggle[data-mode="dark"]{padding-right:8px}
+}
 .menuveil{position:fixed;inset:0;z-index:44}
 .menu{position:absolute;top:46px;right:0;z-index:45;min-width:210px;
   background:var(--bg-2);border:1px solid var(--line);border-radius:13px;
@@ -928,7 +948,7 @@ function LicencePlans({ onBuy, busy }) {
     </div>
   );
   return <div style={{ width: "100%", maxWidth: 420 }}>
-    {card("one", "One device", 49, "One device at a time.",
+    {card("one", "One device", 79, "One device at a time.",
       ["Use SupportFlow on one phone, tablet or computer", "Move it to a new device whenever you like", "Upgrade to Phone and computer later for $29", "No subscription, no monthly fees"],
       ["Not signed in on two devices at the same time"])}
     {card("two", "Phone and computer", 69, "Phone and computer signed in together.",
@@ -2889,6 +2909,27 @@ function LockScreen({ onUnlock, onForgot }) {
 }
 
 
+function ThemeSunIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="3.2" stroke="#C9A227" strokeWidth="1.7" />
+      <path stroke="#C9A227" strokeWidth="1.7" strokeLinecap="round" d="M12 2.7v2.35M12 18.95v2.35M2.7 12h2.35M18.95 12h2.35M5.45 5.45l1.65 1.65M16.9 16.9l1.65 1.65M18.55 5.45l-1.65 1.65M7.1 16.9l-1.65 1.65" />
+    </svg>
+  );
+}
+
+function ThemeMoonIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+      <g transform="translate(0.2 3.1) scale(0.64)">
+        <path fill="#6E8096" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+      </g>
+      <path fill="#8EA0B4" d="M16.35 2.55l.5 1.08 1.12.34-.9.7.26 1.1-.98-.6-.98.6.26-1.1-.9-.7 1.12-.34z" />
+      <circle cx="20.05" cy="6.85" r=".82" fill="#8EA0B4" />
+    </svg>
+  );
+}
+
 function App() {
   // Device licensing. phase "off" (switch off) leaves everything as before.
   const licence = useLicence();
@@ -3161,14 +3202,14 @@ function App() {
     try { await storage.set("ndis:data", JSON.stringify(next)); } catch (e) { console.error(e); }
     if (!skipAutoBackup && next.onboarded) scheduleGoogleAutoBackup(next);
   };
-  // Everyone: pick "system" | "light" | "dark" (saved as ndis:theme; missing = system).
+  // Saved as ndis:theme. Missing or "system" follows the phone live. The header
+  // pill is the only switch and writes an explicit "light" or "dark".
   const setThemePref = async (n) => {
     if (!["system", "light", "dark"].includes(n)) return;
     setTheme(n);
     try { await storage.set("ndis:theme", n); } catch (e) { }
   };
-  const THEME_LABEL = { system: "System", light: "Light", dark: "Dark" };
-  const cycleTheme = () => setThemePref({ system: "light", light: "dark", dark: "system" }[savedTheme] || "system");
+  const toggleTheme = () => setThemePref(theme === "dark" ? "light" : "dark");
 
 
   const m = useMemo(() => {
@@ -3537,8 +3578,14 @@ function App() {
               <div className="eyebrow" style={{ fontSize: 9, marginTop: 1 }}>{fy}–{String(fy + 1).slice(2)}</div>
             </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-
+          <div className="topactions">
+            <button className="themetoggle" data-mode={theme === "dark" ? "dark" : "light"}
+              onClick={() => { setMenuOpen(false); setHelpMenuOpen(false); toggleTheme(); }}
+              aria-label={theme === "dark" ? "Dark mode. Switch to light mode" : "Light mode. Switch to dark mode"}
+              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
+              <span className="knob" aria-hidden="true">{theme === "dark" ? <ThemeMoonIcon /> : <ThemeSunIcon />}</span>
+              <span className="themetoggle-label">{theme === "dark" ? "Dark mode" : "Light mode"}</span>
+            </button>
 
             <div style={{ position: "relative" }}>
               <button className="helpbtn" onClick={() => { setMenuOpen(false); setHelpMenuOpen(!helpMenuOpen); }}
@@ -3618,9 +3665,6 @@ function App() {
                   </button>
                   <button onClick={() => { setMenuOpen(false); setOpenPane(null); go("settings"); }}>Settings</button>
                   <button onClick={() => { setMenuOpen(false); setOpenPane("privacy-security"); go("settings"); }}>Privacy &amp; security</button>
-                  <button aria-label="Theme" onClick={() => cycleTheme()}>
-                    Theme: {THEME_LABEL[savedTheme] || "System"}
-                  </button>
                   {!!readLock() && (
                     <button onClick={() => { setMenuOpen(false); setLocked(true); }}>Lock now</button>
                   )}
@@ -3786,7 +3830,7 @@ function App() {
         {tab === "setup" && <Onboarding data={data} save={save} close={() => go("home")} help={() => go("settings")}
           openPrivacy={() => { setOpenPane("privacy"); go("settings"); }} startStep={firstIncompleteStep(data)} />}
 
-        {tab === "settings" && <Settings data={data} save={save} theme={theme} themePref={savedTheme} setThemePref={setThemePref} wipeAll={wipeAll} rerun={() => setTab("setup")} startPane={openPane || "settings"} helpInitialView={helpInitialView} />}
+        {tab === "settings" && <Settings data={data} save={save} wipeAll={wipeAll} rerun={() => setTab("setup")} startPane={openPane || "settings"} helpInitialView={helpInitialView} />}
       </div>
 
       <div className="mob">
@@ -8368,7 +8412,7 @@ const MANUAL = [
       ["The first thing you see",
        "A welcome screen, once, explaining the app in three lines. You can start setup or read the manual first. Before normal use, onboarding requires a backup password; that backup-security step cannot be skipped."],
       ["Finding your way around",
-       "Four fixed bottom navigation areas: Home, Work, Money and People. Work, Money and People open clean shortcut pages first; choose the feature you need, then use Back near the top to return to those shortcuts. Home gives you quick-start shortcuts. Settings and Help stay in the fixed top header."],
+       "Four fixed bottom navigation areas: Home, Work, Money and People. Work, Money and People open clean shortcut pages first; choose the feature you need, then use Back near the top to return to those shortcuts. Home gives you quick-start shortcuts. The Light mode / Dark mode control sits in the fixed top header, immediately left of ?. Use ? for the manual, and the profile menu for Settings."],
       ["Installing on Android",
        "Open supportflow.work/app in Chrome, open Chrome's menu, then choose Install app or Add to Home screen and confirm. SupportFlow will open from its own Home screen icon. Installing it does not create a SupportFlow cloud account; your working records remain on that app/browser installation and your encrypted backup is stored in the Google Drive account you connect."],
       ["Installing on iPhone or iPad",
@@ -10112,7 +10156,7 @@ function PaymentDetailsFields({ p, setP }) {
   );
 }
 
-function Settings({ data, save, theme, themePref, setThemePref, wipeAll, rerun, startPane, helpInitialView }) {
+function Settings({ data, save, wipeAll, rerun, startPane, helpInitialView }) {
   const [pane, setPane] = useState(startPane || "settings");
   const licence = React.useContext(LicenceContext);
   // The menu can ask for a different pane while Settings is already open.
@@ -10213,28 +10257,6 @@ function Settings({ data, save, theme, themePref, setThemePref, wipeAll, rerun, 
           <div className="disp" style={{ fontSize: 27 }}>Settings</div>
           <div style={{ fontSize: 12.5, color: "var(--tx-3)", marginTop: 3 }}>These print on every invoice you issue</div>
         </div>
-      </div>
-
-      <div className="stepcard done">
-        <span className="stepnum">✓</span>
-        <span className="stepcard-chev" data-open={openSection === "appearance" ? 1 : 0}
-          onClick={() => toggleSection("appearance")} aria-hidden="true">›</span>
-        <div className="steplead stepcard-head" onClick={() => toggleSection("appearance")}>Ready</div>
-        <div className="disp stepcard-head" style={{ fontSize: 19, marginBottom: openSection === "appearance" ? 3 : 0 }}
-          onClick={() => toggleSection("appearance")}>Appearance</div>
-        {openSection === "appearance" && (
-          <>
-            <div style={{ fontSize: 12, color: "var(--tx-3)", marginBottom: 14 }}>
-              {themePref === "system" ? `System follows your phone's setting (currently ${theme}).` : `Always ${themePref}, whatever your phone is set to.`}
-            </div>
-            <div role="radiogroup" aria-label="Theme" style={{ display: "inline-flex", border: "1px solid var(--line)", borderRadius: 999, overflow: "hidden" }}>
-                {[["system", "System"], ["light", "Light"], ["dark", "Dark"]].map(([k, l]) => (
-                  <button key={k} role="radio" aria-checked={themePref === k} className={"btn tiny" + (themePref === k ? "" : " ghost")}
-                    style={{ borderRadius: 0, border: 0 }} onClick={() => setThemePref(k)}>{l}</button>
-                ))}
-              </div>
-          </>
-        )}
       </div>
 
       <LockPanel open={openSection === "lock"} onToggle={() => toggleSection("lock")} />
