@@ -392,6 +392,32 @@ app. It never appears as an invoice, an expense, or against any participant,
 and it stops counting on its own once the financial year rolls over, so it
 can't accidentally carry into next year's figure.
 
+### Accountant pack
+
+**Money → Tax → Accountant pack.** Choose the financial year. It opens on the
+current Australian year, 1 July to 30 June, and you can pick another year.
+**Download PDF** saves the pack. **Print** prints that same PDF, not the rest
+of the app.
+
+Give it to your accountant. It has the figures from this app:
+
+- Your business name, trading name if you set one, and ABN
+- Income from invoices marked **Paid** (invoice date, invoice number, date paid, amount received, invoice total)
+- Expenses by category (date, category, amount, GST on the receipt, business-use percentage)
+- Vehicle kilometres and the cents-per-kilometre deduction, including the cap
+- The tax set-aside estimate
+- GST and BAS figures when the app already calculates them (BAS quarters only if you are registered for GST)
+
+**It does not include participant or client personal information.** No names,
+NDIS numbers, notes, incident details, addresses, contact details, plan manager
+or payer names, or support descriptions. The words you typed on an expense are
+left out as well, because they can name a person. Only the category is shown.
+
+This is not the incident register. Incident records are not in the pack.
+
+The PDF is created on this device. Check the figures before you rely on them.
+It is a record of what you entered, not a tax return.
+
 ### The deduction checker
 
 **Money → Tax → Claim check.** Type anything, "steel cap boots", "phone bill",
