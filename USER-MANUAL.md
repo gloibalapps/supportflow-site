@@ -784,13 +784,19 @@ earlier from the profile menu.
 ### Plans and licenses
 
 The pricing cards on the SupportFlow home page (supportflow.work, **Plans**)
-show two one-off plans:
+show two one-off plans. There is no subscription on either plan.
 
-- **Basic, A$49:** invoices, shifts, notes, kilometres, expenses and tax.
-  The card shows **One license**.
-- **Premium, A$99:** everything in Basic plus the Payment tracker (optional
-  SMS notification is extra, A$4.99 a month for 50 texts). The card shows
-  **Two licenses**.
+- **Basic, A$79:** invoices, shifts, notes, kilometres, expenses and tax, on
+  one device.
+- **Second device, A$29:** a separate add-on if you want two devices. It is
+  not included in Basic.
+- **Premium, A$149:** the real price. Everything in Basic, a two-device
+  licence and the Payment tracker, paid once. Until the end of
+  **31 January 2027** (Australia/Adelaide time) Premium is charged at
+  **A$129**. That is A$20 less once, 13% under A$149 (20 ÷ 149, rounded to
+  the nearest percent). It is cash-flow relief on a one-off licence. From
+  **1 February 2027** the charge is A$149 again, with no further change to
+  make. Optional SMS (A$4.99 a month for 50 texts) is not included.
 
 Your current plan and how many devices it covers are shown in the app under
 **Settings → Licence & devices**.
@@ -804,8 +810,12 @@ opens SupportFlow in a **new tab** (supportflow.work/app?buy=upgrade):
    bought Basic with.
 2. An **Upgrade SupportFlow** box appears. Choose the option you want:
    - **Add a second device, A$29:** your Basic licence then covers two
-     devices. Only available on a one-device (Basic) licence.
-   - **Upgrade to Premium, A$99:** adds the Payment tracker and two licenses.
+     devices. Only available on a one-device (Basic) licence. This is separate
+     from the Payment tracker.
+   - **Upgrade to Premium:** Premium's price is A$149, paid once. Until the
+     end of 31 January 2027 (Adelaide time) you pay A$129, which is A$20 less
+     once (13% under A$149). From 1 February 2027 you pay A$149. Premium adds
+     the Payment tracker and a two-device licence. SMS is not included.
 3. You're taken to **Stripe Checkout** to pay. When payment finishes you come
    back to the app and the upgrade is applied automatically.
 
@@ -832,12 +842,13 @@ The Payment tracker lives at **Money → Payment tracker**. It shows who owes yo
 
 ### Pricing
 
-- **A$49 once:** the tracker on one computer.
-- **A$69 once:** the tracker on two computers.
-- **A$29 once:** upgrade from the A$49 plan to add a second computer. Only for owners of the A$49 one-computer tracker.
-- **A$99 once:** the Premium package: everything in Basic (invoices, shifts, notes, kilometres, expenses and tax), two licenses and the Payment tracker. No subscription.
+- **A$29 once:** the Payment tracker, on top of Basic. It does not add a second device.
+- **A$29 once:** a second device. This is a separate add-on from the tracker. Buy it from the upgrade screen or Settings → Licence & devices.
+- **Premium, A$149 once:** everything in Basic (invoices, shifts, notes, kilometres, expenses and tax), a two-device licence and the Payment tracker. No subscription. Until the end of 31 January 2027 (Australia/Adelaide) the amount charged is A$129, which is A$20 less once, 13% under the A$149 price. From 1 February 2027 the charge is A$149.
 
-The optional SMS pack below is the **only paid add-on**, and it is **separate**. It is not included in the A$99 package or any other tracker purchase.
+The A$49 and A$69 tracker options are not sold.
+
+The optional SMS pack below is separate. It is not included in Basic, the A$29 tracker, or Premium.
 
 ### SMS alerts (optional)
 

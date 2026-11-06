@@ -8,8 +8,8 @@ const mig = fs.readFileSync("TRACKER-MIGRATION.sql", "utf8");
 await db.exec(mig); await db.exec(mig); // re-runnable
 const one = async (q, p) => (await db.query(q, p)).rows[0];
 const ok = (c, m) => { if (!c) { console.error("FAIL", m); process.exit(1); } console.log("ok -", m); };
-await db.query("insert into licence_payments (stripe_session_id, google_sub, product) values ('s1','u1','tracker_base'),('s2','u1','tracker_addon'),('s3','u1','tracker_full'),('s5','u1','tracker_two')");
-ok(true, "licence_payments accepts tracker_base/two/addon/full");
+await db.query("insert into licence_payments (stripe_session_id, google_sub, product) values ('s1','u1','tracker_base'),('s2','u1','tracker_addon'),('s3','u1','tracker_full'),('s5','u1','tracker_two'),('s6','u1','tracker')");
+ok(true, "licence_payments accepts tracker and the retired tracker ids");
 let threw = false; try { await db.query("insert into licence_payments (stripe_session_id, google_sub, product) values ('s4','u1','tracker_sms')"); } catch { threw = true; }
 ok(threw, "tracker_sms is NOT a one-off licence_payments product");
 ok((await one("select tracker_sms_reset('u1','in_1',50,now(),'pi_1','ch_1') r")).r === 50, "invoice.paid grants 50");
