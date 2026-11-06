@@ -183,19 +183,43 @@
   to = "/app"
   status = 301
 
-# The tester admin dashboard. Not linked from anywhere on the public
-# site -- reaching it at all requires knowing this exact path, and
-# reading anything requires the ADMIN_PASSWORD on top of that.
+# Owner stats dashboard. /admin is the only URL. The page holds no stats
+# until admin-dashboard.mjs accepts ADMIN_DASHBOARD_TOKEN. Not linked from
+# the public site. Old bookmarks and the missing-h typo redirect here.
 [[redirects]]
   from = "/admin"
   to = "/admin.html"
   status = 200
 
-# Owner stats dashboard (token-protected server-side, noindex).
 [[redirects]]
   from = "/admin/dashboard"
-  to = "/admin/dashboard.html"
-  status = 200
+  to = "/admin"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/admin/dashboard.html"
+  to = "/admin"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/admin/dasboard"
+  to = "/admin"
+  status = 301
+  force = true
+
+[[headers]]
+  for = "/admin"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+    Cache-Control = "no-store"
+
+[[headers]]
+  for = "/admin.html"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+    Cache-Control = "no-store"
 
 [[headers]]
   for = "/admin/*"

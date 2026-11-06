@@ -1,1 +1,160 @@
-<!doctype html><html lang="en-AU"><head><meta charset="utf-8"><title>SupportFlow</title></head><body><h1>The tester program has ended</h1><a href="/app">Open SupportFlow</a> · <a href="/market">Marketing diary</a> · <a href="/signups">Signups</a></body></html>
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>SupportFlow · Owner dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Same tokens as index.html and the app's dark theme. Bronze is --brass, not a separate gold. */
+:root{
+  --ink:#12140E;--ink-2:#1A1D15;--ink-3:#22261C;
+  --brass:#C8913A;--brass-lift:#E0A83F;--brass-ink:#14150F;
+  --paper:#F2EFE4;--muted:#8B8E82;--muted-2:#9A9D90;--line:#2A2D23;
+  --good:#5E9E77;--req:#C0392B;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--ink);color:var(--paper);font-family:'Instrument Sans',ui-sans-serif,system-ui,sans-serif;-webkit-font-smoothing:antialiased;padding:clamp(20px,3.6vw,40px);min-height:100vh}
+body:before{content:"";position:fixed;inset:0;pointer-events:none;background:radial-gradient(85% 50% at 50% 0%,rgba(224,168,63,.10),transparent 62%)}
+#app{position:relative;z-index:1;max-width:1180px;margin:0 auto}
+h1{font-family:'Fraunces',Georgia,serif;font-weight:300;font-size:clamp(32px,4vw,44px);letter-spacing:-.03em;line-height:1}
+h1 .flow{font-weight:500;background:linear-gradient(96deg,var(--brass-lift),var(--brass) 58%,#9C6F2B);-webkit-background-clip:text;background-clip:text;color:transparent}
+h2{font-size:11.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--brass);font-weight:600;margin:28px 0 10px}
+.brand{display:flex;align-items:center;gap:14px}
+.seal{width:32px;height:32px;border-radius:9px;background:linear-gradient(148deg,var(--brass-lift),var(--brass));display:grid;place-items:center;font-family:'Fraunces',serif;font-size:16px;color:var(--brass-ink);box-shadow:0 0 0 1px rgba(224,168,63,.25),0 6px 22px rgba(200,145,58,.22)}
+.kicker{font-size:11.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--brass);font-weight:600;margin-top:8px}
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:22px}
+.meta,.sub{color:var(--muted);font-size:13.5px;line-height:1.5}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+.card{background:linear-gradient(180deg,var(--ink-2),var(--ink));border:1px solid var(--line);border-radius:16px;padding:22px 18px}
+.card.feature{border-color:rgba(200,145,58,.55);background:linear-gradient(168deg,rgba(200,145,58,.09),var(--ink-2) 46%);box-shadow:0 22px 60px rgba(0,0,0,.35)}
+.card .lbl{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.big{font-family:'Fraunces',Georgia,serif;font-weight:400;font-size:clamp(34px,4.6vw,48px);color:var(--brass-lift);font-variant-numeric:tabular-nums;line-height:1.1;letter-spacing:-.03em;margin-top:8px}
+.grid{display:grid;grid-template-columns:1.15fr .85fr;gap:14px}
+@media(max-width:800px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--ink-2);border:1px solid var(--line);border-radius:18px;padding:clamp(18px,2.4vw,26px);margin-top:10px}
+.panel h3{font-family:'Fraunces',Georgia,serif;font-weight:400;font-size:22px;letter-spacing:-.02em;margin-bottom:8px}
+table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:8px}
+td,th{padding:8px 4px;border-top:1px solid var(--line);text-align:left;vertical-align:top}
+th{color:var(--muted);font-weight:600;font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+.bar{display:flex;align-items:flex-end;gap:3px;height:84px;margin-top:12px}
+.bar div{flex:1;background:linear-gradient(180deg,var(--brass-lift),var(--brass) 58%,#9C6F2B);border-radius:3px 3px 0 0;min-height:2px}
+ul.notes{margin:14px 0 0;padding:14px 16px 14px 32px;border:1px solid rgba(200,145,58,.35);border-radius:14px;background:rgba(200,145,58,.06)}
+ul.notes li{color:var(--muted-2);font-size:13.5px;margin:4px 0}
+.gate{display:flex;flex-direction:column;align-items:stretch;gap:10px;max-width:380px;margin:14vh auto;padding:32px 28px;background:var(--ink-2);border:1px solid rgba(200,145,58,.45);border-radius:18px;box-shadow:0 22px 60px rgba(0,0,0,.4)}
+.gate .seal{margin-bottom:6px}
+.gate .kicker{margin:0 0 8px}
+input{font:inherit;padding:14px 16px;border-radius:11px;border:1px solid var(--line);background:var(--ink);color:var(--paper)}
+input:focus{outline:2px solid var(--brass-lift);outline-offset:2px;border-color:var(--brass)}
+.btn{font-family:inherit;font-size:14.5px;font-weight:600;padding:14px 26px;border-radius:11px;border:1px solid var(--brass);background:var(--brass);color:var(--brass-ink);cursor:pointer}
+.btn:hover{background:var(--brass-lift)}
+.gate label{font-size:12.5px;color:var(--muted)}
+.err{color:var(--req);text-align:center;font-size:13.5px}
+a{color:var(--brass-lift);text-underline-offset:3px}
+a:hover{color:var(--brass)}
+</style></head><body>
+<div id="app"></div>
+<script>
+/* Owner dashboard, served at /admin. The token is checked server-side by admin-dashboard.mjs;
+   this page holds no stats until the server accepts ADMIN_DASHBOARD_TOKEN. */
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const num = v => v == null || v === "" ? "—" : Number(v).toLocaleString("en-AU");
+const aud = v => v == null || v === "" ? "—" : "A$" + Number(v).toLocaleString("en-AU", {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const pct = v => v == null ? "—" : (Math.round(Number(v) * 1000) / 10).toLocaleString("en-AU") + "%";
+const when = iso => { const t = Date.parse(iso || ""); return Number.isFinite(t) ? new Date(t).toLocaleString("en-AU", {hour12: false}) : "—"; };
+const app = document.getElementById("app");
+function login(msg) {
+  app.innerHTML = `<form id="f" class="gate"><div class="seal" aria-hidden="true">S</div><h1>Support<span class="flow">Flow</span></h1><p class="kicker">Owner dashboard</p><label for="t">Password</label><input id="t" type="password" placeholder="Password" autocomplete="current-password" required><button class="btn" type="submit">Open</button>${msg ? `<p class="err">${esc(msg)}</p>` : ""}</form>`;
+  document.getElementById("f").onsubmit = e => { e.preventDefault(); sessionStorage.setItem("sf:dash", document.getElementById("t").value); load(); };
+}
+function card(key, label, value, sub, feature) {
+  return `<article class="card${feature ? " feature" : ""}"><div class="lbl">${esc(label)}</div><div class="big" data-k="${esc(key)}">${esc(value)}</div><div class="sub">${esc(sub || "")}</div></article>`;
+}
+function table(headers, rows) {
+  if (!rows.length) return `<p class="sub">Nothing recorded yet.</p>`;
+  return `<table><thead><tr>${headers.map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table>`;
+}
+function render(d) {
+  const o = d.owner;
+  if (!o) return `<p class="err">The stats response had no owner summary.</p>`;
+  const earn = o.earnings?.stripe?.grossAud != null
+    ? { v: aud(o.earnings.stripe.grossAud), s: "Stripe gross" + (o.earnings.stripe.since ? " since " + String(o.earnings.stripe.since).slice(0, 10) : "") }
+    : { v: aud(o.earnings?.recordedAud), s: "Recorded one-off payments. SMS is not included." };
+  const visits = d.visits;
+  const bars = visits?.trend?.length ? `<div class="bar">${visits.trend.map(t => `<div title="${esc(t.day)}: ${t.visits} visits, ${t.unique} unique" style="height:${Math.max(2, (t.visits / Math.max(1, ...visits.trend.map(x => x.visits))) * 100)}%"></div>`).join("")}</div><p class="sub">Each bar is one Adelaide day. Height is page views.</p>` : "";
+  const v = o.visitors;
+  const f = o.freeOffer || {};
+  const m = o.members || {};
+  const sms = m.sms || {};
+  const att = m.attach || {};
+  const holders = table(["Plan", "Members"], (m.holders || []).map(h => `<tr><td>${esc(h.label)}</td><td>${num(h.count)}</td></tr>`));
+  const products = table(["Product", "Payments", "7 days", "30 days", "Amount"], (o.earnings?.byProduct || []).map(p => `<tr><td>${esc(p.label)}</td><td>${num(p.count)}</td><td>${num(p.d7)}</td><td>${num(p.d30)}</td><td>${aud(p.revenueAud)}</td></tr>`));
+  const recent = table(["When", "Plan", "Amount", "Status", "Who"], (o.recent || []).map(r => `<tr><td>${esc(when(r.at))}</td><td>${esc(r.plan)}</td><td>${aud(r.amountAud)}</td><td>${esc(r.status)}</td><td>${esc(r.who)}</td></tr>`));
+  const sources = table(["Source", "First opens"], (o.signups?.bySource || []).map(([k, n]) => `<tr><td>${esc(k)}</td><td>${num(n)}</td></tr>`));
+  const stripe = o.earnings?.stripe;
+  const payouts = d.stripe?.payouts?.length ? table(["Arrival", "Amount", "Status"], d.stripe.payouts.map(p => `<tr><td>${esc(p.arrival)}</td><td>${aud(p.amountAud)}</td><td>${esc(p.status)}</td></tr>`)) : "";
+  return `<header class="top"><div class="brand"><div class="seal" aria-hidden="true">S</div><div><h1>Support<span class="flow">Flow</span></h1><p class="kicker">Owner dashboard</p></div></div><p class="meta">${esc(o.windowNote || "")}<br>${esc(new Date(d.generatedAt).toLocaleString("en-AU"))} · <a href="#" id="out">Sign out</a></p></header>
+  <div class="cards">
+    ${card("visitors", "Unique visitors today", v ? num(v.todayUnique) : "—", v ? num(v.todayVisits) + " page views" : "Not available")}
+    ${card("free", "On the 5 free invoices", f.unavailable ? "—" : num(f.onOfferNow), f.unavailable ? "Accounts table unavailable" : num(f.allFiveLeft) + " unused · " + num(f.someUsed) + " partly used")}
+    ${card("members", "Paid members", num(m.paid), "Current plan, not every past payment")}
+    ${card("earnings", "Total earnings", earn.v, earn.s, true)}
+  </div>
+  ${o.notes?.length ? `<ul class="notes">${o.notes.map(n => `<li>${esc(n)}</li>`).join("")}</ul>` : ""}
+  <div class="grid">
+    <section class="panel"><h3>Visitors</h3>
+      <p class="sub">${esc(v?.definition || "Unique visitors are not available yet.")}</p>
+      ${v ? `<p class="sub" style="margin-top:8px">7 days: ${num(v.d7UniqueVisitorDays)} visitor-days · ${num(v.d7Visits)} views. 30 days: ${num(v.d30UniqueVisitorDays)} visitor-days · ${num(v.d30Visits)} views. Today ${num(v.newToday)} new · ${num(v.returningToday)} returning. 7 days ${num(v.new7)} new · ${num(v.returning7)} returning.</p>` : ""}
+      ${bars}
+    </section>
+    <section class="panel"><h3>5 free invoices</h3>
+      <p class="sub">${esc(f.definition || "")}</p>
+      <table><tbody>
+        <tr><td>On the offer now</td><td>${num(f.onOfferNow)}</td></tr>
+        <tr><td>All 5 still left</td><td>${num(f.allFiveLeft)}</td></tr>
+        <tr><td>Some of the 5 used</td><td>${num(f.someUsed)}</td></tr>
+        <tr><td>Window open, none left</td><td>${num(f.windowOpenNoneLeft)}</td></tr>
+        <tr><td>Window ended, unused credits</td><td>${num(f.expiredCreditsLeft)}</td></tr>
+        <tr><td>Window ended, unpaid</td><td>${num(f.expiredUnpaid)}</td></tr>
+        <tr><td>No expiry recorded</td><td>${num(f.noWindow)}</td></tr>
+        <tr><td>New accounts, 7 / 30 days</td><td>${num(f.newAccounts7)} / ${num(f.newAccounts30)}</td></tr>
+      </tbody></table>
+    </section>
+  </div>
+  <h2>Members and what they bought</h2>
+  <p class="sub">${esc(m.overlapNote || "")}</p>
+  <div class="grid">
+    <section class="panel"><h3>Current plan</h3>${holders}
+      <p class="sub" style="margin-top:8px">SMS active: ${sms.unavailable ? "—" : num(sms.active)}${sms.canceling ? " (" + num(sms.canceling) + " set to cancel)" : ""}. Past due ${num(sms.pastDue)}. Ended ${num(sms.ended)}. ${esc(sms.note || "")}</p>
+      <p class="sub" style="margin-top:8px">${esc(att.note || "")} Second device: ${num(att.basicWithSecondDevice)} of ${num(att.basicGoogle)} (${pct(att.secondDeviceRate)}). SMS: ${num(att.trackerWithSms)} of ${num(att.trackerHolders)} (${pct(att.smsRate)}).</p>
+    </section>
+    <section class="panel"><h3>Payments by product</h3>${products}
+      <p class="sub" style="margin-top:8px">Recorded one-off total ${aud(o.earnings?.recordedAud)} · 7 days ${aud(o.earnings?.d7Aud)} · 30 days ${aud(o.earnings?.d30Aud)}. Refunded payments ${num(o.earnings?.refundedCount)} (${aud(o.earnings?.refundedAud)}). Disputes ${num(o.earnings?.disputedCount)}. Test checkouts excluded: ${num(o.earnings?.testExcluded)}. ${esc(o.earnings?.smsOmitted || "")}</p>
+    </section>
+  </div>
+  <h2>Earnings</h2>
+  <section class="panel">${stripe ? `<p class="sub">Stripe gross ${aud(stripe.grossAud)} · net ${aud(stripe.netAud)} · fees ${aud(stripe.feesAud)}. ${stripe.netBasis ? esc(stripe.netBasis) + ". " : ""}7-day net of refunds ${aud(stripe.d7Aud)}. 30-day net of refunds ${aud(stripe.d30Aud)}. Successful charges ${num(stripe.successfulPayments)}. Refunds ${aud(stripe.refundsAud)}. Disputes ${num(stripe.disputes)}.${stripe.balance ? " Balance available " + aud(stripe.balance.availableAud) + ", pending " + aud(stripe.balance.pendingAud) + "." : ""}</p>${payouts}` : `<p class="sub">Stripe is not connected, so the total above is the recorded one-off amount only.</p>`}</section>
+  <h2>Counts side by side</h2>
+  <section class="panel"><p class="sub">${esc(o.funnel?.note || "")}</p>
+    <table><tbody>
+      <tr><td>Visitor-days, 30 Adelaide days</td><td>${num(o.funnel?.visitors30)}</td></tr>
+      <tr><td>App first-opens</td><td>${num(o.funnel?.firstOpens)} <span class="sub">(${num(o.funnel?.firstOpens7)} in 7 days · ${num(o.funnel?.firstOpens30)} in 30)</span></td></tr>
+      <tr><td>On the 5 free invoices</td><td>${num(o.funnel?.onFreeOffer)}</td></tr>
+      <tr><td>Paid members</td><td>${num(o.funnel?.paid)}</td></tr>
+    </tbody></table>
+    ${o.signups && !o.signups.unavailable ? `<h3 style="margin-top:14px">First opens by source</h3>${sources}` : ""}
+  </section>
+  <h2>Recent purchases</h2>
+  <section class="panel"><p class="sub">Who is the email already stored on that Google-account licence, masked. Device checkouts have no email on the purchase row, so they show a short device id.</p>${recent}
+    <p class="sub" style="margin-top:8px">${esc(o.checkouts?.note || "")}${o.checkouts?.failedCharges == null ? "" : " Failed charges: " + num(o.checkouts.failedCharges) + (o.checkouts.failedSince ? " since " + String(o.checkouts.failedSince).slice(0, 10) : "") + "."}</p>
+  </section>`;
+}
+async function load() {
+  const tok = sessionStorage.getItem("sf:dash"); if (!tok) return login();
+  let r; try { r = await fetch("/.netlify/functions/admin-dashboard?days=30", { headers: { Authorization: "Bearer " + tok } }); } catch { return login("Network error"); }
+  if (r.status === 401) { sessionStorage.removeItem("sf:dash"); return login("Incorrect password"); }
+  if (!r.ok) return login("Stats unavailable (" + r.status + ")");
+  const d = await r.json();
+  app.innerHTML = render(d);
+  document.getElementById("out").onclick = e => { e.preventDefault(); sessionStorage.removeItem("sf:dash"); login(); };
+}
+load();
+</script></body></html>

@@ -11,7 +11,11 @@ http.createServer(async (req, res) => {
     const r = await mod.default(new Request("http://localhost" + req.url, { method: req.method, headers: req.headers }));
     res.writeHead(r.status, Object.fromEntries(r.headers)); return res.end(await r.text());
   }
-  let p = u.pathname === "/" ? "/index.html" : u.pathname === "/admin/dashboard" ? "/admin/dashboard.html" : u.pathname;
+  const pathName = u.pathname;
+  if (pathName === "/admin/dashboard" || pathName === "/admin/dashboard.html" || pathName === "/admin/dasboard") {
+    res.writeHead(301, { Location: "/admin" + u.search }); return res.end();
+  }
+  let p = pathName === "/" ? "/index.html" : pathName === "/admin" ? "/admin.html" : pathName;
   const f = path.join(root, p);
   if (!f.startsWith(root) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); return res.end("404"); }
   res.writeHead(200, { "Content-Type": types[path.extname(f)] || "application/octet-stream" }); fs.createReadStream(f).pipe(res);

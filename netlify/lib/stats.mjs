@@ -5,10 +5,14 @@
 //   licences            -> licences sold / active / per plan
 //   licence_payments    -> sales count, revenue (A$), daily trend, recent activity
 //   signup_attribution  -> app first-opens ("installs") and sign-ups by source
+//   accounts            -> 5 free invoice credits (not AI tokens)
+//   credit_purchases    -> device-checkout Basic lifetime and legacy credit packs
+//   tracker_sms_subscriptions -> SMS pack status (no phone numbers)
 //
 // Local development: set STATS_FIXTURE=/path/to/backup.json (same shape as
 // backup-licences-*.json) to read a snapshot instead of Supabase.
 import fs from "node:fs";
+import { buildOwner } from "./owner-stats.mjs";
 
 const DAY = 86400000;
 
@@ -27,6 +31,14 @@ async function rows(table, select) {
   });
   if (!r.ok) return null; // missing table / no access -> panel shows "unavailable"
   return r.json();
+}
+
+async function rowsFirst(table, selects) {
+  for (const select of selects) {
+    const got = await rows(table, select);
+    if (got) return got;
+  }
+  return null;
 }
 
 export function maskEmail(e) {
@@ -60,10 +72,19 @@ export async function publicStats() {
 
 /** Private owner dashboard data. Emails are masked before leaving the server. */
 export async function dashboardStats({ days = 30 } = {}) {
-  const [lic, pay, sig] = await Promise.all([
+  const [lic, pay, sig, accounts, purchases, sms] = await Promise.all([
     rows("licences", "google_sub,email,plan,status,purchased_at,created_at"),
     rows("licence_payments", "google_sub,product,amount_aud,status,created_at"),
     rows("signup_attribution", "utm_source,ref_code,referrer_host,created_at"),
+    rowsFirst("accounts", [
+      "id,credit_balance,free_credits_remaining,credits_expire_at,created_at,last_seen_at",
+      "id,credit_balance,free_credits_remaining,credits_expire_at,last_seen_at",
+    ]),
+    rowsFirst("credit_purchases", [
+      "account_id,pack,credits,amount_aud,purchased_at",
+      "account_id,pack,amount_aud,purchased_at",
+    ]),
+    rows("tracker_sms_subscriptions", "google_sub,status,created_at,current_period_end,cancel_at_period_end"),
   ]);
   const out = { generatedAt: new Date().toISOString(), source: process.env.STATS_FIXTURE ? "fixture" : "supabase" };
 
@@ -115,6 +136,7 @@ export async function dashboardStats({ days = 30 } = {}) {
     for (const s of sig) { const k = s.utm_source || s.ref_code || s.referrer_host || "direct"; by[k] = (by[k] || 0) + 1; }
     out.signups = { total: sig.length, bySource: Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 10) };
   }
+  out.owner = buildOwner({ accounts, payments: pay, purchases, licences: lic, signups: sig, sms, cap: 10000 });
   return out;
 }
 
