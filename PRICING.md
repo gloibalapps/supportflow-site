@@ -2,13 +2,12 @@
 
 **One-off. No subscription.**
 
+New accounts receive **5 free invoices for 30 days**.
+
 | Option | Price (AUD) | Licences |
 |---|---:|---:|
-| One device | $49 once | 1 |
-| Phone and computer | $69 once | 2 |
-| Add-on: second licence (existing $49 owners only) | $29 | +1 (total 2) |
-
-$49 + $29 add-on = $78; buying both upfront for $69 saves $9. See LICENSING.md.
+| Basic | A$79 once | 1 |
+| Premium | A$149 once | 2 |
 
 ---
 
@@ -18,7 +17,7 @@ Older credit-pack pricing (Build 27, legacy):
 
 **No monthly subscription. No monthly fees. Pay only when you invoice.**
 
-New accounts receive **5 free invoice credits**.
+New accounts received **5 free invoice credits**.
 
 | Pack | Price (AUD) | Invoice credits |
 |---|---:|---:|

@@ -155,7 +155,8 @@ SupportFlow is an independent software product and is not affiliated with, endor
 
 ## Device licensing (off by default)
 
-One-off A$49 "One device" / A$69 "Phone and computer" licences tied to a
-Google account, behind an owner switch. Nothing changes for anyone until the
+One-off Basic (A$79) and Premium (A$149) licences tied to a
+Google account, behind an owner switch. New accounts can try 5 free
+invoices for 30 days. Nothing changes for anyone until the
 switch is turned on. Setup, testing and the exact steps to turn it on are in
 [`LICENSING.md`](LICENSING.md).
