@@ -2,105 +2,158 @@
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow"><title>SupportFlow · Owner dashboard</title>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{--ink:#12140E;--ink-2:#1A1D15;--ink-3:#22261C;--brass:#C8913A;--brass-lift:#E0A83F;--gold:#D4A03D;--paper:#F2EFE4;--muted:#8B8E82;--line:#2A2D23;--good:#5E9E77;--bad:#C0614F}
+/* Same tokens as index.html and the app's dark theme. Bronze is --brass, not a separate gold. */
+:root{
+  --ink:#12140E;--ink-2:#1A1D15;--ink-3:#22261C;
+  --brass:#C8913A;--brass-lift:#E0A83F;--brass-ink:#14150F;
+  --paper:#F2EFE4;--muted:#8B8E82;--muted-2:#9A9D90;--line:#2A2D23;
+  --good:#5E9E77;--req:#C0392B;
+}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--ink);color:var(--paper);font-family:'Instrument Sans',system-ui,sans-serif;padding:28px clamp(16px,3vw,40px)}
-h1{font-family:'Fraunces',Georgia,serif;font-weight:300;font-size:30px}h1 b{color:var(--gold);font-weight:400}
-.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:22px}
-.meta{color:var(--muted);font-size:12.5px}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px}
-.panel{background:var(--ink-2);border:1px solid var(--line);border-radius:14px;padding:18px}
-.panel.w2{grid-column:span 2}.panel.w4{grid-column:1/-1}
-@media(max-width:620px){.panel.w2{grid-column:auto}}
-.panel h3{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:10px;display:flex;justify-content:space-between}
-.big{font-family:'Fraunces',serif;font-size:40px;color:var(--gold)}.sub{color:var(--muted);font-size:13px;margin-top:4px}
-.soon{border-style:dashed;opacity:.7}.tag{font-size:10px;border:1px solid var(--gold);color:var(--gold);border-radius:99px;padding:1px 8px;letter-spacing:.06em}
-table{width:100%;border-collapse:collapse;font-size:13px}td{padding:6px 4px;border-top:1px solid var(--line)}td:first-child{color:var(--muted);white-space:nowrap}
-.bar{display:flex;align-items:flex-end;gap:3px;height:140px}.bar div{flex:1;background:var(--gold);border-radius:3px 3px 0 0;min-height:2px;position:relative}
-.bar div.o{background:var(--ink-3)}.legend{font-size:12px;color:var(--muted);margin-top:8px}
-form{display:flex;flex-wrap:wrap;gap:8px;max-width:420px;margin:12vh auto}input,button{font:inherit;padding:11px 14px;border-radius:10px;border:1px solid var(--line);background:var(--ink-2);color:var(--paper)}
-input{flex:1}button{background:var(--gold);color:#14150F;font-weight:600;border:0;cursor:pointer}
-form label{flex:1 0 100%;font-size:12.5px;color:var(--muted)}
-.err{color:var(--bad);text-align:center}
+body{background:var(--ink);color:var(--paper);font-family:'Instrument Sans',ui-sans-serif,system-ui,sans-serif;-webkit-font-smoothing:antialiased;padding:clamp(20px,3.6vw,40px);min-height:100vh}
+body:before{content:"";position:fixed;inset:0;pointer-events:none;background:radial-gradient(85% 50% at 50% 0%,rgba(224,168,63,.10),transparent 62%)}
+#app{position:relative;z-index:1;max-width:1180px;margin:0 auto}
+h1{font-family:'Fraunces',Georgia,serif;font-weight:300;font-size:clamp(32px,4vw,44px);letter-spacing:-.03em;line-height:1}
+h1 .flow{font-weight:500;background:linear-gradient(96deg,var(--brass-lift),var(--brass) 58%,#9C6F2B);-webkit-background-clip:text;background-clip:text;color:transparent}
+h2{font-size:11.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--brass);font-weight:600;margin:28px 0 10px}
+.brand{display:flex;align-items:center;gap:14px}
+.seal{width:32px;height:32px;border-radius:9px;background:linear-gradient(148deg,var(--brass-lift),var(--brass));display:grid;place-items:center;font-family:'Fraunces',serif;font-size:16px;color:var(--brass-ink);box-shadow:0 0 0 1px rgba(224,168,63,.25),0 6px 22px rgba(200,145,58,.22)}
+.kicker{font-size:11.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--brass);font-weight:600;margin-top:8px}
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:22px}
+.meta,.sub{color:var(--muted);font-size:13.5px;line-height:1.5}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+.card{background:linear-gradient(180deg,var(--ink-2),var(--ink));border:1px solid var(--line);border-radius:16px;padding:22px 18px}
+.card.feature{border-color:rgba(200,145,58,.55);background:linear-gradient(168deg,rgba(200,145,58,.09),var(--ink-2) 46%);box-shadow:0 22px 60px rgba(0,0,0,.35)}
+.card .lbl{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.big{font-family:'Fraunces',Georgia,serif;font-weight:400;font-size:clamp(34px,4.6vw,48px);color:var(--brass-lift);font-variant-numeric:tabular-nums;line-height:1.1;letter-spacing:-.03em;margin-top:8px}
+.grid{display:grid;grid-template-columns:1.15fr .85fr;gap:14px}
+@media(max-width:800px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--ink-2);border:1px solid var(--line);border-radius:18px;padding:clamp(18px,2.4vw,26px);margin-top:10px}
+.panel h3{font-family:'Fraunces',Georgia,serif;font-weight:400;font-size:22px;letter-spacing:-.02em;margin-bottom:8px}
+table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:8px}
+td,th{padding:8px 4px;border-top:1px solid var(--line);text-align:left;vertical-align:top}
+th{color:var(--muted);font-weight:600;font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+.bar{display:flex;align-items:flex-end;gap:3px;height:84px;margin-top:12px}
+.bar div{flex:1;background:linear-gradient(180deg,var(--brass-lift),var(--brass) 58%,#9C6F2B);border-radius:3px 3px 0 0;min-height:2px}
+ul.notes{margin:14px 0 0;padding:14px 16px 14px 32px;border:1px solid rgba(200,145,58,.35);border-radius:14px;background:rgba(200,145,58,.06)}
+ul.notes li{color:var(--muted-2);font-size:13.5px;margin:4px 0}
+.gate{display:flex;flex-direction:column;align-items:stretch;gap:10px;max-width:380px;margin:14vh auto;padding:32px 28px;background:var(--ink-2);border:1px solid rgba(200,145,58,.45);border-radius:18px;box-shadow:0 22px 60px rgba(0,0,0,.4)}
+.gate .seal{margin-bottom:6px}
+.gate .kicker{margin:0 0 8px}
+input{font:inherit;padding:14px 16px;border-radius:11px;border:1px solid var(--line);background:var(--ink);color:var(--paper)}
+input:focus{outline:2px solid var(--brass-lift);outline-offset:2px;border-color:var(--brass)}
+.btn{font-family:inherit;font-size:14.5px;font-weight:600;padding:14px 26px;border-radius:11px;border:1px solid var(--brass);background:var(--brass);color:var(--brass-ink);cursor:pointer}
+.btn:hover{background:var(--brass-lift)}
+.gate label{font-size:12.5px;color:var(--muted)}
+.err{color:var(--req);text-align:center;font-size:13.5px}
+a{color:var(--brass-lift);text-underline-offset:3px}
+a:hover{color:var(--brass)}
 </style></head><body>
 <div id="app"></div>
 <script>
 /* Owner dashboard, served at /admin. The token is checked server-side by admin-dashboard.mjs;
-   this page holds no data until the server accepts the token.
-   To add a panel: push an object onto PANELS: { id, title, size, render(data) -> html | null }.
-   Returning null shows "unavailable" (data source missing). Set soon:true for placeholders. */
+   this page holds no stats until the server accepts ADMIN_DASHBOARD_TOKEN. */
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const aud = n => "A$" + Number(n || 0).toLocaleString("en-AU", {minimumFractionDigits: Number(n) % 1 ? 2 : 0, maximumFractionDigits: 2});
-const PANELS = [
-  // Stripe is the source of truth for money; when it's unavailable the
-  // Supabase licence_payments cards below still show.
-  { id: "stripe", title: "Stripe — live payments", size: "w4", render: d => {
-      const s = d.stripe;
-      if (!s) return `<div class="sub">Stripe unavailable (${esc(d.stripeError || "unknown")}) — showing Supabase licence_payments below.</div>`;
-      const max = Math.max(1, ...s.trend.map(t => t.revenue));
-      const k = (v, l) => `<div><div class="big" style="font-size:30px">${v}</div><div class="sub">${l}</div></div>`;
-      return `<div class="sub" style="margin:-6px 0 12px">Charges created on/after ${esc(s.since.slice(0, 10))} (AUD, live Stripe)</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:14px">
-        ${k(s.licenceSales.count, `licence sales · ${aud(s.licenceSales.grossAud)}`)}
-        ${k(aud(s.grossAud), `gross · ${s.successfulPayments} payments (${s.otherCharges} non-licence)`)}
-        ${k(s.feesAud === null ? "—" : aud(s.feesAud), "Stripe fees")}${k(aud(s.netAud), "net · " + esc(s.netBasis))}
-        ${k(aud(s.refundsAud), `refunds · ${s.refundedCount} charges`)}${k(s.disputes, "disputes")}
-        ${k(aud(s.balance.pendingAud), "balance pending")}${k(aud(s.balance.availableAud), "balance available")}</div>
-      <div class="bar" style="height:90px;margin-top:16px">${s.trend.map(t => `<div title="${t.day}: ${aud(t.revenue)} (${t.count})" style="height:${(t.revenue / max) * 100}%"></div>`).join("")}</div>
-      <div class="legend">Daily net-of-refund revenue, last ${s.trend.length} days.</div>
-      <div style="display:grid;grid-template-columns:2fr 1fr;gap:18px;margin-top:14px">
-        <table>${s.recent.map(c => `<tr><td>${esc(c.at.slice(0, 16).replace("T", " "))}</td><td>${aud(c.amountAud)}</td><td>${esc(c.status)}${c.refundedAud ? " · refunded " + aud(c.refundedAud) : ""}${c.disputed ? " · disputed" : ""}</td><td>${esc(c.who || "—")}</td></tr>`).join("") || "<tr><td>No charges</td></tr>"}</table>
-        <table>${s.payouts.map(p => `<tr><td>${esc(p.arrival)}</td><td>A$${p.amountAud.toFixed(2)}</td><td>${esc(p.status)}</td></tr>`).join("")}</table></div>`; } },
-  { id: "visits", title: "Website visitors", size: "w4", render: d => {
-      const v = d.visits; if (!v) return null;
-      const max = Math.max(1, ...v.trend.map(t => t.visits));
-      const k = (n, u, l) => `<div><div class="big" style="font-size:30px">${n.toLocaleString()}</div><div class="sub">${l} · ${u.toLocaleString()} unique</div></div>`;
-      const list = (title, rows) => `<div><div class="sub" style="margin-bottom:6px;color:var(--paper)">${title}</div><table>${rows.map(([a, n]) => `<tr><td>${esc(a)}</td><td style="text-align:right">${n}</td></tr>`).join("") || "<tr><td>—</td></tr>"}</table></div>`;
-      return `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">${k(v.today.visits, v.today.unique, "visits today")}${k(v.d7.visits, v.d7.unique, "visits 7 days")}${k(v.d30.visits, v.d30.unique, "visits 30 days")}</div>
-      ${v.newReturning ? (() => { const nr = v.newReturning, c = (o, l) => o ? `<div><div class="big" style="font-size:24px">${o.new.toLocaleString()} new · ${o.returning.toLocaleString()} returning</div><div class="sub">${l}${o.unknown ? " · " + o.unknown + " unknown" : ""}</div></div>` : `<div><div class="sub">${l}: unavailable</div></div>`;
-        return `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:14px">${c(nr.today, "today")}${c(nr.d7, "7 days")}${c(nr.sinceLaunch, nr.sinceLaunch?.since ? "since " + esc(nr.sinceLaunch.since) : "since launch")}</div>`; })() : ""}
-      <div class="bar" style="height:90px;margin-top:16px">${v.trend.map(t => `<div title="${t.day}: ${t.visits} visits, ${t.unique} unique" style="height:${(t.visits / max) * 100}%"></div>`).join("")}</div>
-      <div class="legend">Daily visits. Unique = distinct visitors per day (salted hash rotates daily, so multi-day totals are visitor-days). New/returning come from an on-device sf_seen marker, counted per visitor-day.</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:18px;margin-top:14px">
-        ${list("Top pages", v.topPages)}${list("Top referrers", v.topReferrers)}${list("UTM source / campaign", v.topUtm)}${list("Countries / regions", v.countries)}</div>`; } },
-  { id: "sales", title: "Sales (Supabase)", render: d => d.sales && `<div class="big">${d.sales.count}</div><div class="sub">paid checkouts · ${d.sales.refunded} refunded · ${d.sales.disputed} disputed</div>` },
-  { id: "revenue", title: "Revenue (Supabase)", render: d => d.sales && `<div class="big">${aud(d.sales.revenueAud)}</div><div class="sub">gross, paid licence_payments</div>` },
-  { id: "licences", title: "Active licences", render: d => d.licences && `<div class="big">${d.licences.active}</div><div class="sub">${d.licences.plan1} one-device · ${d.licences.plan2} phone+computer · ${d.licences.revoked} revoked</div>` },
-  { id: "opens", title: "App first-opens", render: d => d.signups && `<div class="big">${d.signups.total}</div><div class="sub">devices (signup_attribution)</div>` },
-  { id: "trend", title: "Daily trend · 30 days", size: "w4", render: d => {
-      if (!d.trend) return null; const max = Math.max(1, ...d.trend.map(t => Math.max(t.sales, t.opens)));
-      return `<div class="bar">${d.trend.map(t => `<div title="${t.day}: ${t.sales} sales, ${t.opens} opens" style="height:${(t.sales / max) * 100}%"></div>`).join("")}</div>
-      <div class="legend">Gold = sales per day (${esc(d.trendBasis)}). ${d.trend[0].day} → ${d.trend.at(-1).day}. Hover a bar for opens.</div>`; } },
-  { id: "activity", title: "Recent activity", size: "w2", render: d => d.activity && (d.activity.length
-      ? `<table>${d.activity.map(a => `<tr><td>${esc(String(a.at).slice(0, 16).replace("T", " "))}</td><td>${esc(a.kind)}</td><td>${esc(a.detail)}</td><td>${esc(a.who || "—")}</td></tr>`).join("")}</table>`
-      : `<div class="sub">No activity yet.</div>`) },
-  { id: "sources", title: "Sign-ups by source", size: "w2", render: d => d.signups && (d.signups.bySource.length
-      ? `<table>${d.signups.bySource.map(([k, n]) => `<tr><td>${esc(k)}</td><td>${n}</td></tr>`).join("")}</table>` : `<div class="sub">No first-opens recorded yet.</div>`) },
-  // ---- Coming soon: modular slots for future upgrades ----
-  { id: "utm", title: "Marketing / reel UTM performance", soon: true, note: "Conversion by utm_campaign: opens → paid licences." },
-  { id: "lookup", title: "Licence lookup / restore", soon: true, note: "Search by email, view devices, resend restore link." },
-  { id: "deliver", title: "Email deliverability", soon: true, note: "Resend delivery, bounce and complaint rates." },
-  { id: "feedback", title: "Feedback", soon: true, note: "Latest in-app feedback submissions." },
-];
+const num = v => v == null || v === "" ? "—" : Number(v).toLocaleString("en-AU");
+const aud = v => v == null || v === "" ? "—" : "A$" + Number(v).toLocaleString("en-AU", {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const pct = v => v == null ? "—" : (Math.round(Number(v) * 1000) / 10).toLocaleString("en-AU") + "%";
+const when = iso => { const t = Date.parse(iso || ""); return Number.isFinite(t) ? new Date(t).toLocaleString("en-AU", {hour12: false}) : "—"; };
 const app = document.getElementById("app");
 function login(msg) {
-  app.innerHTML = `<form id="f"><label for="t">Password</label><input id="t" type="password" placeholder="Password" autocomplete="current-password" required><button>Open</button></form>${msg ? `<p class="err">${esc(msg)}</p>` : ""}`;
+  app.innerHTML = `<form id="f" class="gate"><div class="seal" aria-hidden="true">S</div><h1>Support<span class="flow">Flow</span></h1><p class="kicker">Owner dashboard</p><label for="t">Password</label><input id="t" type="password" placeholder="Password" autocomplete="current-password" required><button class="btn" type="submit">Open</button>${msg ? `<p class="err">${esc(msg)}</p>` : ""}</form>`;
   document.getElementById("f").onsubmit = e => { e.preventDefault(); sessionStorage.setItem("sf:dash", document.getElementById("t").value); load(); };
+}
+function card(key, label, value, sub, feature) {
+  return `<article class="card${feature ? " feature" : ""}"><div class="lbl">${esc(label)}</div><div class="big" data-k="${esc(key)}">${esc(value)}</div><div class="sub">${esc(sub || "")}</div></article>`;
+}
+function table(headers, rows) {
+  if (!rows.length) return `<p class="sub">Nothing recorded yet.</p>`;
+  return `<table><thead><tr>${headers.map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table>`;
+}
+function render(d) {
+  const o = d.owner;
+  if (!o) return `<p class="err">The stats response had no owner summary.</p>`;
+  const earn = o.earnings?.stripe?.grossAud != null
+    ? { v: aud(o.earnings.stripe.grossAud), s: "Stripe gross" + (o.earnings.stripe.since ? " since " + String(o.earnings.stripe.since).slice(0, 10) : "") }
+    : { v: aud(o.earnings?.recordedAud), s: "Recorded one-off payments. SMS is not included." };
+  const visits = d.visits;
+  const bars = visits?.trend?.length ? `<div class="bar">${visits.trend.map(t => `<div title="${esc(t.day)}: ${t.visits} visits, ${t.unique} unique" style="height:${Math.max(2, (t.visits / Math.max(1, ...visits.trend.map(x => x.visits))) * 100)}%"></div>`).join("")}</div><p class="sub">Each bar is one Adelaide day. Height is page views.</p>` : "";
+  const v = o.visitors;
+  const f = o.freeOffer || {};
+  const m = o.members || {};
+  const sms = m.sms || {};
+  const att = m.attach || {};
+  const holders = table(["Plan", "Members"], (m.holders || []).map(h => `<tr><td>${esc(h.label)}</td><td>${num(h.count)}</td></tr>`));
+  const products = table(["Product", "Payments", "7 days", "30 days", "Amount"], (o.earnings?.byProduct || []).map(p => `<tr><td>${esc(p.label)}</td><td>${num(p.count)}</td><td>${num(p.d7)}</td><td>${num(p.d30)}</td><td>${aud(p.revenueAud)}</td></tr>`));
+  const recent = table(["When", "Plan", "Amount", "Status", "Who"], (o.recent || []).map(r => `<tr><td>${esc(when(r.at))}</td><td>${esc(r.plan)}</td><td>${aud(r.amountAud)}</td><td>${esc(r.status)}</td><td>${esc(r.who)}</td></tr>`));
+  const sources = table(["Source", "First opens"], (o.signups?.bySource || []).map(([k, n]) => `<tr><td>${esc(k)}</td><td>${num(n)}</td></tr>`));
+  const stripe = o.earnings?.stripe;
+  const payouts = d.stripe?.payouts?.length ? table(["Arrival", "Amount", "Status"], d.stripe.payouts.map(p => `<tr><td>${esc(p.arrival)}</td><td>${aud(p.amountAud)}</td><td>${esc(p.status)}</td></tr>`)) : "";
+  return `<header class="top"><div class="brand"><div class="seal" aria-hidden="true">S</div><div><h1>Support<span class="flow">Flow</span></h1><p class="kicker">Owner dashboard</p></div></div><p class="meta">${esc(o.windowNote || "")}<br>${esc(new Date(d.generatedAt).toLocaleString("en-AU"))} · <a href="#" id="out">Sign out</a></p></header>
+  <div class="cards">
+    ${card("visitors", "Unique visitors today", v ? num(v.todayUnique) : "—", v ? num(v.todayVisits) + " page views" : "Not available")}
+    ${card("free", "On the 5 free invoices", f.unavailable ? "—" : num(f.onOfferNow), f.unavailable ? "Accounts table unavailable" : num(f.allFiveLeft) + " unused · " + num(f.someUsed) + " partly used")}
+    ${card("members", "Paid members", num(m.paid), "Current plan, not every past payment")}
+    ${card("earnings", "Total earnings", earn.v, earn.s, true)}
+  </div>
+  ${o.notes?.length ? `<ul class="notes">${o.notes.map(n => `<li>${esc(n)}</li>`).join("")}</ul>` : ""}
+  <div class="grid">
+    <section class="panel"><h3>Visitors</h3>
+      <p class="sub">${esc(v?.definition || "Unique visitors are not available yet.")}</p>
+      ${v ? `<p class="sub" style="margin-top:8px">7 days: ${num(v.d7UniqueVisitorDays)} visitor-days · ${num(v.d7Visits)} views. 30 days: ${num(v.d30UniqueVisitorDays)} visitor-days · ${num(v.d30Visits)} views. Today ${num(v.newToday)} new · ${num(v.returningToday)} returning. 7 days ${num(v.new7)} new · ${num(v.returning7)} returning.</p>` : ""}
+      ${bars}
+    </section>
+    <section class="panel"><h3>5 free invoices</h3>
+      <p class="sub">${esc(f.definition || "")}</p>
+      <table><tbody>
+        <tr><td>On the offer now</td><td>${num(f.onOfferNow)}</td></tr>
+        <tr><td>All 5 still left</td><td>${num(f.allFiveLeft)}</td></tr>
+        <tr><td>Some of the 5 used</td><td>${num(f.someUsed)}</td></tr>
+        <tr><td>Window open, none left</td><td>${num(f.windowOpenNoneLeft)}</td></tr>
+        <tr><td>Window ended, unused credits</td><td>${num(f.expiredCreditsLeft)}</td></tr>
+        <tr><td>Window ended, unpaid</td><td>${num(f.expiredUnpaid)}</td></tr>
+        <tr><td>No expiry recorded</td><td>${num(f.noWindow)}</td></tr>
+        <tr><td>New accounts, 7 / 30 days</td><td>${num(f.newAccounts7)} / ${num(f.newAccounts30)}</td></tr>
+      </tbody></table>
+    </section>
+  </div>
+  <h2>Members and what they bought</h2>
+  <p class="sub">${esc(m.overlapNote || "")}</p>
+  <div class="grid">
+    <section class="panel"><h3>Current plan</h3>${holders}
+      <p class="sub" style="margin-top:8px">SMS active: ${sms.unavailable ? "—" : num(sms.active)}${sms.canceling ? " (" + num(sms.canceling) + " set to cancel)" : ""}. Past due ${num(sms.pastDue)}. Ended ${num(sms.ended)}. ${esc(sms.note || "")}</p>
+      <p class="sub" style="margin-top:8px">${esc(att.note || "")} Second device: ${num(att.basicWithSecondDevice)} of ${num(att.basicGoogle)} (${pct(att.secondDeviceRate)}). SMS: ${num(att.trackerWithSms)} of ${num(att.trackerHolders)} (${pct(att.smsRate)}).</p>
+    </section>
+    <section class="panel"><h3>Payments by product</h3>${products}
+      <p class="sub" style="margin-top:8px">Recorded one-off total ${aud(o.earnings?.recordedAud)} · 7 days ${aud(o.earnings?.d7Aud)} · 30 days ${aud(o.earnings?.d30Aud)}. Refunded payments ${num(o.earnings?.refundedCount)} (${aud(o.earnings?.refundedAud)}). Disputes ${num(o.earnings?.disputedCount)}. Test checkouts excluded: ${num(o.earnings?.testExcluded)}. ${esc(o.earnings?.smsOmitted || "")}</p>
+    </section>
+  </div>
+  <h2>Earnings</h2>
+  <section class="panel">${stripe ? `<p class="sub">Stripe gross ${aud(stripe.grossAud)} · net ${aud(stripe.netAud)} · fees ${aud(stripe.feesAud)}. ${stripe.netBasis ? esc(stripe.netBasis) + ". " : ""}7-day net of refunds ${aud(stripe.d7Aud)}. 30-day net of refunds ${aud(stripe.d30Aud)}. Successful charges ${num(stripe.successfulPayments)}. Refunds ${aud(stripe.refundsAud)}. Disputes ${num(stripe.disputes)}.${stripe.balance ? " Balance available " + aud(stripe.balance.availableAud) + ", pending " + aud(stripe.balance.pendingAud) + "." : ""}</p>${payouts}` : `<p class="sub">Stripe is not connected, so the total above is the recorded one-off amount only.</p>`}</section>
+  <h2>Counts side by side</h2>
+  <section class="panel"><p class="sub">${esc(o.funnel?.note || "")}</p>
+    <table><tbody>
+      <tr><td>Visitor-days, 30 Adelaide days</td><td>${num(o.funnel?.visitors30)}</td></tr>
+      <tr><td>App first-opens</td><td>${num(o.funnel?.firstOpens)} <span class="sub">(${num(o.funnel?.firstOpens7)} in 7 days · ${num(o.funnel?.firstOpens30)} in 30)</span></td></tr>
+      <tr><td>On the 5 free invoices</td><td>${num(o.funnel?.onFreeOffer)}</td></tr>
+      <tr><td>Paid members</td><td>${num(o.funnel?.paid)}</td></tr>
+    </tbody></table>
+    ${o.signups && !o.signups.unavailable ? `<h3 style="margin-top:14px">First opens by source</h3>${sources}` : ""}
+  </section>
+  <h2>Recent purchases</h2>
+  <section class="panel"><p class="sub">Who is the email already stored on that Google-account licence, masked. Device checkouts have no email on the purchase row, so they show a short device id.</p>${recent}
+    <p class="sub" style="margin-top:8px">${esc(o.checkouts?.note || "")}${o.checkouts?.failedCharges == null ? "" : " Failed charges: " + num(o.checkouts.failedCharges) + (o.checkouts.failedSince ? " since " + String(o.checkouts.failedSince).slice(0, 10) : "") + "."}</p>
+  </section>`;
 }
 async function load() {
   const tok = sessionStorage.getItem("sf:dash"); if (!tok) return login();
-  let r; try { r = await fetch("/.netlify/functions/admin-dashboard?days=30", {headers: {Authorization: "Bearer " + tok}}); } catch { return login("Network error"); }
+  let r; try { r = await fetch("/.netlify/functions/admin-dashboard?days=30", { headers: { Authorization: "Bearer " + tok } }); } catch { return login("Network error"); }
   if (r.status === 401) { sessionStorage.removeItem("sf:dash"); return login("Incorrect password"); }
   if (!r.ok) return login("Stats unavailable (" + r.status + ")");
   const d = await r.json();
-  app.innerHTML = `<div class="top"><h1>Support<b>Flow</b> · Owner dashboard</h1><div class="meta">Source: ${esc(d.source || "—")}${d.stripe ? " + stripe" : ""} · ${esc(new Date(d.generatedAt).toLocaleString("en-AU"))} · <a href="#" id="out" style="color:var(--gold)">sign out</a></div></div>
-  <div class="grid">${PANELS.map(p => {
-    if (p.soon) return `<section class="panel soon ${p.size || ""}"><h3>${esc(p.title)} <span class="tag">COMING SOON</span></h3><div class="sub">${esc(p.note)}</div></section>`;
-    let h; try { h = p.render(d); } catch { h = null; }
-    return `<section class="panel ${p.size || ""}" data-panel="${p.id}"><h3>${esc(p.title)}</h3>${h || `<div class="sub">Unavailable — data source not reachable.</div>`}</section>`;
-  }).join("")}</div>`;
+  app.innerHTML = render(d);
   document.getElementById("out").onclick = e => { e.preventDefault(); sessionStorage.removeItem("sf:dash"); login(); };
 }
 load();
