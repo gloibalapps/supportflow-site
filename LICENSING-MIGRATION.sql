@@ -21,9 +21,9 @@ create table if not exists public.licences (
   plan smallint not null default 0 check (plan in (0, 1, 2)),   -- max active devices
   status text not null default 'revoked' check (status in ('active', 'revoked')),
   purchased_at timestamptz,
-  stripe_payment_intent_id text,          -- the $49 / $69 purchase
+  stripe_payment_intent_id text,          -- the licence purchase
   upgrade_payment_intent_id text,         -- the $20 upgrade, if any
-  legacy_account_id uuid unique,          -- earlier A$49 Lifetime buyer carried over
+  legacy_account_id uuid unique,          -- earlier Lifetime buyer carried over
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

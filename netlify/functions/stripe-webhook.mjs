@@ -28,9 +28,9 @@ const TOLERANCE_SECONDS = 300; // reject anything claiming to be older than 5 mi
 // Kept in step with CREDIT_PACKS in invoice-credit-rules.js.
 const PACK_CREDITS = Object.freeze({ casual: 10, popular: 30, value: 100, lifetime: 99999 });
 // Fallback only, for sessions created without metadata: full-price amounts
-// in cents. A discounted session without metadata won't match, and is
+// in cents. A session without metadata that doesn't match is
 // retried/logged rather than guessed at.
-const AMOUNT_TO_PACK = Object.freeze({ 799: "casual", 1999: "popular", 3999: "value", 4900: "lifetime", 7900: "lifetime" });
+const AMOUNT_TO_PACK = Object.freeze({ 799: "casual", 1999: "popular", 3999: "value", 7900: "lifetime" });
 
 // STRIPE_WEBHOOK_SECRET may hold one whsec_ value, or several separated by
 // commas/spaces (e.g. the live and test-mode endpoint secrets, or old + new
@@ -238,7 +238,7 @@ async function grantLifetime(accountId) {
 }
 
 // ---------------------------------------------------------------------------
-// Device licences (One device A$49 / Phone and computer A$69 / A$29 upgrade).
+// Device licences (One device / Phone and computer / A$29 upgrade).
 // Created by netlify/functions/licence.mjs with metadata.kind = "licence".
 // This webhook is the ONLY thing that marks a Google account as paid; the
 // browser's ?licence=success return never does. See LICENSING.md.
@@ -282,7 +282,7 @@ async function handleLicenceSession(session) {
   console.log(`stripe-webhook: licence ${product} for ${sub} -> plan ${lic.plan} ${lic.status}`);
 }
 
-// Refunds and disputes: mark the payment and recompute. A refunded $49/$69
+// Refunds and disputes: mark the payment and recompute. A refunded licence
 // drops the account back to unpaid (it locks on the next server check); a
 // refunded $29 upgrade drops Phone and computer back to One device.
 async function handleLicenceReversal(paymentIntentId, status) {
@@ -404,7 +404,7 @@ async function handlePaidSession(session) {
     account_id: accountId,
     // credit_purchases.pack only allows casual/popular/value; the hidden test
     // pack is recorded as casual (its 1 credit / A$0.50 tells it apart), and
-    // the lifetime licence as value (99999 credits at A$79, or an earlier A$49, tells it apart),
+    // the lifetime licence as value (99999 credits tells it apart),
     // so no schema change is needed.
     pack: packName === "test" ? "casual" : packName === "lifetime" ? "value" : packName,
     credits,

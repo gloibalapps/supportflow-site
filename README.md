@@ -155,10 +155,8 @@ SupportFlow is an independent software product and is not affiliated with, endor
 
 ## Device licensing (off by default)
 
-One-off Basic (A$79) and Premium (A$149) licences tied to a
-Google account, behind an owner switch. Until the end of 31 January 2027
-(Australia/Adelaide) Premium is charged at A$129, then A$149 again with no
-further deploy. A second device is a separate A$29 add-on. The Payment
+One-off Basic (A$79) and Premium (A$129) licences tied to a
+Google account, behind an owner switch. A second device is a separate A$29 add-on. The Payment
 tracker is A$29 once, on top of Basic. Optional SMS is A$4.99 a month for
 50 texts and is not included in any package. New accounts can try 5 free
 invoices for 30 days. Nothing changes for anyone until the

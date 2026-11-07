@@ -6,9 +6,9 @@ SupportFlow can sell a one-off licence that belongs to a **Google account**:
 |---|---|---|
 | Basic (one device) | A$79 | 1 |
 | Second device add-on | A$29 | 2 |
-| Premium | A$149 (A$129 until the end of 31 January 2027, Australia/Adelaide) | 2, and includes the Payment tracker |
+| Premium | A$129 | 2, and includes the Payment tracker |
 
-The buy screen does not sell a separate A$69 two-device bundle. `STRIPE_PRICE_69` remains only so an older checkout name still resolves. Basic checkout still uses `STRIPE_PRICE_79` (the old name `STRIPE_PRICE_49` still works as a fallback).
+Basic checkout still uses `STRIPE_PRICE_79` (the old name `STRIPE_PRICE_49` still works as a fallback).
 
 There are no licence keys, redeem codes, share links, subscriptions or trials.
 Everything sits behind an **owner switch**. While the switch is off, every
@@ -27,7 +27,7 @@ the existing credit packs / Lifetime flow keep working.
    copy each Price ID (`price_...`):
    * "SupportFlow: Basic" A$79 → `STRIPE_PRICE_79` (formerly `STRIPE_PRICE_49`, still read)
    * "SupportFlow: Second device" A$29 → `STRIPE_PRICE_UPGRADE`
-   * Premium is not one of these licence Prices. It is the Payment tracker Premium checkout in [`PAYMENT-TRACKER.md`](PAYMENT-TRACKER.md): A$149, charged at A$129 until the end of 31 January 2027 (Australia/Adelaide).
+   * Premium is not one of these licence Prices. It is the Payment tracker Premium checkout in [`PAYMENT-TRACKER.md`](PAYMENT-TRACKER.md): A$129.
 3. **Stripe webhook**: on the existing endpoint
    `https://<your-site>/.netlify/functions/stripe-webhook`, make sure these
    events are selected (the first two are already there):
@@ -149,7 +149,7 @@ refunded Basic purchase, or a refunded Premium purchase with no other licence
 payment, locks on the next check; a refunded A$29 second-device add-on goes
 back to one device. A dispute that is won restores it.
 
-**Earlier Lifetime buyers.** People who bought the old A$49 Lifetime (keyed to
+**Earlier Lifetime buyers.** People who bought the earlier Lifetime (keyed to
 the browser's `ndis:deviceRef`) are carried over automatically as **One
 device** the first time they sign in with Google on a device that holds that
 purchase. If they've lost it, "Restore licence" (existing, by checkout email)

@@ -1,5 +1,5 @@
-// Tracker pricing: A$29 tracker, separate second-device add-on, Premium window, SMS.
-// Retired A$49 / A$69 SKUs are refused. Mocked Supabase/Stripe, no network.
+// Tracker pricing: A$29 tracker, separate second-device add-on, Premium A$129, SMS.
+// Retired SKUs are refused. Mocked Supabase/Stripe, no network.
 // Run from the repo root: node netlify/tracker-checkout.test.mjs
 import assert from "node:assert";
 Object.assign(process.env, {
@@ -7,8 +7,6 @@ Object.assign(process.env, {
   STRIPE_SECRET_KEY: "sk_test_x", SITE_URL: "https://sf.test",
   STRIPE_PRICE_TRACKER: "p_tracker",
   STRIPE_PRICE_TRACKER_FULL: "p_full",
-  STRIPE_COUPON_PREMIUM_129: "coupon_20",
-  STRIPE_PRICE_PREMIUM_129: "p_129",
   STRIPE_PRICE_TRACKER_SMS: "p_sms",
 });
 let rows = [], calls = [];
@@ -19,7 +17,6 @@ globalThis.fetch = async (url, opt = {}) => {
   if (url.includes("checkout/sessions")) return ok({ url: "https://checkout.test/s" });
   return ok([]);
 };
-const { __setPremiumNow } = await import("./lib/premium-window.mjs");
 const T = await import("./lib/tracker.mjs");
 const L = await import("./lib/licence.mjs");
 const tracker = (await import("./functions/tracker.mjs")).default;
@@ -32,26 +29,22 @@ const buy = async (product) => {
   return {
     status: r.status,
     price: params ? params.get("line_items[0][price]") : null,
-    coupon: params ? params.get("discounts[0][coupon]") : null,
+    discounts: params ? [...params.keys()].some((k) => k.startsWith("discounts")) : null,
     mode: params ? params.get("mode") : null,
   };
 };
-__setPremiumNow(() => new Date("2026-11-06T04:00:00Z"));
 const prices = Object.fromEntries(T.trackerOffer().map((o) => [o.id, o.priceAud]));
 assert.deepEqual(prices, { tracker: 29, tracker_full: 129, tracker_sms: 4.99 });
 const full = T.trackerOffer().find((o) => o.id === "tracker_full");
-assert.equal(full.listAud, 149);
-assert.equal(full.savingAud, 20);
-assert.equal(full.savingPercent, Math.round((20 / 149) * 100));
-assert.equal(full.windowOpen, true);
-assert.equal(full.timezone, "Australia/Adelaide");
+assert.equal(full.priceAud, 129);
+assert.deepEqual(Object.keys(full).filter((k) => /list|saving|window|coupon|timezone/i.test(k)), []);
 assert.deepEqual(full.items, [
   "Everything in Basic (invoices, shifts, notes, kilometres, expenses and tax)",
   "Two-device license",
   "Payment tracker",
   "SMS notification \u2014 optional (A$4.99 a month for 50 texts, not included in any package, including Premium)",
 ]);
-assert.doesNotMatch(JSON.stringify(T.trackerOffer()), /Founding|first 200|sale|registration/i);
+assert.doesNotMatch(JSON.stringify(T.trackerOffer()), /Founding|first 200|sale|registration|coupon|discount/i);
 const as = (...p) => { rows = p.map((product) => ({ product, created_at: "2026-11-05T00:00:00Z" })); };
 as(); assert.equal(await T.trackerUnlock("u1"), null);
 as("tracker"); assert.equal((await T.trackerUnlock("u1")).devices, 1);
@@ -61,26 +54,17 @@ as("tracker_base", "tracker_addon"); assert.equal((await T.trackerUnlock("u1")).
 as("tracker_addon"); assert.equal(await T.trackerUnlock("u1"), null);
 as("tracker_full"); const f = await T.trackerUnlock("u1"); assert.equal(f.devices, 2); assert.equal(f.full, true);
 // checkout: client cannot pick the amount
-as(); assert.deepEqual(await buy("tracker"), { status: 200, price: "p_tracker", coupon: null, mode: "payment" });
-as(); assert.deepEqual(await buy("tracker_full"), { status: 200, price: "p_full", coupon: "coupon_20", mode: "payment" });
+as(); assert.deepEqual(await buy("tracker"), { status: 200, price: "p_tracker", discounts: false, mode: "payment" });
+as(); assert.deepEqual(await buy("tracker_full"), { status: 200, price: "p_full", discounts: false, mode: "payment" });
 as(); assert.equal((await buy("tracker_base")).status, 410);
 as(); assert.equal((await buy("tracker_two")).status, 410);
 as(); assert.equal((await buy("tracker_addon")).status, 410);
 as("tracker"); assert.equal((await buy("tracker")).status, 409);
 as("tracker"); assert.equal((await buy("tracker_full")).status, 409);
 as("tracker_base"); assert.equal((await buy("tracker_addon")).status, 410);
-as("tracker"); assert.deepEqual(await buy("tracker_sms"), { status: 200, price: "p_sms", coupon: null, mode: "subscription" });
+as("tracker"); assert.deepEqual(await buy("tracker_sms"), { status: 200, price: "p_sms", discounts: false, mode: "subscription" });
 as(); assert.equal((await buy("tracker_sms")).status, 409);
-// after the window the A$149 price is charged and the coupon is not attached
-__setPremiumNow(() => new Date("2027-02-01T00:00:00+10:30"));
-assert.equal(T.trackerOffer().find((o) => o.id === "tracker_full").priceAud, 149);
-assert.equal(T.trackerOffer().find((o) => o.id === "tracker_full").windowOpen, false);
-as(); assert.deepEqual(await buy("tracker_full"), { status: 200, price: "p_full", coupon: null, mode: "payment" });
-// coupon missing during the window: do not fall through to A$149
-__setPremiumNow(() => new Date("2026-11-06T04:00:00Z"));
-delete process.env.STRIPE_COUPON_PREMIUM_129;
-as(); assert.deepEqual(await buy("tracker_full"), { status: 200, price: "p_129", coupon: null, mode: "payment" });
-delete process.env.STRIPE_PRICE_PREMIUM_129;
+// no price configured: Premium is not sold
+delete process.env.STRIPE_PRICE_TRACKER_FULL;
 as(); assert.equal((await buy("tracker_full")).status, 503);
-__setPremiumNow(null);
-console.log("tracker checkout/entitlement tests pass (A$29 tracker, Premium window, SMS A$4.99)");
+console.log("tracker checkout/entitlement tests pass (A$29 tracker, Premium A$129, SMS A$4.99)");

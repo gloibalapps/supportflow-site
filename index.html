@@ -54,7 +54,7 @@
         "audienceType": "Independent Australian NDIS support workers"
       },
       "isAccessibleForFree": false,
-        "offers": [{ "@type": "Offer", "name": "Basic", "price": "79.00", "priceCurrency": "AUD", "description": "Basic, one device, one-off payment" }, { "@type": "Offer", "name": "Premium", "price": "149.00", "priceCurrency": "AUD", "description": "Premium, two devices and payment tracker, one-off. Real price A$149. Until the end of 31 January 2027 (Australia/Adelaide) the amount charged is A$129." }],
+        "offers": [{ "@type": "Offer", "name": "Basic", "price": "79.00", "priceCurrency": "AUD", "description": "Basic, one device, one-off payment" }, { "@type": "Offer", "name": "Premium", "price": "129.00", "priceCurrency": "AUD", "description": "Premium, two devices and payment tracker, one-off." }],
       "inLanguage": "en-AU"
     }
 ,
@@ -487,7 +487,6 @@
     .cmp-row.total b{color:var(--brass-lift);font-family:'Fraunces',Georgia,serif;font-size:20px;font-weight:400}
     .cmp-save{grid-column:1/-1;margin:0;text-align:center;font-size:15px;color:var(--paper)}
     .cmp-save b{color:var(--brass-lift)}
-    .premium-pct{margin:0;font-size:14px;font-weight:700;color:#14150F;background:var(--brass-lift,#E0A83F);border-radius:999px;padding:4px 10px;display:inline-block}
   </style>
   <h2 id="plans-title">Simple, one-off pricing</h2>
   <p class="sub">Start with 5 free invoices for 30 days. Upgrade when you're ready. No subscription.</p>
@@ -506,10 +505,9 @@
       <div class="cmp-row"><span>Overdue payment tracker</span><b>Included</b></div>
       <div class="cmp-row"><span>No upgrades needed</span><b>&check;</b></div>
       <div class="cmp-row"><span>Optional SMS, 50 texts (not included in Premium or any other package)</span><b>A$4.99/mo</b></div>
-      <div class="cmp-row total"><span>Premium price, one-off</span><b>A$149</b></div>
-      <div class="cmp-row" data-premium-window><span>What you pay until 31 January 2027</span><b>A$129</b></div>
+      <div class="cmp-row total"><span>Premium price, one-off</span><b>A$129</b></div>
     </div>
-    <p class="cmp-save">Basic plus both add-ons totals <b>A$137</b>. Premium is <b>A$149</b>, paid once, and packages the second device and payment tracker. <span data-premium-window>Until 31 January 2027 (Adelaide time) you pay <b>A$129</b> — <b>A$<span data-premium-saving-aud>20</span></b> less once (<span data-premium-pct>13</span>% under A$149). Cash-flow relief on a one-off licence.</span></p>
+    <p class="cmp-save">Basic plus both add-ons totals <b>A$137</b>. Premium is <b>A$129</b>, paid once, and packages the second device and payment tracker.</p>
   </div>
   <div class="grid">
     <div class="plan">
@@ -520,17 +518,13 @@
     </div>
     <div class="plan feat">
       <div class="name">Premium</div>
-      <p class="premium-pct" data-premium-window><span data-premium-pct>13</span>% less until 31 January 2027</p>
-      <div class="price">A$149 <small>one-off</small></div>
-      <p data-premium-window style="text-align:left;margin:0;font-size:14px;color:var(--muted)">You pay <b>A$129</b> until 31 January 2027 — A$<span data-premium-saving-aud>20</span> less once (<span data-premium-pct>13</span>% under A$149).</p>
+      <div class="price">A$129 <small>one-off</small></div>
       <ul><li>Everything in Basic (invoices, shifts, notes, kilometres, expenses and tax)</li><li>Two-device license</li><li>Payment tracker<br><small>Keeps an eye on unpaid invoices and chases them for you: a polite nudge email after 7 business days, a firmer follow-up at 12, and a complaint draft at 20. You can edit every email, and it works for self-managed, plan-managed and NDIA-managed participants.</small></li><li>SMS notification &mdash; optional<br><small>(A$4.99 a month for 50 texts, not included in Premium or any other package)</small></li></ul>
       <a class="btn" data-premium-cta href="./app?buy=upgrade">Get Premium &mdash; A$129</a>
     </div>
   </div>
-  <p class="fine">Prices in Australian dollars, GST inclusive where applicable. <span data-premium-window>Premium's price is A$149. Until the end of 31 January 2027, Australia/Adelaide time, Premium is charged at A$129. </span>Your rights under the Australian Consumer Law are not affected.</p>
+  <p class="fine">Prices in Australian dollars, GST inclusive where applicable. Your rights under the Australian Consumer Law are not affected.</p>
 </section>
-<script src="/premium-price.js"></script>
-<script>if (window.SupportFlowPremium) SupportFlowPremium.apply();</script>
 
 <!-- Live stats strip. Fed by /.netlify/functions/public-stats (aggregate-only).
      Hidden entirely if the function is unavailable or returns no numbers. -->

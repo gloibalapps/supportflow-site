@@ -1,6 +1,6 @@
 /* SupportFlow™ — service worker
    Bump CACHE when you deploy, or testers will keep the old build. */
-const CACHE = 'supportflow-v43-premium-window-129';
+const CACHE = 'supportflow-v44-premium-129';
 
 // Everything needed to open the app with no network at all.
 const CORE = [
@@ -15,7 +15,6 @@ const CORE = [
   './apple-touch-icon.png',
   './mark.svg',
   './sfsd.html',
-  './premium-price.js',
 ];
 
 // Third-party runtime deps. Cached on first successful load rather than during

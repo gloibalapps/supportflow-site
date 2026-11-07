@@ -580,8 +580,7 @@ const APP_VERSION = "21";
 
 /* ---------------- device licensing ----------------
    One-off licences owned by a Google account. Basic is A$79 for one device.
-   A second device is a separate A$29 add-on. The buy screen does not sell
-   the old A$69 two-device bundle. Everything is decided by the
+   A second device is a separate A$29 add-on. Everything is decided by the
    server (netlify/functions/licence.mjs); this side only stores a device id,
    the sign-in session and a signed 7-day offline lease in IndexedDB.
    Nothing here does anything until the owner switch is on -- while it's off
@@ -932,30 +931,13 @@ function LicenceGoogleButton({ clientId, onCredential }) {
   </div>;
 }
 
+const PREMIUM_AUD = 129;
 function premiumQuoteFrom(cfg) {
   const server = cfg && cfg.premium;
-  if (server && server.listAud) return server;
+  if (server && server.priceAud) return server;
   const full = ((cfg && cfg.offer) || []).find((o) => o.id === "tracker_full");
-  if (full && full.listAud) {
-    return {
-      listAud: full.listAud, chargeAud: full.priceAud, windowOpen: !!full.windowOpen,
-      savingAud: full.savingAud, savingPercent: full.savingPercent,
-      windowUntil: full.windowUntil || "31 January 2027", timezone: full.timezone || "Australia/Adelaide",
-    };
-  }
-  const local = typeof SupportFlowPremium !== "undefined" ? SupportFlowPremium : null;
-  if (local) {
-    const open = local.windowOpen();
-    const s = local.saving();
-    return { listAud: local.listAud, chargeAud: local.chargeAud(), windowOpen: open, savingAud: s.amount, savingPercent: s.percent, windowUntil: local.untilLabel, timezone: local.tz };
-  }
-  const amount = 149 - 129;
-  return { listAud: 149, chargeAud: 129, windowOpen: true, savingAud: amount, savingPercent: Math.round((amount / 149) * 100), windowUntil: "31 January 2027", timezone: "Australia/Adelaide" };
-}
-function PremiumWindowCopy({ q }) {
-  if (!q) return null;
-  if (!q.windowOpen) return <>Premium is A${q.listAud}, paid once.</>;
-  return <>Premium is A${q.listAud}, paid once. Until {q.windowUntil} ({q.timezone === "Australia/Adelaide" ? "Adelaide time" : q.timezone}) you pay A${q.chargeAud} — A${q.savingAud} less once ({q.savingPercent}% under A${q.listAud}). Cash-flow relief on a one-off licence.</>;
+  if (full && full.priceAud) return { priceAud: full.priceAud };
+  return { priceAud: PREMIUM_AUD };
 }
 function LicencePlans({ onBuy, onPremium, busy, premium }) {
   const q = premium || premiumQuoteFrom(null);
@@ -976,15 +958,14 @@ function LicencePlans({ onBuy, onPremium, busy, premium }) {
     </div>
     <div className="panel" style={{ textAlign: "left", borderColor: "var(--brass)" }}>
       <div className="eyebrow" style={{ color: "var(--brass)" }}>Premium</div>
-      {q.windowOpen && <div style={{ display: "inline-block", margin: "8px 0 4px", fontSize: 13, fontWeight: 700, color: "#14150F", background: "var(--brass-lift)", borderRadius: 999, padding: "3px 10px" }}>{q.savingPercent}% less until {q.windowUntil}</div>}
-      <div className="disp" style={{ fontSize: 28, margin: "6px 0 2px" }}>A${q.listAud} <span style={{ fontSize: 13, color: "var(--tx-3)", fontFamily: "inherit" }}>once</span></div>
-      <div style={{ fontSize: 13.5, lineHeight: 1.55, marginBottom: 8 }}><PremiumWindowCopy q={q} /></div>
+      <div className="disp" style={{ fontSize: 28, margin: "6px 0 2px" }}>A${q.priceAud} <span style={{ fontSize: 13, color: "var(--tx-3)", fontFamily: "inherit" }}>once</span></div>
+      <div style={{ fontSize: 13.5, lineHeight: 1.55, marginBottom: 8 }}>Premium is A${q.priceAud}, paid once.</div>
       {tick("Everything in Basic")}
       {tick("Two-device license")}
       {tick("Payment tracker included")}
       {tick("Optional SMS, A$4.99 a month for 50 texts, not included in Premium")}
       <button className="btn" style={{ marginTop: 14, width: "100%" }} disabled={!!busy} onClick={onPremium}>
-        {busy === "premium" ? "One moment..." : `Get Premium \u2014 A$${q.chargeAud}`}
+        {busy === "premium" ? "One moment..." : `Get Premium \u2014 A$${q.priceAud}`}
       </button>
     </div>
     <div style={{ fontSize: 11.5, color: "var(--tx-3)", lineHeight: 1.6, marginTop: 12, textAlign: "center" }}>
@@ -3372,11 +3353,10 @@ function UpgradeChooser({ licence }) {
         </button>
         {plan === 2 && <div style={{ fontSize: 12, color: "var(--tx-3)", marginBottom: 10 }}>Your licence already covers two devices.</div>}
         <button className="btn" style={{ width: "100%", minHeight: 48, marginBottom: 10 }} disabled={!!busy || licence.offline} onClick={buyPremium}>
-          {busy === "premium" ? "Opening checkout\u2026" : `Upgrade to Premium \u2014 A$${premiumQuote.chargeAud}`}
+          {busy === "premium" ? "Opening checkout\u2026" : `Upgrade to Premium \u2014 A$${premiumQuote.priceAud}`}
         </button>
         <div style={{ fontSize: 12, color: "var(--tx-3)", lineHeight: 1.6, marginBottom: 10 }}>
-          {premiumQuote.windowOpen && <div style={{ display: "inline-block", marginBottom: 6, fontWeight: 700, color: "#14150F", background: "var(--brass-lift)", borderRadius: 999, padding: "2px 8px" }}>{premiumQuote.savingPercent}% less until {premiumQuote.windowUntil}</div>}
-          <div><PremiumWindowCopy q={premiumQuote} /> Premium adds the Payment tracker and a two-device licence. SMS is A$4.99 a month for 50 texts and is not included.</div>
+          <div>Premium is A${premiumQuote.priceAud}, paid once. Premium adds the Payment tracker and a two-device licence. SMS is A$4.99 a month for 50 texts and is not included.</div>
         </div>
       </>}
       {err && <div style={{ fontSize: 12.5, color: "var(--warn)", marginBottom: 10 }}>{err}</div>}
@@ -3408,7 +3388,7 @@ function OfferOrUpgradeBanner({ paid, freeOffer, known }) {
   if (!due) return null;
   return <div role="status" style={box}>
     <div style={{ flex: 1 }}><b style={{ color: "#E8C171" }}>Keep invoicing with SupportFlow</b><br />
-      Basic A$79 one-off, or Premium {(() => { const q = premiumQuoteFrom(null); return q.windowOpen ? `A$${q.listAud} (A$${q.chargeAud} until ${q.windowUntil}, ${q.savingPercent}% under A$${q.listAud})` : `A$${q.listAud}`; })()}. Everything in Basic, a two-device licence and the Payment tracker. A second device or the tracker on Basic is A$29 each. SMS is optional, A$4.99 a month for 50 texts, and is not included.</div>
+      Basic A$79 one-off, or Premium A${premiumQuoteFrom(null).priceAud}. Everything in Basic, a two-device licence and the Payment tracker. A second device or the tracker on Basic is A$29 each. SMS is optional, A$4.99 a month for 50 texts, and is not included.</div>
     <a className="btn" href={BUY_URL} style={{ whiteSpace: "nowrap" }}>See plans</a>
     <button style={btn} onClick={() => hide(true)}>Remind me later</button>
   </div>;
@@ -3838,7 +3818,7 @@ function App() {
   // (billing unconfigured), so nothing is shown and nothing is blocked.
   const [creditBalance, setCreditBalance] = useState(null);
   const [creditsExpired, setCreditsExpired] = useState(false);
-  // Lifetime licence (A$49 once): check-status returns lifetime:true. Never expires, never needs a top-up.
+  // Lifetime licence: check-status returns lifetime:true. Never expires, never needs a top-up.
   const [isLifetime, setLifetime] = useState(false);
   // Theme: "system" (default, follows prefers-color-scheme live) or a saved light/dark override. Same for everyone.
   const theme = savedTheme === "system" ? (sysLight ? "light" : "dark") : savedTheme;
@@ -5497,7 +5477,7 @@ function useTrackerAccess() {
 
 function TrackerUpsell({ access, owed, count, go }) {
   // Not paid: Payment tracker A$29 once (on top of Basic), or Premium.
-  // A$49 and A$69 tracker options are not sold. A second device is a separate A$29 add-on.
+  // A second device is a separate A$29 add-on.
   // SMS is offered only after the tracker is unlocked.
   const offer = (access.cfg?.offer || []).filter((o) => !o.retired && o.id !== "tracker_sms" && (o.available || access.preview));
   const smsOffer = (access.cfg?.offer || []).find((o) => o.id === "tracker_sms");
@@ -5532,8 +5512,7 @@ function TrackerUpsell({ access, owed, count, go }) {
           {access.busy === tracker.id ? "One moment..." : `Payment tracker · A$${tracker.priceAud} once`}
         </button>}
         {premiumOffer && <>
-          {premiumOffer.windowOpen && <div style={{ marginTop: 12, display: "inline-block", fontWeight: 700, fontSize: 13, color: "#14150F", background: "var(--brass-lift)", borderRadius: 999, padding: "3px 10px" }}>{premiumOffer.savingPercent}% less until {premiumOffer.windowUntil}</div>}
-          <div style={{ fontSize: 13, lineHeight: 1.55, color: "var(--tx-2)", marginTop: 8 }}><PremiumWindowCopy q={premiumQuoteFrom({ premium: { listAud: premiumOffer.listAud, chargeAud: premiumOffer.priceAud, windowOpen: premiumOffer.windowOpen, savingAud: premiumOffer.savingAud, savingPercent: premiumOffer.savingPercent, windowUntil: premiumOffer.windowUntil, timezone: premiumOffer.timezone } })} /></div>
+          <div style={{ fontSize: 13, lineHeight: 1.55, color: "var(--tx-2)", marginTop: 12 }}>Premium is A${premiumOffer.priceAud}, paid once.</div>
           <button className="btn" style={{ width: "100%", marginTop: 10, minHeight: 48 }} disabled={!!access.busy} onClick={() => access.buy(premiumOffer.id)}>
             {access.busy === premiumOffer.id ? "One moment..." : `Premium · A$${premiumOffer.priceAud} once`}
           </button>
@@ -9485,9 +9464,9 @@ const MANUAL = [
     d: "The optional Payment tracker add-on: prices, SMS pack and push notifications.",
     q: [
       ["What the Payment tracker costs",
-       "The Payment tracker (Money \u2192 Payment tracker) is optional. It is A$29 once, on top of Basic. A second device is a separate A$29 add-on, not a tracker price. Premium is A$149 once and includes everything in Basic, a two-device licence and the Payment tracker. Until the end of 31 January 2027 (Adelaide time) Premium is charged at A$129, which is A$20 less once, 13% under A$149. That is cash-flow relief on a one-off licence. From 1 February 2027 Premium is charged at A$149. The optional SMS pack (A$4.99 a month for 50 texts) is offered after the tracker is unlocked and is not included in any package, including Premium."],
+       "The Payment tracker (Money \u2192 Payment tracker) is optional. It is A$29 once, on top of Basic. A second device is a separate A$29 add-on, not a tracker price. Premium is A$129 once and includes everything in Basic, a two-device licence and the Payment tracker. The optional SMS pack (A$4.99 a month for 50 texts) is offered after the tracker is unlocked and is not included in any package, including Premium."],
       ["SMS alerts pack",
-       "Optional, only for Payment tracker owners, and not included in the A$149 Premium package. Texts go only to your own mobile after you verify it with a code, never to the NDIA, a plan manager or a payer. They are used for the day 7, 12 and 20 overdue alerts and the complaint-draft-ready nudge. Credits reset to 50 each month and don't roll over. Reply STOP or use Stop texts in Payment tracker \u2192 Settings to stop texts."],
+       "Optional, only for Payment tracker owners, and not included in the A$129 Premium package. Texts go only to your own mobile after you verify it with a code, never to the NDIA, a plan manager or a payer. They are used for the day 7, 12 and 20 overdue alerts and the complaint-draft-ready nudge. Credits reset to 50 each month and don't roll over. Reply STOP or use Stop texts in Payment tracker \u2192 Settings to stop texts."],
       ["Out of SMS credits",
        "When texts run out, alerts are sent as push notifications instead, to every device where you turned notifications on. You get one notification saying texts are used up. Push notifications are free."],
       ["Turn on push notifications",

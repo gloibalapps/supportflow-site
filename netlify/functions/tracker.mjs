@@ -20,7 +20,7 @@
 import crypto from "node:crypto";
 import { json, supa, supaConfigured, signSession, verifySession, verifyGoogleIdToken, isUuid } from "../lib/licence.mjs";
 import { TRACKER_PRODUCTS, isTrackerProduct, isRetiredTrackerProduct, trackerOffer, trackerUnlock, trackerDeviceOk, autosendEnabled, seal, emailHash } from "../lib/tracker.mjs";
-import { premiumCheckoutSelection, premiumPublic } from "../lib/premium-window.mjs";
+import { premiumCheckoutSelection, premiumPublic } from "../lib/premium.mjs";
 import { TRACKER_STATES } from "../../payment-tracker-rules.js";
 import { normaliseAuMobile, maskPhone, rawSend, smsEnabled, smsDryRun } from "../lib/sms.mjs";
 import { open as openSealed } from "../lib/tracker.mjs";
@@ -43,7 +43,7 @@ async function checkout(session, deviceId, body) {
   const key = process.env.STRIPE_SECRET_KEY, site = process.env.SITE_URL;
   if (!key || !site) return json({ error: "Payments aren't set up on this site yet.", comingSoon: true }, 503);
   const product = String(body?.product || "");
-  // The client may send a product name only. Amount, coupon and price id are chosen here.
+  // The client may send a product name only. Amount and price id are chosen here.
   if (isRetiredTrackerProduct(product)) {
     return json({ error: "That option is no longer sold. The Payment tracker is A$29 once, on top of Basic. A second device is a separate A$29 add-on." }, 410);
   }
@@ -51,12 +51,10 @@ async function checkout(session, deviceId, body) {
   const have = await trackerUnlock(session.sub);
   const isSub = product === "tracker_sms";
   let price = process.env[TRACKER_PRODUCTS[product].env];
-  let coupon = null;
   if (product === "tracker_full") {
     const sel = premiumCheckoutSelection();
     if (sel.error) return json({ error: sel.error, comingSoon: true }, 503);
     price = sel.price;
-    coupon = sel.coupon;
   }
   if (!price) return json({ error: "That option isn't available yet.", comingSoon: true }, 503);
   if (!isSub && have) return json({ error: have.full ? "This account already has Premium." : "This account already has the Payment tracker." }, 409);
@@ -76,7 +74,6 @@ async function checkout(session, deviceId, body) {
     success_url: `${site}/app?tracker=success`,
     cancel_url: `${site}/app?tracker=cancelled`,
   };
-  if (coupon) params["discounts[0][coupon]"] = coupon;
   if (!isSub) params.customer_creation = "always"; // subscription mode always creates a customer
   if (session.email) params.customer_email = session.email;
   const metaKey = isSub ? "subscription_data[metadata]" : "payment_intent_data[metadata]";

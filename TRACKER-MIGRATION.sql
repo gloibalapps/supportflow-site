@@ -78,7 +78,7 @@ create table if not exists public.tracker_send_log (
 create index if not exists tracker_send_log_sub_idx on public.tracker_send_log (google_sub, created_at desc);
 alter table public.tracker_send_log enable row level security;
 
--- 5b) Tracker device seats: 1 with base (A$49), 2 with base + add-on (A$29) or the full package (A$99).
+-- 5b) Tracker device seats: 1 with base, 2 with base + add-on or the full package.
 create table if not exists public.tracker_devices (
   google_sub text not null,
   device_id uuid not null,

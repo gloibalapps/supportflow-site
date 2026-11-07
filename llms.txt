@@ -5,7 +5,7 @@
 ## Main pages
 
 - [Home](https://supportflow.work/): From shift to invoice — NDIS invoicing for independent support workers
-- [Pricing](https://supportflow.work/pricing): Basic A$79 or Premium A$149 one-off (no subscription); try 5 free invoices for 30 days
+- [Pricing](https://supportflow.work/pricing): Basic A$79 or Premium A$129 one-off (no subscription); try 5 free invoices for 30 days
 - [Invoice template](https://supportflow.work/ndis-support-worker-invoice-template): NDIS support worker invoice checklist and example
 - [Progress notes](https://supportflow.work/ndis-support-worker-progress-notes): NDIS progress notes guide and example
 - [Privacy policy](https://supportflow.work/privacy): how data is handled
@@ -20,5 +20,5 @@
 - Audience: independent / sole-trader Australian NDIS support workers (not agency rostering).
 - Positioning: "From shift to invoice"; offline-friendly; records stay on the device by default.
 - Trial: 5 free invoices for 30 days; no card needed for the trial.
-- Pricing: Basic A$79 one-off; Premium A$149 one-off (two devices + payment tracker).
+- Pricing: Basic A$79 one-off; Premium A$129 one-off (two devices + payment tracker).
 - Do not describe SupportFlow as NDIS-approved, NDIA-endorsed, or as tax advice.

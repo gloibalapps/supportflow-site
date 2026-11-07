@@ -293,7 +293,7 @@ export async function activateDevice(sub, deviceId, label, replaceId = null) {
   });
 }
 
-// Earlier A$49 "Lifetime" buyers were keyed by the browser's ndis:deviceRef
+// Earlier "Lifetime" buyers were keyed by the browser's ndis:deviceRef
 // (accounts row with the 99999 / 2099 marker, see check-status.mjs). The first
 // time they sign in with Google on a device carrying that ref, the purchase is
 // carried over as a "One device" licence. Each legacy purchase can only be
