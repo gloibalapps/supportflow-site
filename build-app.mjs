@@ -13,6 +13,11 @@ const a0 = src.indexOf(START), b0 = src.indexOf(END);
 if (a0 < 0 || b0 < a0) throw new Error("tracker rules markers not found in app.jsx");
 const rules = fs.readFileSync("payment-tracker-rules.js", "utf8").replace(/^export\s+/gm, "").trim();
 src = src.slice(0, a0 + START.length) + "\n" + rules + "\n" + src.slice(b0);
+const BSTART = "/* @@BACKUP_ENVELOPE_START */", BEND = "/* @@BACKUP_ENVELOPE_END */";
+const c0 = src.indexOf(BSTART), d0 = src.indexOf(BEND);
+if (c0 < 0 || d0 < c0) throw new Error("backup envelope markers not found in app.jsx");
+const envelope = fs.readFileSync("backup-envelope.mjs", "utf8").replace(/\nexport \{[\s\S]*$/, "").replace(/^export\s+/gm, "").trim();
+src = src.slice(0, c0 + BSTART.length) + "\n" + envelope + "\n" + src.slice(d0);
 fs.writeFileSync("app.jsx", src);
 
 const html = fs.readFileSync("app.html", "utf8");

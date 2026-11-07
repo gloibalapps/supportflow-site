@@ -18,6 +18,7 @@ import {
   verifyGoogleIdToken, evaluate, activateDevice, getLicence, listDevices, isUuid, cleanLabel,
   PLAN_NAMES, PRODUCTS, sendEmail,
 } from "../lib/licence.mjs";
+import { normaliseAccountEmail, passwordOk, hashPassword, verifyPassword, newAccountId } from "../lib/password-account.mjs";
 
 const STRIPE_API = "https://api.stripe.com/v1";
 const formBody = (obj) => Object.entries(obj).map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join("&");
@@ -43,7 +44,7 @@ async function config(req) {
     staleDays: 21,
     leaseDays: 7,
     plans: [
-      { id: "one", plan: 1, name: PLAN_NAMES[1], priceAud: 49 },
+      { id: "one", plan: 1, name: PLAN_NAMES[1], priceAud: 79 },
       { id: "two", plan: 2, name: PLAN_NAMES[2], priceAud: 69 },
     ],
     upgradeAud: 29,
@@ -145,12 +146,68 @@ export default async (req) => {
     if (!dev) return json({ error: "Missing device id." }, 400);
     if (!supaConfigured() || !process.env.LICENCE_SECRET) return json({ state: "disabled", reason: "unconfigured" });
 
+    const issueAccountSession = async (account) => {
+      const session = signSession(account);
+      const parsed = verifySession(session);
+      // The lock switch only decides whether the app is gated. A purchase still
+      // has to be tied to this account, including while the switch is off.
+      if (!(await enforcedFor(parsed.email))) {
+        return json({ state: "disabled", session, account: { email: parsed.email, name: parsed.name || "" } });
+      }
+      return await stateFor(parsed, dev, { session });
+    };
+
     if (action === "signin") {
       const who = await verifyGoogleIdToken(body?.idToken).catch((e) => { console.warn("id token check failed", e.message); return null; });
       if (!who) return json({ error: "Google sign-in couldn't be confirmed. Try again." }, 401);
-      const session = signSession(who);
-      const parsed = verifySession(session);
-      return await stateFor(parsed, dev, { session });
+      return await issueAccountSession(who);
+    }
+
+    if (action === "password-signup" || action === "password-signin") {
+      const email = normaliseAccountEmail(body?.email);
+      const password = String(body?.password || "");
+      if (!email || !passwordOk(password)) return json({ error: "Use a valid email and a password of at least 10 characters." }, 400);
+      try {
+        const rows = await supa(`licence_passwords?email=eq.${encodeURIComponent(email)}&select=id,email,password_hash,fail_count,locked_until`);
+        const row = rows?.[0] || null;
+        if (action === "password-signup") {
+          if (row) return json({ error: "An account with that email already exists. Sign in instead." }, 409);
+          const id = newAccountId();
+          await supa("licence_passwords", {
+            method: "POST",
+            prefer: "return=minimal",
+            body: { id, email, password_hash: await hashPassword(password), fail_count: 0, updated_at: new Date().toISOString() },
+          });
+          return await issueAccountSession({ sub: id, email, name: "", ev: false });
+        }
+        if (!row) {
+          await hashPassword(password);
+          return json({ error: "Email or password is incorrect." }, 401);
+        }
+        if (row.locked_until && new Date(row.locked_until).getTime() > Date.now()) {
+          return json({ error: "Too many attempts. Try again in a few minutes." }, 429);
+        }
+        const ok = await verifyPassword(password, row.password_hash);
+        if (!ok) {
+          const fails = Number(row.fail_count || 0) + 1;
+          const locked = fails >= 8 ? new Date(Date.now() + 15 * 60 * 1000).toISOString() : null;
+          await supa(`licence_passwords?id=eq.${encodeURIComponent(row.id)}`, {
+            method: "PATCH", prefer: "return=minimal",
+            body: { fail_count: locked ? 0 : fails, locked_until: locked, updated_at: new Date().toISOString() },
+          });
+          return json({ error: locked ? "Too many attempts. Try again in a few minutes." : "Email or password is incorrect." }, locked ? 429 : 401);
+        }
+        if (row.fail_count) {
+          await supa(`licence_passwords?id=eq.${encodeURIComponent(row.id)}`, {
+            method: "PATCH", prefer: "return=minimal",
+            body: { fail_count: 0, locked_until: null, updated_at: new Date().toISOString() },
+          });
+        }
+        return await issueAccountSession({ sub: row.id, email: row.email, name: "", ev: false });
+      } catch (e) {
+        console.error("licence: password account request failed");
+        return json({ error: "Email sign-in isn't available yet. You can still use Google." }, 503);
+      }
     }
 
     const session = verifySession(body?.session);
@@ -172,6 +229,11 @@ export default async (req) => {
     }
 
     if (action === "heartbeat") return await stateFor(session, dev);
+
+    // Buying Basic / an upgrade must work while the lock switch is off. The
+    // switch gates the app; it must not send this purchase to the old
+    // device-ref credit checkout. Stripe metadata carries google_sub.
+    if (action === "checkout") return await checkout(session, dev, body);
 
     if (!(await enforcedFor(session.email))) return json({ state: "disabled" });
 
@@ -210,8 +272,6 @@ export default async (req) => {
       });
       return json({ state: "signed_out" });
     }
-
-    if (action === "checkout") return await checkout(session, dev, body);
 
     return json({ error: "Unknown action." }, 400);
   } catch (e) {

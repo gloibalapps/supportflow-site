@@ -23,7 +23,7 @@ or replace an accountant. In your first year of working for yourself a
 registered tax agent is usually worth the few hundred dollars, and the fee is
 deductible.
 
-**Your working records live on your device.** There is no SupportFlow cloud database or account sync. Encrypted backup copies are stored in the Google Drive account you connect during onboarding. That's why
+**Your working records live on your device.** There is no SupportFlow database of participant records. A licence sign-in (Google, or email and password) only ties a purchase to that account. Encrypted backup copies are stored in the Google Drive, Dropbox, or OneDrive account you choose during onboarding. That's why
 backups matter, see [Backing up](#9-backing-up-important).
 
 > **This manual is also inside the app.** Tap **?** in the fixed top header, then **Manual & Help**. The in-app version is written to tap through on a phone.
@@ -32,7 +32,7 @@ backups matter, see [Backing up](#9-backing-up-important).
 
 ## Installing SupportFlow
 
-SupportFlow is a Progressive Web App (PWA). You can use it in a browser, or install it so it opens like an app from your phone, tablet or computer. Installing it does not create a SupportFlow cloud account or move your working records to a SupportFlow server. Your records remain on that browser/app installation, with encrypted backups stored in the Google Drive account you connect.
+SupportFlow is a Progressive Web App (PWA). You can use it in a browser, or install it so it opens like an app from your phone, tablet or computer. Installing it does not move your working records to a SupportFlow server. Your records remain on that browser/app installation, with encrypted backups stored in the Google Drive, Dropbox, or OneDrive account you connect.
 
 ### Android phone or tablet
 
@@ -465,36 +465,42 @@ or delete the app, and the records go.
 
 ### Every backup is encrypted
 
-During onboarding you create **one backup password** and confirm it. That password protects every new SupportFlow backup until you deliberately change it. You do **not** need to type it again for each new backup on the same device.
+During onboarding you create **one backup password** and confirm it. SupportFlow then shows a **recovery key**. Save that key somewhere safe, away from the device. You cannot continue until you confirm you have saved it. You do **not** need to type the password again for each new backup on the same device.
 
-SupportFlow does not keep the readable password and cannot recover or reset it. The device retains the derived encryption credential required to create later encrypted backups. Backup files are encrypted on the device with AES-256 before they are uploaded to the connected Google Drive.
+The backup file is encrypted on the device with AES-256 before it is uploaded. A random data key locks the file. That data key can be unwrapped with the backup password **or** the recovery key. The readable password and the readable recovery key are not written into the file, and they are not sent to SupportFlow or to Google Drive, Dropbox, or OneDrive.
 
-> **If you lose the backup password, SupportFlow cannot recover it for you.** Keep it in a password manager or somewhere secure away from the device.
+> **SupportFlow cannot recover a backup for you.** If you forget the password, use **Forgot backup password?** and enter the recovery key, then set a new password. You will be shown a new recovery key. If you lose both the password and the recovery key, that backup cannot be decrypted.
 
-If you change the backup password in **Settings → Backup**, new backups use the new password. Existing backup files still require the password that created them, so keep an old password until you no longer need backups protected by it.
+Backups made before recovery keys existed still open with the password they were made with. They do not have a recovery key.
+
+If you change the backup password in **Settings → Backup** while you still know it, new backups use the new password and a new recovery key. Files already saved still need the password or recovery key that protected that file.
 
 ### Backing up
 
-Google Drive is connected during required onboarding. The first encrypted backup must succeed before onboarding can continue. After that, SupportFlow automatically backs up meaningful changes to the connected Google Drive. The saved backup password is used automatically to encrypt each backup before upload.
+During required onboarding you choose **Google Drive**, **Dropbox**, or **OneDrive**. The first encrypted backup must succeed before onboarding can continue. After that, SupportFlow automatically backs up meaningful changes to the provider you chose. The saved backup password is used on this device to encrypt each backup before upload. The same encrypted file format is used for all three providers.
 
 SupportFlow waits about five minutes after meaningful changes so several edits can be combined into one backup. If the device is offline, the backup remains pending and retries when SupportFlow is next opened online. The latest seven encrypted SupportFlow backups are retained. A PWA cannot reliably run while completely closed, so a pending backup completes when the app is next active and connected.
 
 ### Restoring
 
-Tap **Restore**, choose the file, and enter the passphrase it was made with.
+Tap **Restore**, choose the file from this device or **Restore from** Google Drive, Dropbox, or OneDrive, and enter the passphrase it was made with.
 Get it right and you'll see exactly what's in the file, how many
 participants, invoices, and so on, and how many of your current records would
 be overwritten, **before anything changes**. Get the passphrase wrong and it
 tells you plainly rather than showing you gibberish.
+
+**Forgot backup password?** asks for the recovery key instead. If the key matches, you set a new backup password and SupportFlow shows a new recovery key. The selected backup is decrypted on this device, the same as a correct password would. SupportFlow does not email or text a reset, and it does not keep a copy of the key.
 
 An older, unencrypted backup file still opens, it doesn't ask for a
 passphrase it never had.
 
 ### Automatic backups
 
-**Settings → Backup** shows the Google Drive connection and the last successful backup. Automatic backup is the standard behaviour; there is no daily/weekly/fortnightly schedule to configure. After meaningful changes, SupportFlow waits about five minutes and uploads one encrypted backup. **Back up now** remains available for an immediate backup. While a backup is running, the button changes to **Backing up…** and additional backup attempts are blocked until that backup finishes, preventing duplicate Drive files from rapid taps or an overlapping automatic backup.
+**Settings → Backup** shows which provider is in use (Google Drive, Dropbox, or OneDrive) and the last successful backup. You can switch provider there. Automatic backup is the standard behaviour. After meaningful changes, SupportFlow waits about five minutes and uploads one encrypted backup. **Back up now** remains available for an immediate backup. While a backup is running, the button changes to **Backing up…** and additional backup attempts are blocked until that backup finishes.
 
-From the same panel, **Change Google account** lets you connect a different Google Drive account, and **Disconnect Google Drive** stops automatic Drive backups on that device. Disconnecting does not delete backup files already stored in Google Drive. After changing accounts, use **Back up now** to create a fresh encrypted backup in the newly connected Drive.
+**Change account** connects a different account of the same provider (Microsoft's account picker for OneDrive; a fresh sign-in for Dropbox and Google). **Disconnect** stops automatic backups on this device. It does not delete backup files already stored at the provider. After changing accounts, use **Back up now** to create a fresh encrypted backup in the newly connected account.
+
+Google Drive uses the `drive.file` scope (files this app creates). Dropbox uses an App folder with `files.content.read`, `files.content.write`, and `files.metadata.read`. OneDrive uses `Files.ReadWrite.AppFolder` plus `offline_access`. None of those connections receive the backup password or the recovery key.
 
 A reminder appears **the next time you open the app** after your chosen time. The PWA cannot guarantee work while it is completely closed.
 
@@ -753,19 +759,15 @@ and plan managers needs a paid SupportFlow licence. Everything you've
 already entered stays visible, and you can still view, edit, back up and
 export it either way.
 
-Buy the licence from the prompt that appears when the free period ends, or
-earlier from the profile menu.
+Buy from the pricing page, the homepage, or the profile menu. Basic opens `/app?buy=1`. Premium opens `/app?buy=upgrade`. Both ask you to sign in **before** Stripe Checkout. You can sign in with Google, or create or sign in to an email-and-password account. The payment is stored against that account, so signing in with the same account on another computer finds the licence. A member device's ordinary PIN or fingerprint unlock does not ask for Google or email.
 
 ### Plans and licenses
 
 The pricing cards on the SupportFlow home page (supportflow.work, **Plans**)
 show two one-off plans:
 
-- **Basic, A$49:** invoices, shifts, notes, kilometres, expenses and tax.
-  The card shows **One license**.
-- **Premium, A$99:** everything in Basic plus the Payment tracker (optional
-  SMS notification is extra, A$4.99 a month for 50 texts). The card shows
-  **Two licenses**.
+- **Basic, A$79 once:** invoices, shifts, notes, kilometres, expenses and tax, on one device.
+- **Premium, A$149 once:** everything in Basic, a two-device licence, and the Payment tracker. Optional SMS notification is extra (A$4.99 a month for 50 texts) and is not included.
 
 Your current plan and how many devices it covers are shown in the app under
 **Settings → Licence & devices**.
@@ -775,12 +777,12 @@ Your current plan and how many devices it covers are shown in the app under
 Next to **One license** on the Basic card there's an **Upgrade** button. It
 opens SupportFlow in a **new tab** (supportflow.work/app?buy=upgrade):
 
-1. If this device isn't signed in yet, sign in with the Google account you
-   bought Basic with.
+1. If this device isn't signed in yet, sign in with Google, or with the email
+   and password for the account you bought Basic with.
 2. An **Upgrade SupportFlow** box appears. Choose the option you want:
    - **Add a second device, A$29:** your Basic licence then covers two
      devices. Only available on a one-device (Basic) licence.
-   - **Upgrade to Premium, A$99:** adds the Payment tracker and two licenses.
+   - **Upgrade to Premium, A$149:** adds the Payment tracker and two devices.
 3. You're taken to **Stripe Checkout** to pay. When payment finishes you come
    back to the app and the upgrade is applied automatically.
 

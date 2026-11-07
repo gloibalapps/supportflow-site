@@ -754,6 +754,9 @@ function useLicence() {
     try {
       const res = await licenceFetch({ action, session: session?.token, deviceId, label: licenceDeviceLabel(), legacyRef: legacyRef(), ...extra });
       if (res.status >= 500 && action === "heartbeat") { await offlineDecision(); return res.data; }
+      // A checkout URL is not a licence state. Redirect to Stripe with it;
+      // don't treat a missing state as an offline lock.
+      if (action === "checkout" && res.data?.url) return res.data;
       if (res.status >= 400 && res.status !== 401 && !res.data?.state) return { error: res.data?.error || "Something went wrong. Try again." };
       return await apply(res);
     } catch (e) {
@@ -792,15 +795,27 @@ function useLicence() {
     } finally { ref.current.busy = false; }
   };
 
+  const finishSignIn = async (res, fallback) => {
+    if (res.status >= 400 && !res.data?.state && !res.data?.session) return { error: res.data?.error || fallback };
+    const out = await apply(res);
+    if (out?.state === "active") { try { if (!readLock()) localStorage.setItem(ASK_PIN_FLAG, "1"); } catch (e) { } }
+    return out;
+  };
   const signIn = async (idToken) => {
     if (!ref.current.deviceId) { ref.current.deviceId = await licenceDeviceId(); LICENCE_CTX.deviceId = ref.current.deviceId; }
     try {
       const res = await licenceFetch({ action: "signin", idToken, deviceId: ref.current.deviceId, label: licenceDeviceLabel(), legacyRef: legacyRef() }, 15000);
-      if (res.status >= 400 && !res.data?.state) return { error: res.data?.error || "Google sign-in didn't work. Try again." };
-      const out = await apply(res);
-      // New device just linked: ask for a PIN/fingerprint, then never Google again here.
-      if (out?.state === "active") { try { if (!readLock()) localStorage.setItem(ASK_PIN_FLAG, "1"); } catch (e) { } }
-      return out;
+      return await finishSignIn(res, "Google sign-in didn't work. Try again.");
+    } catch (e) { return { error: "You're offline. Connect to the internet and try again." }; }
+  };
+  const signInPassword = async ({ email, password, create }) => {
+    if (!ref.current.deviceId) { ref.current.deviceId = await licenceDeviceId(); LICENCE_CTX.deviceId = ref.current.deviceId; }
+    try {
+      const res = await licenceFetch({
+        action: create ? "password-signup" : "password-signin",
+        email, password, deviceId: ref.current.deviceId, label: licenceDeviceLabel(), legacyRef: legacyRef(),
+      }, 20000);
+      return await finishSignIn(res, "Email sign-in didn't work. Try again.");
     } catch (e) { return { error: "You're offline. Connect to the internet and try again." }; }
   };
   const signOut = async () => {
@@ -880,7 +895,7 @@ function useLicence() {
     return () => { clearInterval(iv); window.removeEventListener("online", onOnline); };
   }, []);
 
-  return { ...lic, clientId: ref.current.cfg?.clientId || "", notice, dismissNotice: () => setNotice(null), check, call, signIn, signOut, checkout };
+  return { ...lic, clientId: ref.current.cfg?.clientId || "", notice, dismissNotice: () => setNotice(null), check, call, signIn, signInPassword, signOut, checkout };
 }
 
 function LicenceGoogleButton({ clientId, onCredential }) {
@@ -912,28 +927,60 @@ function LicenceGoogleButton({ clientId, onCredential }) {
   </div>;
 }
 
+function LicenceAccountSignIn({ clientId, onGoogle, onPassword, busy }) {
+  const [mode, setMode] = useState("signin");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [password2, setPassword2] = useState("");
+  const [localErr, setLocalErr] = useState("");
+  const submit = (e) => {
+    e.preventDefault();
+    setLocalErr("");
+    const em = email.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) { setLocalErr("Enter a valid email address."); return; }
+    if (password.length < 10) { setLocalErr("Use at least 10 characters."); return; }
+    if (mode === "create" && password !== password2) { setLocalErr("Those passwords don't match."); return; }
+    const next = password;
+    setPassword(""); setPassword2("");
+    onPassword({ email: em, password: next, create: mode === "create" });
+  };
+  return <div style={{ width: "100%", maxWidth: 360 }}>
+    <LicenceGoogleButton clientId={clientId} onCredential={onGoogle} />
+    <div style={{ fontSize: 12, color: "var(--tx-3)", textAlign: "center", margin: "14px 0" }}>or use email and password</div>
+    <form onSubmit={submit}>
+      <label className="f"><span>Email</span>
+        <input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} />
+      </label>
+      <label className="f"><span>Password</span>
+        <input type="password" autoComplete={mode === "create" ? "new-password" : "current-password"} value={password} onChange={(e) => setPassword(e.target.value)} />
+      </label>
+      {mode === "create" && <label className="f"><span>Confirm password</span>
+        <input type="password" autoComplete="new-password" value={password2} onChange={(e) => setPassword2(e.target.value)} />
+      </label>}
+      {localErr && <div style={{ fontSize: 12.5, color: "var(--warn)", marginBottom: 8 }}>{localErr}</div>}
+      <button className="btn" type="submit" style={{ width: "100%" }} disabled={!!busy}>
+        {busy ? "One moment..." : mode === "create" ? "Create account and continue" : "Sign in and continue"}
+      </button>
+    </form>
+    <button className="btn ghost tiny" type="button" style={{ marginTop: 8 }} onClick={() => { setMode(mode === "create" ? "signin" : "create"); setLocalErr(""); }}>
+      {mode === "create" ? "Already have an email account? Sign in" : "New here? Create an account with email"}
+    </button>
+  </div>;
+}
+
 function LicencePlans({ onBuy, busy }) {
-  const tick = (t, no) => <div style={{ display: "flex", gap: 8, fontSize: 12.5, color: no ? "var(--tx-3)" : "var(--tx-2)", lineHeight: 1.5, marginTop: 5 }}>
-    <span style={{ color: no ? "var(--tx-3)" : "var(--good)", fontWeight: 700, flexShrink: 0 }}>{no ? "\u2715" : "\u2713"}</span><span>{t}</span></div>;
-  const card = (id, name, price, line, yes, no) => (
-    <div className="panel" style={{ textAlign: "left", borderColor: id === "two" ? "var(--brass)" : undefined }}>
-      <div className="eyebrow" style={{ color: "var(--brass)" }}>{name}</div>
-      <div className="disp" style={{ fontSize: 28, margin: "6px 0 2px" }}>A${price} <span style={{ fontSize: 13, color: "var(--tx-3)", fontFamily: "inherit" }}>once</span></div>
-      <div style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 8 }}>{line}</div>
-      {yes.map((t) => <React.Fragment key={t}>{tick(t)}</React.Fragment>)}
-      {no.map((t) => <React.Fragment key={t}>{tick(t, true)}</React.Fragment>)}
-      <button className="btn" style={{ marginTop: 14, width: "100%" }} disabled={!!busy} onClick={() => onBuy(id)}>
-        {busy === id ? "One moment..." : `Buy ${name} \u2014 A$${price}`}
+  const tick = (t) => <div style={{ display: "flex", gap: 8, fontSize: 12.5, color: "var(--tx-2)", lineHeight: 1.5, marginTop: 5 }}>
+    <span style={{ color: "var(--good)", fontWeight: 700, flexShrink: 0 }}>{"\u2713"}</span><span>{t}</span></div>;
+  return <div style={{ width: "100%", maxWidth: 420 }}>
+    <div className="panel" style={{ textAlign: "left" }}>
+      <div className="eyebrow" style={{ color: "var(--brass)" }}>Basic</div>
+      <div className="disp" style={{ fontSize: 28, margin: "6px 0 2px" }}>A$79 <span style={{ fontSize: 13, color: "var(--tx-3)", fontFamily: "inherit" }}>once</span></div>
+      <div style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 8 }}>One device. Pay once, no subscription.</div>
+      {["Use SupportFlow on one phone, tablet or computer", "Move it to a new device whenever you like", "Your licence stays on this Google account", "No subscription, no monthly fees"].map((t) => <React.Fragment key={t}>{tick(t)}</React.Fragment>)}
+      <button className="btn" style={{ marginTop: 14, width: "100%" }} disabled={!!busy} onClick={() => onBuy("one")}>
+        {busy === "one" ? "One moment..." : "Buy Basic \u2014 A$79"}
       </button>
     </div>
-  );
-  return <div style={{ width: "100%", maxWidth: 420 }}>
-    {card("one", "One device", 49, "One device at a time.",
-      ["Use SupportFlow on one phone, tablet or computer", "Move it to a new device whenever you like", "Upgrade to Phone and computer later for $29", "No subscription, no monthly fees"],
-      ["Not signed in on two devices at the same time"])}
-    {card("two", "Phone and computer", 69, "Phone and computer signed in together.",
-      ["Two devices signed in at the same time", "Swap either device whenever you like", "No subscription, no monthly fees"],
-      ["Not for sharing with another person \u2014 one Google account, one licence"])}
     <div style={{ fontSize: 11.5, color: "var(--tx-3)", lineHeight: 1.6, marginTop: 12, textAlign: "center" }}>
       Prices in AUD. Your licence belongs to your Google account. Your records stay on your device and back up to your own Google Drive, as now.
     </div>
@@ -1011,15 +1058,16 @@ function LicenceGate({ licence, theme }) {
   });
   const buy = (product) => run(async () => { setBusy(product); return licence.checkout(product); });
   const signIn = (cred) => run(() => licence.signIn(cred));
+  const signInPassword = (creds) => run(() => licence.signInPassword(creds));
 
   let body;
   if (state === "signed_out") {
     body = <>
       <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.65, marginBottom: 20, maxWidth: 360 }}>
-        Sign in with Google to link your purchase, or to find your licence and add this device. You don’t need Google to use the free trial.
+        Sign in with Google, or with email and password, to link your purchase or to find your licence and add this device. You don’t need an account to use the free trial.
       </div>
-      <LicenceGoogleButton clientId={licence.clientId} onCredential={signIn} />
-      <div style={{ fontSize: 12, color: "var(--tx-3)", lineHeight: 1.6, marginTop: 16, maxWidth: 340 }}>Signing in links your purchase to your Google account. Already a member on a new device? Sign in to find your licence and add this device. You will then set a PIN and won’t need Google again here.</div>
+      <LicenceAccountSignIn clientId={licence.clientId} onGoogle={signIn} onPassword={signInPassword} busy={busy} />
+      <div style={{ fontSize: 12, color: "var(--tx-3)", lineHeight: 1.6, marginTop: 16, maxWidth: 340 }}>Signing in links your purchase to that account. Already a member on a new device? Sign in with the same Google account or email to find your licence. You will then set a PIN and won’t need to sign in again here.</div>
     </>;
   } else if (state === "offline") {
     body = <>
@@ -2594,8 +2642,9 @@ function PinSetupPrompt({ onDone }) {
 // Never shown to paid users (device licence or lifetime).
 const REMIND_KEY = "ndis:upgradeRemindAt";
 const BUY_URL = "/app?buy=1";
-function wantsLicenceFlow() { try { const b = new URLSearchParams(location.search).get("buy"); return b === "1" || b === "upgrade"; } catch (e) { return false; } }
+function wantsLicenceFlow() { try { const b = new URLSearchParams(location.search).get("buy"); return b === "1" || b === "upgrade" || b === "restore"; } catch (e) { return false; } }
 function wantsUpgradeChooser() { try { return new URLSearchParams(location.search).get("buy") === "upgrade"; } catch (e) { return false; } }
+function wantsBasicCheckout() { try { return new URLSearchParams(location.search).get("buy") === "1"; } catch (e) { return false; } }
 // /app?buy=upgrade (Basic card "Upgrade" button, opens in a new tab): after
 // Google sign-in / licence restore, pick an upgrade and go to Stripe Checkout.
 function UpgradeChooser({ licence }) {
@@ -2631,8 +2680,8 @@ function UpgradeChooser({ licence }) {
       <div className="disp" style={{ fontSize: 20, marginBottom: 6 }}>Upgrade SupportFlow</div>
       <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.6, marginBottom: 14 }}>Choose the option you want. You'll pay securely on Stripe Checkout.</div>
       {!signedIn ? <>
-        <div style={{ fontSize: 13, color: "var(--tx-2)", lineHeight: 1.6, marginBottom: 12 }}>Sign in with the Google account you bought Basic with first.</div>
-        <LicenceGoogleButton clientId={licence.clientId} onCredential={(c) => licence.signIn(c)} />
+        <div style={{ fontSize: 13, color: "var(--tx-2)", lineHeight: 1.6, marginBottom: 12 }}>Sign in with Google, or with email and password, before payment. Use the same account on a new computer to find this licence.</div>
+        <LicenceAccountSignIn clientId={licence.clientId} onGoogle={(c) => licence.signIn(c)} onPassword={(c) => licence.signInPassword(c)} busy={!!busy} />
       </> : <>
         <button className="btn" style={{ width: "100%", minHeight: 48, marginBottom: 10 }} disabled={!!busy || licence.offline || plan !== 1} onClick={addDevice}>
           {busy === "upgrade" ? "Opening checkout\u2026" : "Add a second device \u2014 A$29"}
@@ -2642,6 +2691,46 @@ function UpgradeChooser({ licence }) {
           {busy === "premium" ? "Opening checkout\u2026" : "Upgrade to Premium \u2014 A$149"}
         </button>
         <div style={{ fontSize: 12, color: "var(--tx-3)", lineHeight: 1.6, marginBottom: 10 }}>Premium adds the Payment tracker and two licenses.</div>
+      </>}
+      {err && <div style={{ fontSize: 12.5, color: "var(--warn)", marginBottom: 10 }}>{err}</div>}
+      <button className="btn ghost tiny" onClick={close}>Not now</button>
+    </div>
+  </div>;
+}
+// /app?buy=1 (homepage Get Basic, pricing Buy now, in-app Buy Basic):
+// Google sign-in first, then licence checkout product "one" (A$79). The
+// Stripe session carries the same session + deviceId as Premium's
+// tracker_full checkout, so the webhook stores the payment on that Google
+// account. Ordinary PIN/fingerprint unlock never opens this.
+function BasicChooser({ licence }) {
+  const [open, setOpen] = useState(() => wantsBasicCheckout());
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  if (!open) return null;
+  const close = () => {
+    try { const sp = new URLSearchParams(location.search); sp.delete("buy"); history.replaceState(null, "", location.pathname + (sp.toString() ? "?" + sp : "") + location.hash); } catch (e) { }
+    setOpen(false);
+  };
+  const signedIn = !!licence.account;
+  const licensed = licence.phase === "ok";
+  const buy = async () => {
+    setBusy(true); setErr("");
+    const r = await licence.checkout("one");
+    if (r?.error) { setErr(r.error); setBusy(false); }
+  };
+  return <div role="dialog" aria-modal="true" aria-label="Buy Basic" style={{ position: "fixed", inset: 0, zIndex: 90, background: "rgba(10,11,8,.72)", display: "grid", placeItems: "center", padding: 16 }}>
+    <div className="panel" style={{ maxWidth: 440, width: "100%", maxHeight: "90vh", overflow: "auto" }}>
+      <div className="disp" style={{ fontSize: 20, marginBottom: 6 }}>Basic — A$79</div>
+      <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.6, marginBottom: 14 }}>One payment, one device. Sign in with Google or with email and password first, so the licence stays on that account and can be restored on another computer.</div>
+      {!signedIn ? <>
+        <LicenceAccountSignIn clientId={licence.clientId} onGoogle={(c) => licence.signIn(c)} onPassword={(c) => licence.signInPassword(c)} busy={busy} />
+      </> : licensed ? (
+        <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.6, marginBottom: 12 }}>This Google account already has a SupportFlow licence on this device.</div>
+      ) : <>
+        <div style={{ fontSize: 13, color: "var(--tx-2)", lineHeight: 1.6, marginBottom: 12 }}>Signed in as {licence.account?.email || "your account"}. Continue to Stripe to pay A$79 once.</div>
+        <button className="btn" style={{ width: "100%", minHeight: 48, marginBottom: 10 }} disabled={busy || licence.offline} onClick={buy}>
+          {busy ? "Opening checkout\u2026" : "Buy Basic — A$79"}
+        </button>
       </>}
       {err && <div style={{ fontSize: 12.5, color: "var(--warn)", marginBottom: 10 }}>{err}</div>}
       <button className="btn ghost tiny" onClick={close}>Not now</button>
@@ -2664,7 +2753,7 @@ function OfferOrUpgradeBanner({ paid, freeOffer, known }) {
       <span aria-hidden="true" style={{ fontSize: 18 }}>&#127873;</span>
       <div style={{ flex: 1 }}><b style={{ color: "#E8C171" }}>Free: 5 invoices for 30 days</b><br />
         {freeOffer.remaining} invoice{freeOffer.remaining === 1 ? "" : "s"} left · {freeOffer.daysLeft} day{freeOffer.daysLeft === 1 ? "" : "s"} left</div>
-      <a href={BUY_URL} style={{ ...btn, textDecoration: "underline" }}>Already a member?</a>
+      <a href="/app?buy=restore" style={{ ...btn, textDecoration: "underline" }}>Already a member?</a>
       <button style={btn} onClick={() => hide(false)} aria-label="Hide free offer banner">Hide</button>
     </div>;
   }
@@ -2673,41 +2762,18 @@ function OfferOrUpgradeBanner({ paid, freeOffer, known }) {
   return <div role="status" style={box}>
     <div style={{ flex: 1 }}><b style={{ color: "#E8C171" }}>Keep invoicing with SupportFlow</b><br />
       Basic A$79 one-off, or Premium A$149 (everything in Basic, two-device license, Payment tracker; SMS notification optional, A$4.99 a month for 50 texts, not included in A$149).</div>
-    <a className="btn" href={BUY_URL} style={{ whiteSpace: "nowrap" }}>See plans</a>
+    <a className="btn" href="/pricing" style={{ whiteSpace: "nowrap" }}>See plans</a>
     <button style={btn} onClick={() => hide(true)}>Remind me later</button>
   </div>;
 }
 
 /* ---------------- trial ended notice ---------------- */
 function TrialEndedNotice({ onClose, startInRestore = false }) {
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
   const [showRestore, setShowRestore] = useState(startInRestore);
   const [restoreEmail, setRestoreEmail] = useState("");
   const [restoreBusy, setRestoreBusy] = useState(false);
   const [restoreErr, setRestoreErr] = useState("");
   const [restoreDone, setRestoreDone] = useState(false);
-
-  const subscribe = (plan) => {
-    setBusy(true); setErr("");
-    let ref;
-    try { ref = localStorage.getItem("ndis:deviceRef"); } catch (e) { }
-    if (!ref) {
-      ref = (crypto.randomUUID ? crypto.randomUUID() : "10000000-1000-4000-8000-100000000000".replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)));
-      try { localStorage.setItem("ndis:deviceRef", ref); } catch (e) { }
-    }
-    fetch("/.netlify/functions/create-checkout", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ plan, clientReferenceId: ref }),
-    })
-      .then((r) => r.json().then((data) => ({ ok: r.ok, data })))
-      .then(({ ok, data }) => {
-        if (ok && data && data.url) { window.location.href = data.url; return; }
-        throw new Error((data && data.error) || "Couldn't start checkout.");
-      })
-      .catch((e) => { setErr(e.message || "Something went wrong."); setBusy(false); });
-  };
 
   // Reconnects this device to a licence that already exists, rather
   // than letting someone accidentally pay again after reinstalling or switching phones. Adopts the original device's
@@ -2741,17 +2807,16 @@ function TrialEndedNotice({ onClose, startInRestore = false }) {
       onClick={onClose}>
       <div className="panel" style={{ maxWidth: 440, width: "100%", margin: 16,
         borderColor: "var(--brass)" }} onClick={(e) => e.stopPropagation()}>
-        <div className="disp" style={{ fontSize: 20, marginBottom: 8 }}>{startInRestore ? "Restore your licence" : "SupportFlow Lifetime"}</div>
+        <div className="disp" style={{ fontSize: 20, marginBottom: 8 }}>{startInRestore ? "Restore your licence" : "Basic"}</div>
         <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.7, marginBottom: 16 }}>
-          A$49 once, yours for life. Unlimited invoices on any phone or PC. Everything you've
+          Basic is A$79 once, for one device. You’ll sign in with Google, or with email and password, so the licence stays on your account, then pay on Stripe. Everything you've
           already entered stays here, you can view, edit, back up and export all of it.
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
-          <button className="btn" onClick={() => subscribe("lifetime")} disabled={busy}>
-            {busy ? "One moment..." : "Buy Lifetime \u2014 A$49"}
+          <button className="btn" onClick={() => { window.location.href = BUY_URL; }}>
+            Buy Basic — A$79
           </button>
         </div>
-        {err && <div style={{ fontSize: 12.5, color: "var(--warn)", marginBottom: 10 }}>{err}</div>}
 
         {!showRestore ? (
           <button className="btn ghost tiny" style={{ marginBottom: 4 }} onClick={() => setShowRestore(true)}>
@@ -2790,9 +2855,9 @@ function TrialEndingBanner({ daysLeft, onSubscribe }) {
     <div className="band">
       <div className="callout" style={{ borderColor: "var(--brass)" }}>
         <b>{daysLeft === 0 ? "Your trial ends today." : `Your trial ends in ${daysLeft} day${daysLeft === 1 ? "" : "s"}.`}</b>{" "}
-        Buy Lifetime (A$49 once) to keep creating new invoices, shifts and records without limit.
+        Buy Basic (A$79 once) to keep creating new invoices, shifts and records.
         <div style={{ marginTop: 10 }}>
-          <button className="btn tiny" onClick={onSubscribe}>Buy Lifetime — A$49</button>
+          <button className="btn tiny" onClick={onSubscribe}>Buy Basic — A$79</button>
         </div>
       </div>
     </div>
@@ -3150,7 +3215,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!loaded || !data.onboarded || !googleDriveConnected() || !hasBackupMasterKey()) return;
+    if (!loaded || !data.onboarded || !cloudBackupConnected() || !hasBackupMasterKey()) return;
     let pending=false; try { pending=localStorage.getItem("sf_backup_pending_v1")==="1"; } catch(_){}
     const changed=countRecords(data)!==(data.profile.backedUpCount||0);
     if (pending || changed) scheduleGoogleAutoBackup(data);
@@ -3504,6 +3569,7 @@ function App() {
   return (
     <LicenceContext.Provider value={licence}>
     <UpgradeChooser licence={licence} />
+    <BasicChooser licence={licence} />
     {licence.notice && (
       <div className="checkout-toast" data-type={licence.notice.type === "cancelled" ? "cancelled" : "success"} role="status" aria-live="polite">
         <span className="ti">{licence.notice.type === "cancelled" ? "\u2715" : "\u2713"}</span>
@@ -3595,16 +3661,16 @@ function App() {
                       <span style={{ fontSize: 16, fontWeight: 700, color: "var(--brass-lift)", lineHeight: 1.2 }}>Lifetime</span>
                     </div>
                   ) : (
-                    <button className="buycredits" onClick={() => { setMenuOpen(false); window.location.href = PRICING_URL; }}>
+                    <button className="buycredits" onClick={() => { setMenuOpen(false); window.location.href = BUY_URL; }}>
                       <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <ellipse cx="12" cy="7" rx="7" ry="3" /><path d="M5 7v5c0 1.7 3.1 3 7 3s7-1.3 7-3V7" /><path d="M5 12v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5" />
                       </svg>
                       <span>
                         {creditsExpired
-                          ? <><b style={{ color: "var(--warn)" }}>Credits expired</b><br/><span style={{ fontSize: 11, color: "var(--tx-3)" }}>Buy Lifetime to keep invoicing</span></>
+                          ? <><b style={{ color: "var(--warn)" }}>Credits expired</b><br/><span style={{ fontSize: 11, color: "var(--tx-3)" }}>Buy Basic to keep invoicing</span></>
                           : typeof creditBalance === "number"
-                            ? <><span style={{ fontSize: 16, fontWeight: 700, color: "var(--ink)", lineHeight: 1.2, display: "block" }}>{creditBalance} credits</span><span style={{ fontSize: 11, color: creditExpiresIn !== null && creditExpiresIn <= 3 ? "var(--warn)" : "var(--tx-3)" }}>{creditExpiresIn !== null ? `Expires in ${creditExpiresIn} day${creditExpiresIn === 1 ? "" : "s"}` : `Buy Lifetime — A$49`}</span></>
-                            : <b>Buy Lifetime — A$49</b>}
+                            ? <><span style={{ fontSize: 16, fontWeight: 700, color: "var(--ink)", lineHeight: 1.2, display: "block" }}>{creditBalance} credits</span><span style={{ fontSize: 11, color: creditExpiresIn !== null && creditExpiresIn <= 3 ? "var(--warn)" : "var(--tx-3)" }}>{creditExpiresIn !== null ? `Expires in ${creditExpiresIn} day${creditExpiresIn === 1 ? "" : "s"}` : `Basic — A$79`}</span></>
+                            : <b>Basic — A$79</b>}
                       </span>
                     </button>
                   )}
@@ -4586,7 +4652,7 @@ function TrackerUpsell({ access, owed, count, go }) {
       {access.phase === "signedout" && (
         <div style={{ marginTop: 14 }}>
           <div style={{ fontSize: 13, marginBottom: 8 }}>Sign in with Google so the unlock stays with you on every device.</div>
-          <a className="btn" style={{ display: "inline-flex", minHeight: 44, alignItems: "center" }} href={BUY_URL}>Sign in to unlock</a>
+          <a className="btn" style={{ display: "inline-flex", minHeight: 44, alignItems: "center" }} href="/app?buy=restore">Sign in to unlock</a>
         </div>
       )}
       {access.phase === "locked" && access.deviceLimit && <div style={{ fontSize: 13, marginTop: 12 }}>Your Payment tracker is already in use on your other computer.{baseOwner ? " Add this one with the A$29 upgrade:" : ""}</div>}
@@ -5334,7 +5400,6 @@ function Editor({ inv, setInv, onSave, onCancel, onDelete, profile, data, go }) 
 /* ---------------- invoice credits ---------------- */
 // 1 credit is charged server-side (charge-invoice.mjs) the FIRST time a new
 // invoice number is previewed or shared; re-previews of that number are free.
-const PRICING_URL = "https://supportflow.work/pricing";
 const CHARGED_KEY = "ndis:chargedInvoices";
 
 function getDeviceRef() {
@@ -5393,7 +5458,7 @@ async function chargeInvoiceCredit(invoiceNumber) {
 
 function CreditNotice({ kind }) {
   if (kind === "no_credits") return <div className="creditnotice">
-    Your free invoices have ended. <a href={BUY_URL}>Get SupportFlow — A$49 one-off →</a>
+    Your free invoices have ended. <a href={BUY_URL}>Get Basic — A$79 one-off →</a>
   </div>;
   if (kind === "error") return <div className="creditnotice">
     Couldn't check your invoice credits. Check your connection and try again.
@@ -5529,7 +5594,7 @@ function Welcome({ onSetup }) {
         </div>
       </div>
       <div className="panel">
-        {["Secure the app with your PIN","Protect backups and connect Google Drive","Add your business and invoice details","Set up managers and your first participant"].map((x,i)=>(
+        {["Secure the app with your PIN","Protect backups and connect a cloud provider","Add your business and invoice details","Set up managers and your first participant"].map((x,i)=>(
           <div key={x} style={{display:"flex",gap:10,padding:"8px 0",alignItems:"flex-start"}}>
             <span style={{color:"var(--brass)",fontWeight:800}}>{i+1}</span>
             <div style={{fontSize:13.5,lineHeight:1.55}}>{x}</div>
@@ -5639,7 +5704,7 @@ function Onboarding({ data, save, close, help, openPrivacy, startStep }) {
           <div>
             <div className="eyebrow">Guided setup · 2 of 5</div>
             <div className="disp" style={{ fontSize: 26, marginTop: 5 }}>Now protect your backup</div>
-            <div style={{ fontSize: 12.5, color: "var(--tx-3)", marginTop: 5 }}>Create your backup password and connect your Google Drive below. Continue unlocks only when both are ready.</div>
+            <div style={{ fontSize: 12.5, color: "var(--tx-3)", marginTop: 5 }}>Create your backup password, save the recovery key, and connect Google Drive, Dropbox, or OneDrive. Continue unlocks only when both are ready.</div>
           </div>
         </div>
         <div className="stepcard">
@@ -5650,11 +5715,11 @@ function Onboarding({ data, save, close, help, openPrivacy, startStep }) {
             Create one backup password now. It protects every new SupportFlow backup until you change it.
             SupportFlow cannot recover this password, so keep it somewhere safe away from this device.
           </div>
-          <GoogleDriveSetup onConnected={() => setBackupRefresh((n) => n + 1)} />
+          <CloudBackupChoices onConnected={() => setBackupRefresh((n) => n + 1)} />
           <BackupPasswordSetup data={data} save={save} onReady={() => setBackupRefresh((n) => n + 1)} />
         </div>
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 }}>
-          <button className="btn" disabled={!hasBackupMasterKey() || !googleDriveConnected()} onClick={async () => { try { await performGoogleAutoBackup(data); setBackupDecided(true); } catch (e) { alert("The first encrypted Google Drive backup could not be completed. Check your connection and try again."); } }}>
+          <button className="btn" disabled={!hasBackupMasterKey() || !cloudBackupConnected()} onClick={async () => { try { await performCloudAutoBackup(data); setBackupDecided(true); } catch (e) { alert("The first encrypted backup could not be completed. Check your connection and try again."); } }}>
             Continue
           </button>
         </div>
@@ -8364,13 +8429,13 @@ const MANUAL = [
       ["What this app does, and doesn't",
        "It handles the paperwork around support work: invoices with the right NDIS codes, a running figure for the tax you'll owe, your kilometres, and your service agreements. It is not a rostering system, it records shifts you have done, it does not arrange them. It does not lodge anything with the ATO, prepare a BAS, or replace an accountant."],
       ["What SupportFlow costs",
-       "SupportFlow is a one-off Lifetime licence \u2014 no subscription. New accounts start with 5 free invoice credits for 30 days to try the app; one credit is used the first time you preview a new invoice. After the free credits, buy the lifetime licence from the pricing page or via the profile menu. Once you own it, the menu shows Lifetime and invoicing has no limit. Moving to a new phone or PC is covered under Backups and troubleshooting."],
+       "Basic is A$79 once. Premium is A$149 once and adds a second device and the Payment tracker. There is no subscription. New accounts start with 5 free invoice credits for 30 days. Buying Basic or Premium asks you to sign in with Google, or with email and password, before Stripe. The licence is stored on that account, so you can sign in with the same account on another computer. Optional SMS alerts are A$4.99 a month and are not included in either price."],
       ["The first thing you see",
        "A welcome screen, once, explaining the app in three lines. You can start setup or read the manual first. Before normal use, onboarding requires a backup password; that backup-security step cannot be skipped."],
       ["Finding your way around",
        "Four fixed bottom navigation areas: Home, Work, Money and People. Work, Money and People open clean shortcut pages first; choose the feature you need, then use Back near the top to return to those shortcuts. Home gives you quick-start shortcuts. Settings and Help stay in the fixed top header."],
       ["Installing on Android",
-       "Open supportflow.work/app in Chrome, open Chrome's menu, then choose Install app or Add to Home screen and confirm. SupportFlow will open from its own Home screen icon. Installing it does not create a SupportFlow cloud account; your working records remain on that app/browser installation and your encrypted backup is stored in the Google Drive account you connect."],
+       "Open supportflow.work/app in Chrome, open Chrome's menu, then choose Install app or Add to Home screen and confirm. SupportFlow will open from its own Home screen icon. Installing it does not create a SupportFlow cloud account; your working records remain on that app/browser installation and your encrypted backup is stored in the Google Drive, Dropbox, or OneDrive account you connect."],
       ["Installing on iPhone or iPad",
        "Open supportflow.work/app in Safari, tap Share, choose Add to Home Screen, then tap Add. Open SupportFlow from the new Home screen icon."],
       ["Installing on a Windows PC",
@@ -8503,19 +8568,19 @@ const MANUAL = [
     d: "Keep your data protected and know what to do when something goes wrong.",
     q: [
       ["Your records live on this device only",
-       "There is no account and no cloud sync. Clear your browser data, lose the phone or delete the app, and the records go with it. Settings \u2192 Backup handles this."],
+       "Working records are not kept in a SupportFlow database. A licence account (Google, or email and password) is only for purchase and restore. Clear your browser data, lose the phone or delete the app, and the records go with it unless you have an encrypted backup. Settings \u2192 Backup handles this."],
       ["Every backup is encrypted",
-       "During required onboarding, you create one backup password. New backups use that password until you change it in Settings → Backup. The file is locked with it before it leaves the app, so wherever it ends up (your Drive, an email, a chat) it is unreadable without that passphrase. Nobody at SupportFlow ever sees it or stores it. That also means nobody can reset it. If you lose the passphrase, that backup cannot be recovered by anyone. Write it down somewhere separate from the device, or keep it in a password manager, and do not reuse a password from somewhere else."],
+       "During required onboarding you create one backup password and SupportFlow shows a recovery key. Save that key away from the device. New backups are encrypted on this device with a key that can be opened by the backup password or by that recovery key. Neither secret is stored by SupportFlow or sent to Google Drive, Dropbox, or OneDrive. SupportFlow still cannot recover a backup for you. If you forget the password, Settings \u2192 Backup \u2192 Forgot backup password asks for the recovery key, then lets you set a new password and shows a new recovery key. If you lose both, that backup cannot be decrypted. Backups made before recovery keys still open with the password they were made with, and do not have a recovery key."],
       ["Restoring a backup",
-       "Choose Restore, pick the file, and enter the passphrase it was made with. Get the passphrase right and it shows you exactly what is in the file, how many participants, invoices and so on, and how many of your current records would be overwritten, before anything changes. Nothing is replaced until you confirm."],
+       "Choose Restore, pick the file from this device or from Google Drive, Dropbox, or OneDrive, and enter the passphrase it was made with. If you have forgotten it, choose Forgot backup password and enter the recovery key for that file, then set a new backup password. Get it right and the app shows exactly what is in the file before anything changes. Nothing is replaced until you confirm."],
       ["Moving to a new phone or PC",
-       "Before switching devices, open Settings \u2192 Backup \u2192 Back up now and wait until the upload confirms. That backup must complete successfully \u2014 it is the only copy of your records. On the new device, open supportflow.work/app in Chrome, install it, and complete onboarding. When asked to restore, choose the file from your Google Drive and enter your backup passphrase. Your participants, shifts, invoices, incidents, expenses and settings will appear exactly as they were. Once you have confirmed the new device has everything, stop using the old installation \u2014 do not keep working on it, or the two copies will diverge."],
+       "Before switching devices, open Settings \u2192 Backup \u2192 Back up now and wait until the upload confirms. On the new device, open supportflow.work/app, connect the same Google Drive, Dropbox, or OneDrive account, choose Restore from that provider, and enter the backup password or the recovery key. Sign in with the same Google account or email and password so the licence is found. Once the new device has everything, stop using the old installation."],
       ["What transfers and what does not",
-       "Everything in your encrypted backup transfers: participants, shifts, invoices, service agreements, plan managers, incidents, expenses, trips and settings. Your lifetime licence is linked to your purchase email. After restoring your backup on the new device, if the Lifetime badge doesn't appear, open the profile menu (top right), tap Restore licence, and enter the email you used at checkout. What does not transfer automatically: your backup passphrase (you must know it \u2014 nobody can recover it), your Google Drive connection (reconnect it during onboarding on the new device), and any unsaved draft open at the time of the last backup."],
-      ["Automatic Google Drive backups",
-       "Google Drive is connected during required onboarding and the first encrypted backup must succeed before setup continues. After meaningful changes, SupportFlow waits about five minutes and uploads one encrypted backup while the app is active. If you are offline, the backup remains pending and retries when SupportFlow is next opened online. A PWA cannot reliably run while completely closed."],
+       "Everything in your encrypted backup transfers: participants, shifts, invoices, service agreements, plan managers, incidents, expenses, trips and settings. The licence stays on the Google account or the email-and-password account you paid with. Sign in with that same account on the new device. What does not transfer automatically: the backup password, the recovery key, the cloud connection (connect it again), and any unsaved draft. SupportFlow cannot look up the password or the recovery key."],
+      ["Where backups are stored",
+       "During onboarding you choose one of Google Drive, Dropbox, or OneDrive. The encrypted file is uploaded only after it is encrypted on this device. Google Drive access is limited to files the app creates. Dropbox and OneDrive access is limited to that app's own folder. You can switch provider later in Settings \u2192 Backup. Change account signs in to a different account of the same provider. Disconnect stops automatic backups on this device and does not delete files already stored."],
       ["Back up now, change account or disconnect",
-       "Settings \u2192 Backup shows the connected Google Drive, last successful backup and status. Back up now starts an immediate encrypted backup; while it is running the button changes to Backing up and additional manual or automatic backup attempts are blocked. Change Google account connects a different Drive account. Disconnect Google Drive stops automatic backups on this device but does not delete backups already stored in Drive."],
+       "Settings \u2192 Backup shows which provider is in use, the last successful backup, and the status. Back up now starts an immediate encrypted backup. While it is running the button says Backing up and another backup will not start over the top of it. After meaningful changes, SupportFlow waits about five minutes and uploads one encrypted backup while the app is open and online. If you are offline, it retries the next time you open SupportFlow online."],
       ["A figure looks wrong",
        "Check the invoice is marked Paid, because unpaid invoices do not count toward tax. Then check the date falls inside the current financial year, 1 July to 30 June."],
       ["A shift or trip will not delete",
@@ -8527,7 +8592,7 @@ const MANUAL = [
       ["Getting support",
        "Manual & help has a Support tab. Describe what happened, then Email support opens your mail app addressed to us with the subject already set to \u201cSupport NDIS\u201d and your message filled in. Nothing sends until you press send there. A few harmless details, app version, device, and how many records you have, are included automatically so we can help faster. Nothing about a participant is ever included."],
       ["Privacy and security",
-       "Settings \u2192 Privacy & security explains where your records are stored, how encrypted Google Drive backups work, and what limited information is shared when you deliberately use services such as Claimable or SupportFlow Assistant. The Legal documents section links to the full public Privacy Policy and Terms of Use."],
+       "Settings \u2192 Privacy & security explains where your records are stored, how encrypted Google Drive, Dropbox, and OneDrive backups work, and what limited information is shared when you deliberately use services such as Claimable or SupportFlow Assistant. The Legal documents section links to the full public Privacy Policy and Terms of Use."],
       ["Daily limit on checks",
        "The checker allows 15 questions a day, and the note tidier 30. That is far more than a normal day of work and exists to stop the cost running away, each check reads live pages from the ATO, which is not free. Anything you have already asked opens instantly and does not count against the limit, and it resets the next day."],
       ["Checking things yourself",
@@ -8568,7 +8633,7 @@ const FEEDBACK_TO = "support@supportflow.work";
 // to read in full is not meaningfully visible.
 const PRIVACY_SECTIONS = [
   ["The short version",
-   "Your SupportFlow working records stay on your device by default. There is no central SupportFlow participant database. Encrypted backups go to the Google Drive account you connect. Information leaves your device only when a feature needs it or you deliberately share, back up or submit something."],
+   "Your SupportFlow working records stay on your device by default. There is no central SupportFlow participant database. Encrypted backups go to the Google Drive, Dropbox, or OneDrive account you choose. Information leaves your device only when a feature needs it or you deliberately share, back up or submit something."],
   ["Who this policy covers",
    "This covers SupportFlow™, provided by its developer, contactable at support@supportflow.work, on a phone, tablet or desktop, on a production release or a testing build. As the support worker entering information, you remain responsible for being authorised to collect, store, use and disclose it, under whatever consent or service agreement you hold. This policy explains how the app handles information; it doesn't establish or replace your own authority to collect it. Because SupportFlow may record sensitive and health-related information, it's designed with the standards of the Australian Privacy Principles in mind, though the obligations that apply to any individual support worker depend on their own circumstances."],
   ["What you may store",
@@ -8678,10 +8743,10 @@ const PRIVSEC_SECTIONS = [
     <p>SupportFlow keeps your participant and work records on this device. SupportFlow does not operate a central database containing your participant records.</p>
     <p>If the app or browser data is cleared, those local records can be lost, which is why encrypted backup is part of setup.</p>
   </>],
-  ["Backups & Google Drive", <>
-    <p>Your SupportFlow backup is encrypted on this device before it is uploaded to your connected Google Drive. The encrypted backup is stored in your own Drive, not in a central SupportFlow participant database.</p>
-    <p>SupportFlow uses the Google Drive permission needed for backup files it creates or uses. Your backup password is not sent with the backup and is required when restoring on another device.</p>
-    <p>Backup controls, status and the time of the last successful backup are available in Settings → Backup.</p>
+  ["Backups", <>
+    <p>Your SupportFlow backup is encrypted on this device before it is uploaded to the Google Drive, Dropbox, or OneDrive account you choose. The encrypted file is stored in that account, not in a central SupportFlow participant database.</p>
+    <p>Google Drive access is limited to files the app creates. Dropbox and OneDrive access is limited to the app's own folder. The backup password and the recovery key are not sent with the file. SupportFlow cannot decrypt a backup for you. You can reset the password with your recovery key. If both are lost, the backup cannot be decrypted.</p>
+    <p>Disconnect stops future backups from this device and does not delete files already stored. Backup controls are in Settings → Backup.</p>
   </>],
   ["Information shared with other services", <>
     <p><strong>SupportFlow Assistant:</strong> sends the question you type and generic app/help context needed to answer it. It is designed not to send participant or business records.</p>
@@ -9186,8 +9251,169 @@ function backupPayload(data) {
 }
 
 // AES-256-GCM via the browser's own Web Crypto — no library, nothing sent
-// anywhere. The passphrase itself never leaves the device and is never part
-// of the encrypted file.
+// anywhere. The passphrase and the recovery key never leave the device and
+// are never part of the encrypted file. See backup-envelope.mjs.
+/* @@BACKUP_ENVELOPE_START */
+// Backup envelope. Inlined into app.jsx by build-app.mjs (export keywords stripped).
+// Also imported by tests. Uses Web Crypto only.
+//
+// A backup file is encrypted with a random data key. That key is wrapped twice:
+// once for the backup password and once for a recovery key. The readable
+// password and the readable recovery key are never written into the file.
+// Older files (no `wraps`) still open with the password they were made with.
+
+const BACKUP_KDF_ITERATIONS = 250000;
+const RECOVERY_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+
+function backupB64(buf) {
+  const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+  let s = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+function backupB64d(s) {
+  const bin = atob(String(s || ""));
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+function generateRecoveryKey() {
+  const bytes = crypto.getRandomValues(new Uint8Array(20));
+  let bits = 0, nbits = 0;
+  const chars = [];
+  for (const b of bytes) {
+    bits = (bits << 8) | b;
+    nbits += 8;
+    while (nbits >= 5 && chars.length < 32) {
+      nbits -= 5;
+      chars.push(RECOVERY_ALPHABET[(bits >> nbits) & 31]);
+    }
+  }
+  return chars.join("").match(/.{4}/g).join("-");
+}
+
+function normalizeRecoveryKey(value) {
+  return String(value || "").toUpperCase().replace(/[^23456789ABCDEFGHJKLMNPQRSTUVWXYZ]/g, "");
+}
+
+async function deriveWrapKey(secret, salt, iterations) {
+  const material = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt, iterations, hash: "SHA-256" },
+    material,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"],
+  );
+}
+
+async function wrapDataKey(dataKey, secret) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await deriveWrapKey(secret, salt, BACKUP_KDF_ITERATIONS);
+  const cipher = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, dataKey);
+  return {
+    kdf: "PBKDF2-SHA256",
+    iterations: BACKUP_KDF_ITERATIONS,
+    salt: backupB64(salt),
+    iv: backupB64(iv),
+    data: backupB64(cipher),
+  };
+}
+
+async function unwrapDataKey(wrap, secret) {
+  const key = await deriveWrapKey(normalizeSecretForWrap(secret, wrap), backupB64d(wrap.salt), wrap.iterations || BACKUP_KDF_ITERATIONS);
+  const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: backupB64d(wrap.iv) }, key, backupB64d(wrap.data));
+  return new Uint8Array(plain);
+}
+
+function normalizeSecretForWrap(secret, wrap) {
+  // Recovery keys are grouped codes. Passwords are kept exactly as typed.
+  // Callers pass kind separately; this only normalises when the secret looks
+  // like a recovery code (no lowercase letters and mostly the recovery alphabet).
+  return String(secret);
+}
+
+async function createBackupRecord(passphrase, recoveryKey) {
+  const dataKey = crypto.getRandomValues(new Uint8Array(32));
+  const passwordWrap = await wrapDataKey(dataKey, passphrase);
+  const recoveryWrap = await wrapDataKey(dataKey, normalizeRecoveryKey(recoveryKey));
+  return {
+    v: 2,
+    dataKey: backupB64(dataKey),
+    passwordWrap,
+    recoveryWrap,
+  };
+}
+
+async function encryptPayloadWithRecord(record, text) {
+  if (!record || record.v !== 2 || !record.dataKey || !record.passwordWrap || !record.recoveryWrap) {
+    throw new Error("backup-record-missing");
+  }
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await crypto.subtle.importKey("raw", backupB64d(record.dataKey), { name: "AES-GCM" }, false, ["encrypt"]);
+  const cipher = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, new TextEncoder().encode(text));
+  return JSON.stringify({
+    encrypted: true,
+    envelope: "sf-recovery-v1",
+    iv: backupB64(iv),
+    data: backupB64(cipher),
+    wraps: { password: record.passwordWrap, recovery: record.recoveryWrap },
+  });
+}
+
+async function decryptBackupEnvelope(json, secret, kind) {
+  const env = JSON.parse(json);
+  if (!env || !env.encrypted) return json;
+  const mode = kind === "recovery" ? "recovery" : "password";
+  if (env.wraps && env.wraps.password && env.wraps.recovery) {
+    const wrap = env.wraps[mode];
+    if (!wrap) throw new Error("wrong-passphrase");
+    const secretBytes = mode === "recovery" ? normalizeRecoveryKey(secret) : String(secret);
+    if (mode === "recovery" && secretBytes.length < 20) throw new Error("wrong-passphrase");
+    let dataKey;
+    try { dataKey = await unwrapDataKey(wrap, secretBytes); }
+    catch (e) { throw new Error("wrong-passphrase"); }
+    try {
+      const key = await crypto.subtle.importKey("raw", dataKey, { name: "AES-GCM" }, false, ["decrypt"]);
+      const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: backupB64d(env.iv) }, key, backupB64d(env.data));
+      return new TextDecoder().decode(plain);
+    } catch (e) {
+      throw new Error("wrong-passphrase");
+    }
+  }
+  if (mode === "recovery") throw new Error("older-backup");
+  const keyMaterial = await crypto.subtle.importKey("raw", new TextEncoder().encode(String(secret)), "PBKDF2", false, ["deriveKey"]);
+  const key = await crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt: backupB64d(env.salt), iterations: env.iterations || BACKUP_KDF_ITERATIONS, hash: "SHA-256" },
+    keyMaterial,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["decrypt"],
+  );
+  try {
+    const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: backupB64d(env.iv) }, key, backupB64d(env.data));
+    return new TextDecoder().decode(plain);
+  } catch (e) {
+    throw new Error("wrong-passphrase");
+  }
+}
+
+async function recoveryKeyMatchesRecord(record, recoveryKey) {
+  if (!record || record.v !== 2 || !record.recoveryWrap || !record.dataKey) return false;
+  try {
+    const got = await unwrapDataKey(record.recoveryWrap, normalizeRecoveryKey(recoveryKey));
+    const expect = backupB64d(record.dataKey);
+    if (got.length !== expect.length) return false;
+    let diff = 0;
+    for (let i = 0; i < got.length; i++) diff |= got[i] ^ expect[i];
+    return diff === 0;
+  } catch (e) {
+    return false;
+  }
+}
+/* @@BACKUP_ENVELOPE_END */
 async function encryptBackup(text, passphrase) {
   const enc = new TextEncoder();
   const salt = crypto.getRandomValues(new Uint8Array(16));
@@ -9205,22 +9431,8 @@ async function encryptBackup(text, passphrase) {
   });
 }
 
-async function decryptBackup(json, passphrase) {
-  const env = JSON.parse(json);
-  if (!env.encrypted) return json;   // an older, unencrypted export
-  const b64d = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
-  const enc = new TextEncoder(), dec = new TextDecoder();
-  const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(passphrase), "PBKDF2", false, ["deriveKey"]);
-  const key = await crypto.subtle.deriveKey(
-    { name: "PBKDF2", salt: b64d(env.salt), iterations: env.iterations || PBKDF2_ITERATIONS, hash: "SHA-256" },
-    keyMaterial, { name: "AES-GCM", length: 256 }, false, ["decrypt"]
-  );
-  try {
-    const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64d(env.iv) }, key, b64d(env.data));
-    return dec.decode(plain);
-  } catch (e) {
-    throw new Error("wrong-passphrase");
-  }
+async function decryptBackup(json, secret, kind = "password") {
+  return decryptBackupEnvelope(json, secret, kind);
 }
 
 function downloadBackup(text, encrypted) {
@@ -9654,18 +9866,193 @@ async function runSingleGoogleDriveBackup(data) {
   try { return await googleBackupInFlight; }
   finally { googleBackupInFlight = null; }
 }
-async function performGoogleAutoBackup(data, saveFn=null) {
-  if (!hasBackupMasterKey() || !googleDriveConnected() || !navigator.onLine) return false;
-  await runSingleGoogleDriveBackup(data);
-  const profile={...data.profile,backedUp:today(),backedUpCount:countRecords(data),backupHow:"Google Drive",remindedOn:today(),backupPending:false,lastBackupAt:new Date().toISOString()};
+const BACKUP_PROVIDER_KEY = "sf_backup_provider_v1";
+const DROPBOX_AUTH_KEY = "sf_dropbox_auth_v1";
+const ONEDRIVE_AUTH_KEY = "sf_onedrive_auth_v1";
+const DROPBOX_SCOPES = "files.content.read files.content.write files.metadata.read";
+const ONEDRIVE_SCOPES = "offline_access Files.ReadWrite.AppFolder";
+const PROVIDER_LABEL = { google: "Google Drive", dropbox: "Dropbox", onedrive: "OneDrive" };
+function readJsonKey(key) { try { return JSON.parse(localStorage.getItem(key) || "null"); } catch (_) { return null; } }
+function activeBackupProvider() {
+  try { const p = localStorage.getItem(BACKUP_PROVIDER_KEY); if (p === "google" || p === "dropbox" || p === "onedrive") return p; } catch (_) {}
+  return googleDriveConnected() ? "google" : "";
+}
+function setActiveBackupProvider(p) { try { localStorage.setItem(BACKUP_PROVIDER_KEY, p); } catch (_) {} }
+function providerLabel(p) { return PROVIDER_LABEL[p] || "cloud"; }
+function dropboxConnected() { return !!readJsonKey(DROPBOX_AUTH_KEY)?.accessToken; }
+function onedriveConnected() { return !!readJsonKey(ONEDRIVE_AUTH_KEY)?.accessToken; }
+function cloudBackupConnected() {
+  const p = activeBackupProvider();
+  return p === "google" ? googleDriveConnected() : p === "dropbox" ? dropboxConnected() : p === "onedrive" ? onedriveConnected() : false;
+}
+function disconnectDropbox() {
+  const auth = readJsonKey(DROPBOX_AUTH_KEY);
+  try { localStorage.removeItem(DROPBOX_AUTH_KEY); if (activeBackupProvider() === "dropbox") localStorage.removeItem(BACKUP_PROVIDER_KEY); } catch (_) {}
+  if (auth?.accessToken) fetch("https://api.dropboxapi.com/2/auth/token/revoke", { method: "POST", headers: { Authorization: "Bearer " + auth.accessToken } }).catch(() => {});
+}
+function disconnectOneDrive() {
+  try { localStorage.removeItem(ONEDRIVE_AUTH_KEY); if (activeBackupProvider() === "onedrive") localStorage.removeItem(BACKUP_PROVIDER_KEY); } catch (_) {}
+}
+function backupRedirectUri() { return location.origin + "/oauth-callback.html"; }
+async function backupOAuthConfig() {
+  const r = await fetch("/.netlify/functions/backup-oauth", { cache: "no-store" });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error("backup-oauth-config");
+  return d;
+}
+async function pkcePair() {
+  const raw = crypto.getRandomValues(new Uint8Array(32));
+  const verifier = btoa(String.fromCharCode(...raw)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
+  const challenge = btoa(String.fromCharCode(...new Uint8Array(digest))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  return { verifier, challenge };
+}
+function openBackupOAuth(url, state) {
+  return new Promise((resolve, reject) => {
+    const popup = window.open(url, "sf-backup-oauth", "width=520,height=720");
+    if (!popup) { reject(new Error("popup-blocked")); return; }
+    let done = false;
+    const finish = (fn) => { if (done) return; done = true; clearInterval(timer); window.removeEventListener("message", onMsg); fn(); };
+    const timer = setInterval(() => { if (popup.closed) finish(() => reject(new Error("oauth-cancelled"))); }, 400);
+    const onMsg = (ev) => {
+      if (ev.origin !== location.origin || !ev.data || ev.data.type !== "sf-backup-oauth") return;
+      finish(() => {
+        if (ev.data.error) reject(new Error(ev.data.error));
+        else if (ev.data.state !== state) reject(new Error("oauth-state"));
+        else resolve(ev.data.code);
+      });
+    };
+    window.addEventListener("message", onMsg);
+  });
+}
+async function exchangeBackupCode(provider, code, verifier) {
+  const r = await fetch("/.netlify/functions/backup-oauth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider, grant: "code", code, codeVerifier: verifier, redirectUri: backupRedirectUri() }) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || !d.accessToken) throw new Error(d.error === "not_configured" ? provider + "-not-configured" : "oauth-failed");
+  return d;
+}
+function saveProviderAuth(key, token) {
+  localStorage.setItem(key, JSON.stringify({ accessToken: token.accessToken, refreshToken: token.refreshToken || "", expiresAt: Date.now() + Math.max(60, (token.expiresIn || 3600) - 60) * 1000 }));
+}
+async function connectDropbox() {
+  const cfg = await backupOAuthConfig();
+  if (!cfg.dropboxClientId) throw new Error("dropbox-not-configured");
+  const { verifier, challenge } = await pkcePair();
+  const state = crypto.randomUUID();
+  const url = "https://www.dropbox.com/oauth2/authorize?" + new URLSearchParams({ client_id: cfg.dropboxClientId, response_type: "code", redirect_uri: backupRedirectUri(), code_challenge: challenge, code_challenge_method: "S256", token_access_type: "offline", scope: DROPBOX_SCOPES, state });
+  const code = await openBackupOAuth(url, state);
+  saveProviderAuth(DROPBOX_AUTH_KEY, await exchangeBackupCode("dropbox", code, verifier));
+  setActiveBackupProvider("dropbox");
+}
+async function connectOneDrive(selectAccount) {
+  const cfg = await backupOAuthConfig();
+  if (!cfg.onedriveClientId) throw new Error("onedrive-not-configured");
+  const { verifier, challenge } = await pkcePair();
+  const state = crypto.randomUUID();
+  const url = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize?" + new URLSearchParams({ client_id: cfg.onedriveClientId, response_type: "code", redirect_uri: backupRedirectUri(), response_mode: "query", scope: ONEDRIVE_SCOPES, code_challenge: challenge, code_challenge_method: "S256", state, prompt: selectAccount ? "select_account" : "consent" });
+  const code = await openBackupOAuth(url, state);
+  saveProviderAuth(ONEDRIVE_AUTH_KEY, await exchangeBackupCode("onedrive", code, verifier));
+  setActiveBackupProvider("onedrive");
+}
+async function refreshProviderToken(provider) {
+  const key = provider === "dropbox" ? DROPBOX_AUTH_KEY : ONEDRIVE_AUTH_KEY;
+  const auth = readJsonKey(key);
+  if (!auth?.refreshToken) throw new Error(provider + "-not-connected");
+  const r = await fetch("/.netlify/functions/backup-oauth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider, grant: "refresh", refreshToken: auth.refreshToken }) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || !d.accessToken) throw new Error("oauth-failed");
+  if (!d.refreshToken) d.refreshToken = auth.refreshToken;
+  saveProviderAuth(key, d);
+  return d.accessToken;
+}
+async function providerToken(provider) {
+  const auth = readJsonKey(provider === "dropbox" ? DROPBOX_AUTH_KEY : ONEDRIVE_AUTH_KEY);
+  if (!auth?.accessToken) throw new Error(provider + "-not-connected");
+  if (Number(auth.expiresAt) > Date.now() + 15000) return auth.accessToken;
+  return refreshProviderToken(provider);
+}
+function backupStampName() { return "supportflow-backup-" + new Date().toISOString().replace(/[:.]/g, "-") + ".json"; }
+async function uploadDropbox(encrypted) {
+  const token = await providerToken("dropbox");
+  const r = await fetch("https://content.dropboxapi.com/2/files/upload", { method: "POST", headers: { Authorization: "Bearer " + token, "Content-Type": "application/octet-stream", "Dropbox-API-Arg": JSON.stringify({ path: "/" + backupStampName(), mode: "add", autorename: true, mute: true }) }, body: encrypted });
+  if (!r.ok) throw new Error("dropbox-upload-failed");
+  const listed = await fetch("https://api.dropboxapi.com/2/files/list_folder", { method: "POST", headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" }, body: JSON.stringify({ path: "", recursive: false, limit: 100 }) });
+  if (listed.ok) {
+    const entries = ((await listed.json()).entries || []).filter((e) => e[".tag"] === "file" && String(e.name || "").startsWith("supportflow-backup-")).sort((a, b) => String(b.client_modified || "").localeCompare(String(a.client_modified || ""))).slice(7);
+    for (const f of entries) await fetch("https://api.dropboxapi.com/2/files/delete_v2", { method: "POST", headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" }, body: JSON.stringify({ path: f.path_lower }) }).catch(() => {});
+  }
+  return r.json();
+}
+async function listDropboxBackups() {
+  const token = await providerToken("dropbox");
+  const r = await fetch("https://api.dropboxapi.com/2/files/list_folder", { method: "POST", headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" }, body: JSON.stringify({ path: "", recursive: false, limit: 50 }) });
+  if (!r.ok) return [];
+  return ((await r.json()).entries || []).filter((e) => e[".tag"] === "file" && String(e.name || "").startsWith("supportflow-backup-")).sort((a, b) => String(b.client_modified || "").localeCompare(String(a.client_modified || ""))).slice(0, 10).map((e) => ({ id: e.path_lower || e.id, name: e.name, createdTime: e.client_modified }));
+}
+async function fetchDropboxFile(path) {
+  const token = await providerToken("dropbox");
+  const r = await fetch("https://content.dropboxapi.com/2/files/download", { method: "POST", headers: { Authorization: "Bearer " + token, "Dropbox-API-Arg": JSON.stringify({ path }) } });
+  if (!r.ok) throw new Error("dropbox-download-failed");
+  return r.text();
+}
+async function uploadOneDrive(encrypted) {
+  const token = await providerToken("onedrive");
+  const name = backupStampName();
+  const r = await fetch("https://graph.microsoft.com/v1.0/me/drive/special/approot:/" + encodeURIComponent(name) + ":/content", { method: "PUT", headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" }, body: encrypted });
+  if (!r.ok) throw new Error("onedrive-upload-failed");
+  const list = await fetch("https://graph.microsoft.com/v1.0/me/drive/special/approot/children?$select=id,name,createdDateTime&$top=50", { headers: { Authorization: "Bearer " + token } });
+  if (list.ok) {
+    const old = ((await list.json()).value || []).filter((f) => String(f.name || "").startsWith("supportflow-backup-")).sort((a, b) => String(b.createdDateTime || "").localeCompare(String(a.createdDateTime || ""))).slice(7);
+    for (const f of old) await fetch("https://graph.microsoft.com/v1.0/me/drive/items/" + encodeURIComponent(f.id), { method: "DELETE", headers: { Authorization: "Bearer " + token } }).catch(() => {});
+  }
+  return r.json();
+}
+async function listOneDriveBackups() {
+  const token = await providerToken("onedrive");
+  const r = await fetch("https://graph.microsoft.com/v1.0/me/drive/special/approot/children?$select=id,name,createdDateTime&$top=50", { headers: { Authorization: "Bearer " + token } });
+  if (!r.ok) return [];
+  return ((await r.json()).value || []).filter((f) => String(f.name || "").startsWith("supportflow-backup-")).sort((a, b) => String(b.createdDateTime || "").localeCompare(String(a.createdDateTime || ""))).slice(0, 10).map((f) => ({ id: f.id, name: f.name, createdTime: f.createdDateTime }));
+}
+async function fetchOneDriveFile(id) {
+  const token = await providerToken("onedrive");
+  const r = await fetch("https://graph.microsoft.com/v1.0/me/drive/items/" + encodeURIComponent(id) + "/content", { headers: { Authorization: "Bearer " + token } });
+  if (!r.ok) throw new Error("onedrive-download-failed");
+  return r.text();
+}
+async function uploadEncryptedBackup(encrypted) {
+  const p = activeBackupProvider();
+  if (p === "dropbox") return uploadDropbox(encrypted);
+  if (p === "onedrive") return uploadOneDrive(encrypted);
+  return uploadEncryptedBackupToDrive(encrypted);
+}
+async function listCloudBackups() {
+  const p = activeBackupProvider();
+  if (p === "dropbox") return listDropboxBackups();
+  if (p === "onedrive") return listOneDriveBackups();
+  return (await listDriveBackups() || []).map((f) => ({ id: f.id, name: f.name, createdTime: f.createdTime }));
+}
+async function fetchCloudFile(id) {
+  const p = activeBackupProvider();
+  if (p === "dropbox") return fetchDropboxFile(id);
+  if (p === "onedrive") return fetchOneDriveFile(id);
+  return fetchDriveFile(id);
+}
+async function performCloudAutoBackup(data, saveFn=null) {
+  if (!hasBackupMasterKey() || !cloudBackupConnected() || !navigator.onLine) return false;
+  if (googleBackupInFlight) await googleBackupInFlight;
+  googleBackupInFlight = (async () => uploadEncryptedBackup(await encryptBackupWithMaster(backupPayload(data))))();
+  try { await googleBackupInFlight; }
+  finally { googleBackupInFlight = null; }
+  const how = providerLabel(activeBackupProvider() || "google");
+  const profile={...data.profile,backedUp:today(),backedUpCount:countRecords(data),backupHow:how,remindedOn:today(),backupPending:false,lastBackupAt:new Date().toISOString()};
   if(saveFn) await saveFn({...data,profile}, true); else { try { const next={...data,profile}; await storage.set("ndis:data",JSON.stringify(next)); } catch(_){} }
   return true;
 }
 function scheduleGoogleAutoBackup(data) {
-  if (!hasBackupMasterKey() || !googleDriveConnected()) return;
+  if (!hasBackupMasterKey() || !cloudBackupConnected()) return;
   clearTimeout(autoBackupTimer);
   try { localStorage.setItem("sf_backup_pending_v1","1"); } catch(_){}
-  autoBackupTimer=setTimeout(async()=>{ try { await performGoogleAutoBackup(data); localStorage.removeItem("sf_backup_pending_v1"); } catch(e) { console.warn("Automatic backup pending",e); } },AUTO_BACKUP_DELAY_MS);
+  autoBackupTimer=setTimeout(async()=>{ try { await performCloudAutoBackup(data); localStorage.removeItem("sf_backup_pending_v1"); } catch(e) { console.warn("Automatic backup pending",e); } },AUTO_BACKUP_DELAY_MS);
 }
 
 function GoogleDriveSetup({ onConnected }) {
@@ -9679,22 +10066,62 @@ function GoogleDriveSetup({ onConnected }) {
     {msg&&<div style={{fontSize:12,color:"var(--good)",marginTop:8}}>{msg}</div>}{err&&<div style={{fontSize:12,color:"var(--warn)",marginTop:8}}>{err}</div>}
   </div>;
 }
+function CloudBackupChoices({ onConnected }) {
+  const [busy, setBusy] = useState("");
+  const [err, setErr] = useState("");
+  const [active, setActive] = useState(() => activeBackupProvider());
+  const rows = [
+    ["google", "Google Drive", googleDriveConnected(), "Only files this app creates"],
+    ["dropbox", "Dropbox", dropboxConnected(), "App folder only"],
+    ["onedrive", "OneDrive", onedriveConnected(), "App folder only"],
+  ];
+  const use = async (id) => {
+    setBusy(id); setErr("");
+    try {
+      if (id === "google") { if (!googleDriveConnected()) await requestGoogleDriveToken("consent"); setActiveBackupProvider("google"); }
+      else if (id === "dropbox") { if (!dropboxConnected()) await connectDropbox(); else setActiveBackupProvider("dropbox"); }
+      else { if (!onedriveConnected()) await connectOneDrive(false); else setActiveBackupProvider("onedrive"); }
+      setActive(activeBackupProvider());
+      onConnected && onConnected();
+    } catch (e) {
+      const m = String(e && e.message || "");
+      setErr(/not-configured/.test(m) ? "That provider isn't configured on this site yet." : m === "popup-blocked" ? "Allow the sign-in window and try again." : m === "oauth-cancelled" ? "Sign-in was cancelled." : "Couldn't connect. Try again.");
+    } finally { setBusy(""); }
+  };
+  return <div style={{background:"var(--bg)",border:"1px solid var(--line)",borderRadius:10,padding:"15px 16px",marginBottom:12}}>
+    <div className="eyebrow" style={{marginBottom:8}}>Where to store the encrypted backup</div>
+    <div style={{fontSize:12.5,color:"var(--tx-2)",lineHeight:1.6,marginBottom:8}}>Choose Google Drive, Dropbox, or OneDrive. The file is encrypted on this device first. The backup password and recovery key are not sent.</div>
+    {rows.map(([id, label, on, note]) => (
+      <div key={id} style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"center",padding:"8px 0",borderTop:"1px solid var(--line)"}}>
+        <div><div style={{fontWeight:650}}>{label}{active === id && on ? " · in use" : ""}</div><div style={{fontSize:11.5,color:"var(--tx-3)"}}>{note}{on ? " · Connected" : ""}</div></div>
+        <button className="btn tiny" type="button" disabled={!!busy} onClick={() => use(id)}>{busy === id ? "Connecting…" : on && active === id ? "In use" : on ? "Use" : "Connect"}</button>
+      </div>
+    ))}
+    {err && <div style={{fontSize:12,color:"var(--warn)",marginTop:8}}>{err}</div>}
+  </div>;
+}
 
 const BACKUP_KEY_STORAGE = "sf_backup_master_v1";
 function hasBackupMasterKey() { try { return !!localStorage.getItem(BACKUP_KEY_STORAGE); } catch (_) { return false; } }
 function getBackupMaster() { try { return JSON.parse(localStorage.getItem(BACKUP_KEY_STORAGE) || "null"); } catch (_) { return null; } }
 function clearBackupMaster() { try { localStorage.removeItem(BACKUP_KEY_STORAGE); } catch (_) {} }
+async function prepareBackupCredentials(passphrase) {
+  const recoveryKey = generateRecoveryKey();
+  const record = await createBackupRecord(passphrase, recoveryKey);
+  return { recoveryKey, record };
+}
+function storeBackupRecord(record) {
+  localStorage.setItem(BACKUP_KEY_STORAGE, JSON.stringify(record));
+}
 async function setBackupMaster(passphrase) {
-  const enc = new TextEncoder();
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  const material = await crypto.subtle.importKey("raw", enc.encode(passphrase), "PBKDF2", false, ["deriveBits"]);
-  const bits = await crypto.subtle.deriveBits({ name:"PBKDF2", salt, iterations:PBKDF2_ITERATIONS, hash:"SHA-256" }, material, 256);
-  const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
-  localStorage.setItem(BACKUP_KEY_STORAGE, JSON.stringify({ salt:b64(salt), key:b64(bits), iterations:PBKDF2_ITERATIONS }));
+  const cred = await prepareBackupCredentials(passphrase);
+  storeBackupRecord(cred.record);
+  return cred.recoveryKey;
 }
 async function encryptBackupWithMaster(text) {
   const master = getBackupMaster();
   if (!master) throw new Error("backup-password-not-set");
+  if (master.v === 2) return encryptPayloadWithRecord(master, text);
   const b64d = (x) => Uint8Array.from(atob(x), c => c.charCodeAt(0));
   const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
   const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -9702,11 +10129,32 @@ async function encryptBackupWithMaster(text) {
   const cipher = await crypto.subtle.encrypt({name:"AES-GCM", iv}, key, new TextEncoder().encode(text));
   return JSON.stringify({ encrypted:true, format:BACKUP_FORMAT, kdf:"PBKDF2-SHA256", iterations:master.iterations, salt:master.salt, iv:b64(iv), data:b64(cipher) });
 }
+function RecoveryKeyPanel({ recoveryKey, onConfirm }) {
+  const [saved, setSaved] = useState(false);
+  const [copied, setCopied] = useState(false);
+  return <div style={{background:"var(--bg)",border:"1px solid var(--line)",borderRadius:10,padding:"15px 16px"}}>
+    <div className="eyebrow" style={{marginBottom:8}}>Save your recovery key</div>
+    <div style={{fontSize:12.5,color:"var(--tx-2)",lineHeight:1.6,marginBottom:10}}>
+      SupportFlow cannot recover a backup for you. This key lets you reset the backup password yourself, whichever of Google Drive, Dropbox or OneDrive holds the file. If you lose both the password and this key, that backup cannot be decrypted.
+    </div>
+    <div style={{fontFamily:"ui-monospace,monospace",fontSize:14,letterSpacing:".04em",background:"var(--bg-2)",border:"1px solid var(--line)",borderRadius:8,padding:"10px 12px",wordBreak:"break-all"}}>{recoveryKey}</div>
+    <div style={{display:"flex",gap:8,flexWrap:"wrap",margin:"10px 0"}}>
+      <button className="btn ghost tiny" type="button" onClick={() => { try { navigator.clipboard.writeText(recoveryKey); setCopied(true); } catch (e) { setCopied(false); } }}>{copied ? "Copied" : "Copy"}</button>
+    </div>
+    <label style={{display:"flex",gap:8,alignItems:"flex-start",fontSize:12.5,lineHeight:1.5,marginBottom:12}}>
+      <input type="checkbox" checked={saved} onChange={(e) => setSaved(e.target.checked)} />
+      <span>I have saved this recovery key somewhere safe, away from this device.</span>
+    </label>
+    <button className="btn" type="button" disabled={!saved} onClick={onConfirm}>Continue</button>
+  </div>;
+}
 function BackupPasswordSetup({ data, save, onReady }) {
   const [pass,setPass]=useState(""); const [pass2,setPass2]=useState(""); const [show,setShow]=useState(false); const [busy,setBusy]=useState(false); const [err,setErr]=useState("");
+  const [pending,setPending]=useState(null);
   const weak=weakPassphrase(pass);
-  if (hasBackupMasterKey()) return <div className="callout"><b>Backup password set ✓</b><div style={{marginTop:6,fontSize:12.5}}>This password will protect all new backups until you change it in Settings → Backup.</div></div>;
-  const create=async()=>{ if(weak||!pass||pass!==pass2)return; setBusy(true);setErr(""); try{await setBackupMaster(pass); save({...data,profile:{...data.profile,backupPasswordSet:true,backupEvery:"daily"}}); setPass("");setPass2("");onReady&&onReady();}catch(e){setErr("Couldn't set the backup password on this device.");}finally{setBusy(false);} };
+  if (hasBackupMasterKey()) return <div className="callout"><b>Backup password set ✓</b><div style={{marginTop:6,fontSize:12.5}}>This password will protect all new backups until you change it in Settings → Backup. A recovery key was shown when it was created.</div></div>;
+  if (pending) return <RecoveryKeyPanel recoveryKey={pending.recoveryKey} onConfirm={() => { storeBackupRecord(pending.record); setPending(null); save({...data,profile:{...data.profile,backupPasswordSet:true,backupEvery:"daily"}}); onReady&&onReady(); }} />;
+  const create=async()=>{ if(weak||!pass||pass!==pass2)return; setBusy(true);setErr(""); try{const cred=await prepareBackupCredentials(pass); setPass(""); setPass2(""); setPending(cred);}catch(e){setErr("Couldn't set the backup password on this device.");}finally{setBusy(false);} };
   return <div style={{background:"var(--bg)",border:"1px solid var(--line)",borderRadius:10,padding:"15px 16px"}}>
     <div className="eyebrow" style={{marginBottom:10}}>Create your backup password</div>
     <label className="f"><span>Backup password</span><input type={show?"text":"password"} value={pass} onChange={e=>setPass(e.target.value)} placeholder="A few random words work well" /></label>
@@ -9734,8 +10182,12 @@ function BackupPanel({ data, save, open, onToggle }) {
   const [unlockPass, setUnlockPass] = useState("");
   const [unlockFile, setUnlockFile] = useState(null);
   const [showPass, setShowPass] = useState(false);
-  const [driveConnected, setDriveConnected] = useState(() => googleDriveConnected());
+  const [driveConnected, setDriveConnected] = useState(() => cloudBackupConnected());
+  const [providerNow, setProviderNow] = useState(() => activeBackupProvider());
   const [backupFailed, setBackupFailed] = useState(false);
+  const [pendingCred, setPendingCred] = useState(null);
+  const [recoveryInput, setRecoveryInput] = useState("");
+  const [recoveredPlain, setRecoveredPlain] = useState("");
   const [driveBusy, setDriveBusy] = useState(false);
   const [driveFiles, setDriveFiles] = useState(null);
   const [driveFileBusy, setDriveFileBusy] = useState(false);
@@ -9743,16 +10195,17 @@ function BackupPanel({ data, save, open, onToggle }) {
   const [driveFetchingId, setDriveFetchingId] = useState(null);
   const openDrivePicker = async () => {
     setErr(""); setMsg(""); setDriveFileBusy(true);
-    const files = await listDriveBackups();
-    setDriveFiles(files); setShowDrivePicker(true); setDriveFileBusy(false);
+    try { const files = await listCloudBackups(); setDriveFiles(files); setShowDrivePicker(true); }
+    catch (_) { setErr("Couldn't list backups. Check the connection and try again."); }
+    setDriveFileBusy(false);
   };
   const useDriveFile = async (f) => {
     setErr(""); setDriveFetchingId(f.id);
     try {
-      const text = await fetchDriveFile(f.id);
+      const text = await fetchCloudFile(f.id);
       setUnlockFile(text); setUnlockPass(""); setMode("unlock"); setShowDrivePicker(false);
     } catch (_) {
-      setErr("Couldn't download that backup from Google Drive. Check your connection and try again.");
+      setErr("Couldn't download that backup. Check your connection and try again.");
     } finally { setDriveFetchingId(null); }
   };
   const backupLockRef = useRef(false);
@@ -9772,9 +10225,9 @@ function BackupPanel({ data, save, open, onToggle }) {
     backupLockRef.current = true;
     setBusy(true);
     try {
-      await runSingleGoogleDriveBackup(data);
-      stampSaved("Google Drive"); setBackupFailed(false); setMsg("Encrypted backup saved to Google Drive.");
-    } catch (e) { console.error("Google Drive backup failed", e); setBackupFailed(true); setErr("Backup couldn't be completed. Try again."); } finally { backupLockRef.current = false; setBusy(false); }
+      await performCloudAutoBackup(data, save);
+      setBackupFailed(false); setMsg("Encrypted backup saved to " + providerLabel(activeBackupProvider() || "google") + ".");
+    } catch (e) { console.error("Backup failed"); setBackupFailed(true); setErr("Backup couldn't be completed. Try again."); } finally { backupLockRef.current = false; setBusy(false); }
   };
 
   const runBackup = async (via) => {
@@ -9782,16 +10235,53 @@ function BackupPanel({ data, save, open, onToggle }) {
     if (pass !== pass2) { setErr("Those two don't match."); return; }
     setBusy(true); setErr("");
     try {
-      await setBackupMaster(pass);
-      const encrypted = await encryptBackupWithMaster(backupPayload(data));
-      const how = via === "share" ? await shareBackup(encrypted, true) : (downloadBackup(encrypted, true), "downloaded");
-      if (how !== "cancelled") {
-        stampSaved(how);
-        setMsg(how === "shared" ? "Backup shared, encrypted, so it's safe wherever it lands."
-          : "Backup downloaded, encrypted, so it's safe wherever you save it.");
-      }
-    } catch (e) { setErr("Couldn't create the backup file."); }
-    finally { setBusy(false); setMode(null); setPass(""); setPass2(""); }
+      const cred = await prepareBackupCredentials(pass);
+      setPendingCred({ ...cred, via, plain: recoveredPlain || "" });
+      setPass(""); setPass2("");
+    } catch (e) { setErr("Couldn't prepare the new backup password."); }
+    finally { setBusy(false); }
+  };
+  const confirmCred = async () => {
+    const cred = pendingCred;
+    if (!cred) return;
+    storeBackupRecord(cred.record);
+    setPendingCred(null);
+    setRecoveryInput("");
+    if (cred.plain) {
+      try { setPending(parseBackup(cred.plain)); setRecoveredPlain(""); setMode(null); setMsg("Recovery key accepted. New backups will use the new password. Review the restore below before replacing records on this device."); }
+      catch (e) { setErr("The file opened, but it doesn't look like a SupportFlow backup."); }
+      return;
+    }
+    if (cred.via) {
+      setBusy(true);
+      try {
+        const encrypted = await encryptBackupWithMaster(backupPayload(data));
+        const how = cred.via === "share" ? await shareBackup(encrypted, true) : (downloadBackup(encrypted, true), "downloaded");
+        if (how !== "cancelled") {
+          stampSaved(how);
+          setMsg(how === "shared" ? "Backup shared. It is encrypted, and the recovery key you just saved can reset the password later." : "Backup downloaded. It is encrypted, and the recovery key you just saved can reset the password later.");
+        }
+      } catch (e) { setErr("Couldn't create the backup file."); }
+      finally { setBusy(false); setMode(null); }
+      return;
+    }
+    setMode(null);
+    setMsg("Backup password updated. Files already saved still open with the password or recovery key from when each file was made. New backups use the new password and the new recovery key.");
+  };
+  const checkRecovery = async () => {
+    setBusy(true); setErr("");
+    try {
+      let plain = "";
+      if (unlockFile) plain = await decryptBackup(unlockFile, recoveryInput, "recovery");
+      else if (getBackupMaster()?.v === 2) {
+        if (!(await recoveryKeyMatchesRecord(getBackupMaster(), recoveryInput))) throw new Error("wrong-passphrase");
+      } else throw new Error("need-file");
+      setRecoveredPlain(plain);
+      setPass(""); setPass2(""); setMode("resetpass");
+    } catch (e) {
+      const m = e && e.message;
+      setErr(m === "older-backup" ? "This backup was created before recovery keys. Open it with the backup password from that time." : m === "need-file" ? "Choose a backup file, or pick one from your cloud provider, then enter its recovery key." : "That recovery key doesn't open this backup.");
+    } finally { setBusy(false); }
   };
 
   // ---- restoring: pick a file, then unlock it ----
@@ -9809,12 +10299,14 @@ function BackupPanel({ data, save, open, onToggle }) {
   const unlock = async () => {
     setBusy(true); setErr("");
     try {
-      const plain = await decryptBackup(unlockFile, unlockPass);
+      const plain = await decryptBackup(unlockFile, unlockPass, "password");
       setPending(parseBackup(plain));
       setMode(null); setUnlockFile(null); setUnlockPass("");
     } catch (e) {
       setErr(e.message === "wrong-passphrase"
-        ? "That passphrase doesn't open this file. Check it and try again."
+        ? "That passphrase doesn't open this file. Check it and try again, or use Forgot backup password with your recovery key."
+        : e.message === "older-backup"
+        ? "This backup was created before recovery keys. Open it with the backup password from that time."
         : (e.message || "Couldn't read that file."));
     } finally { setBusy(false); }
   };
@@ -9852,11 +10344,14 @@ function BackupPanel({ data, save, open, onToggle }) {
       <>
       <div style={{ fontSize: 13, color: "var(--tx-2)", lineHeight: 1.65, marginBottom: 16 }}>
         <div style={{ fontWeight: 700, color: "var(--tx)", marginBottom: 6 }}>Your data is protected</div>
-        SupportFlow keeps your records on this device and automatically backs them up securely to your connected Google Drive.
-        <div style={{ marginTop: 8 }}>Your backups are <b>encrypted before they leave your device</b> and can only be restored using your backup password.</div>
+        SupportFlow keeps your records on this device and backs them up, encrypted, to the Google Drive, Dropbox, or OneDrive account you choose.
+        <div style={{ marginTop: 8 }}>Your backups are <b>encrypted before they leave your device</b>. SupportFlow cannot open them. You can reset the backup password with your recovery key. If you lose both, that backup cannot be decrypted.</div>
       </div>
+      <input ref={fileRef} type="file" accept="application/json,.json" onChange={pick} style={{ display: "none" }} />
 
-      {pending ? (
+      {pendingCred ? (
+        <RecoveryKeyPanel recoveryKey={pendingCred.recoveryKey} onConfirm={confirmCred} />
+      ) : pending ? (
         <div className="callout" style={{ borderColor: "var(--req)", marginBottom: 0 }}>
           <b>Ready to restore this backup?</b>
           <div style={{ marginTop: 9, fontSize: 12.5, lineHeight: 1.8 }}>
@@ -9899,7 +10394,7 @@ function BackupPanel({ data, save, open, onToggle }) {
           <div style={{ border: "1px solid var(--req)", background: "var(--req-soft)", borderRadius: 9,
                         padding: "12px 13px", marginBottom: 16 }}>
             <div style={{ color: "var(--req)", fontWeight: 700, fontSize: 12.5, lineHeight: 1.6 }}>
-              If you lose this passphrase, this backup cannot be recovered, not by us, not by anyone.
+              SupportFlow cannot recover this for you. Save the recovery key on the next screen. If you lose both the password and that key, the backup cannot be decrypted.
             </div>
             <div style={{ color: "var(--req)", fontSize: 11.5, lineHeight: 1.6, marginTop: 6, fontWeight: 600 }}>
               Don't reuse a password from somewhere else, and don't save it in a note on this phone.
@@ -9933,20 +10428,44 @@ function BackupPanel({ data, save, open, onToggle }) {
             <button className="btn ghost" onClick={() => setShowPass(!showPass)}>{showPass ? "Hide" : "Show"}</button>
             <button className="btn ghost" onClick={() => { setMode(null); setUnlockFile(null); setUnlockPass(""); }}>Cancel</button>
           </div>
+          <button className="btn ghost tiny" style={{ marginTop: 12 }} onClick={() => { setMode("forgot"); setErr(""); }}>Forgot backup password?</button>
+        </div>
+
+      ) : mode === "forgot" || mode === "resetpass" ? (
+        <div style={{ background: "var(--bg)", border: "1px solid var(--line)", borderRadius: 10, padding: "15px 16px" }}>
+          <div className="eyebrow" style={{ marginBottom: 10 }}>{mode === "forgot" ? "Forgot backup password?" : "Set a new backup password"}</div>
+          {mode === "forgot" ? <>
+            <div style={{ fontSize: 12.5, color: "var(--tx-2)", lineHeight: 1.6, marginBottom: 10 }}>Enter the recovery key for this backup. It works the same way for Google Drive, Dropbox, and OneDrive. SupportFlow does not have a copy of it. If you lost both the password and the recovery key, the backup cannot be decrypted.</div>
+            <label className="f"><span>Recovery key</span>
+              <input value={recoveryInput} onChange={(e) => setRecoveryInput(e.target.value)} autoComplete="off" spellCheck={false} />
+            </label>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button className="btn" onClick={checkRecovery} disabled={busy || !recoveryInput}>{busy ? "Checking…" : "Check recovery key"}</button>
+              <button className="btn ghost" onClick={() => fileRef.current && fileRef.current.click()}>Choose a file</button>
+              {driveConnected && <button className="btn ghost" onClick={openDrivePicker} disabled={driveFileBusy}>Choose from {providerLabel(providerNow || "google")}</button>}
+              <button className="btn ghost" onClick={() => setMode(null)}>Cancel</button>
+            </div>
+          </> : <>
+            <div style={{ fontSize: 12.5, color: "var(--tx-2)", lineHeight: 1.6, marginBottom: 10 }}>Choose a new backup password. You will then get a new recovery key. Backups already saved still need the password or recovery key that protected that file.</div>
+            <label className="f"><span>New backup password</span><input type="password" value={pass} onChange={(e) => setPass(e.target.value)} /></label>
+            <label className="f"><span>Type it again</span><input type="password" value={pass2} onChange={(e) => setPass2(e.target.value)} /></label>
+            <button className="btn" onClick={() => runBackup(null)} disabled={busy || !pass || pass !== pass2 || !!weakPassphrase(pass)}>Continue</button>
+          </>}
         </div>
 
       ) : (
         <>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button className="btn" onClick={startBackup} disabled={total === 0 || busy}>{busy ? "Backing up…" : "Back up now"}</button>
+            <button className="btn" onClick={startBackup} disabled={total === 0 || busy || !driveConnected}>{busy ? "Backing up…" : "Back up now"}</button>
             <button className="btn ghost" onClick={() => fileRef.current && fileRef.current.click()}>Restore</button>
-            {driveConnected && <button className="btn ghost" onClick={openDrivePicker} disabled={driveFileBusy}>{driveFileBusy ? "Loading..." : "Restore from Drive"}</button>}
+            {driveConnected && <button className="btn ghost" onClick={openDrivePicker} disabled={driveFileBusy}>{driveFileBusy ? "Loading..." : "Restore from " + providerLabel(providerNow || "google")}</button>}
+            <button className="btn ghost" onClick={() => { setMode("forgot"); setErr(""); setMsg(""); }}>Forgot backup password?</button>
           </div>
           {showDrivePicker && (
             <div style={{ marginTop: 12, background: "var(--bg-2)", border: "1px solid var(--line)", borderRadius: 12, padding: 12 }}>
-              <div className="eyebrow" style={{ marginBottom: 8, color: "var(--brass)" }}>Backups in Google Drive</div>
+              <div className="eyebrow" style={{ marginBottom: 8, color: "var(--brass)" }}>Backups in {providerLabel(providerNow || "google")}</div>
               {driveFiles && driveFiles.length === 0 ? (
-                <div style={{ fontSize: 12.5, color: "var(--tx-3)", padding: "6px 0" }}>No backups found in this Google Drive account.</div>
+                <div style={{ fontSize: 12.5, color: "var(--tx-3)", padding: "6px 0" }}>No backups found in this {providerLabel(providerNow || "google")} account.</div>
               ) : (driveFiles || []).map((f, i) => (
                 <div key={f.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "9px 0", borderTop: i ? "1px solid var(--line)" : "none" }}>
                   <div style={{ fontSize: 13, minWidth: 0 }}>
@@ -9960,25 +10479,24 @@ function BackupPanel({ data, save, open, onToggle }) {
               <button className="btn ghost tiny" style={{ marginTop: 10 }} onClick={() => setShowDrivePicker(false)} disabled={!!driveFetchingId}>Cancel</button>
             </div>
           )}
-          <input ref={fileRef} type="file" accept="application/json,.json" onChange={pick} style={{ display: "none" }} />
           <div style={{marginTop:10,fontSize:11.5,color:"var(--tx-3)"}}>Backup password: {hasBackupMasterKey() ? "Set ✓" : "Not set — required for new encrypted backups"}</div>
-          {hasBackupMasterKey() && <button className="btn ghost tiny" style={{marginTop:8}} onClick={() => { if (confirm("Change the backup password? Existing backup files will still need the password that created them.")) { clearBackupMaster(); setMode("setpass"); } }}>Change backup password</button>}
+          {hasBackupMasterKey() && <button className="btn ghost tiny" style={{marginTop:8}} onClick={() => { setRecoveredPlain(""); setMode("setpass"); }}>Change backup password</button>}
 
           <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--line)" }}>
             <div className="eyebrow" style={{marginBottom:8}}>Automatic backup</div>
-            <div style={{fontSize:12.5,color:driveConnected?"var(--good)":"var(--warn)",fontWeight:600,marginBottom:6}}>Google Drive: {driveConnected?"Connected ✓":"Not connected"}</div>
-            <div style={{fontSize:11.5,color:"var(--tx-3)",lineHeight:1.65}}>SupportFlow automatically creates a new backup after important changes to your records. If you're offline, the backup will be completed the next time you open SupportFlow with an internet connection.</div>
-            {driveConnected ? (
+            <CloudBackupChoices onConnected={() => { setDriveConnected(cloudBackupConnected()); setProviderNow(activeBackupProvider()); setBackupFailed(false); }} />
+            <div style={{fontSize:11.5,color:"var(--tx-3)",lineHeight:1.65}}>SupportFlow automatically creates a new backup after important changes. If you're offline, it finishes the next time you open SupportFlow with an internet connection. Disconnect stops new backups on this device and does not delete files already stored.</div>
+            {driveConnected && (
               <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}>
-                <button className="btn ghost tiny" disabled={driveBusy} onClick={async()=>{setDriveBusy(true);setErr("");setMsg("");try{await changeGoogleDriveAccount();setDriveConnected(true);setBackupFailed(false);setMsg("Google account changed. Use Back up now to create a backup in this Drive.");}catch(e){setDriveConnected(googleDriveConnected());setErr("Couldn't change Google account. Try again.");}finally{setDriveBusy(false);}}}>{driveBusy?"Connecting…":"Change Google account"}</button>
-                <button className="btn ghost tiny" disabled={driveBusy} onClick={async()=>{if(!confirm("Disconnect Google Drive? Automatic backups will stop on this device. Existing backups in Google Drive will not be deleted."))return;setDriveBusy(true);setErr("");setMsg("");try{await disconnectGoogleDrive();setDriveConnected(false);setBackupFailed(false);setMsg("Google Drive disconnected. Existing backups were not deleted.");}finally{setDriveBusy(false);}}}>Disconnect Google Drive</button>
+                <button className="btn ghost tiny" disabled={driveBusy} onClick={async()=>{const p=activeBackupProvider(); setDriveBusy(true);setErr("");setMsg("");try{ if(p==="dropbox"){ disconnectDropbox(); await connectDropbox(); } else if(p==="onedrive"){ await connectOneDrive(true); } else { await changeGoogleDriveAccount(); } setDriveConnected(true); setProviderNow(activeBackupProvider()); setBackupFailed(false); setMsg("Account updated. Use Back up now to save a backup in this account.");}catch(e){setDriveConnected(cloudBackupConnected());setErr("Couldn't change account. Try again.");}finally{setDriveBusy(false);}}}>{driveBusy?"Connecting…":"Change account"}</button>
+                <button className="btn ghost tiny" disabled={driveBusy} onClick={async()=>{const p=activeBackupProvider(); const label=providerLabel(p||"google"); if(!confirm("Disconnect "+label+"? Automatic backups will stop on this device. Existing backups in "+label+" will not be deleted."))return; setDriveBusy(true);setErr("");setMsg("");try{ if(p==="dropbox") disconnectDropbox(); else if(p==="onedrive") disconnectOneDrive(); else await disconnectGoogleDrive(); setDriveConnected(false); setProviderNow(""); setBackupFailed(false); setMsg(label+" disconnected. Existing backups were not deleted.");}finally{setDriveBusy(false);}}}>Disconnect</button>
               </div>
-            ) : <div style={{marginTop:10}}><GoogleDriveSetup onConnected={() => { setDriveConnected(true); setBackupFailed(false); }} /></div>}
+            )}
 
             <div style={{ marginTop: 12, fontSize: 11.5, color: "var(--tx-3)", lineHeight: 1.75 }}>
               <div><b>Last successful backup:</b> {data.profile.backedUp ? (data.profile.lastBackupAt ? new Date(data.profile.lastBackupAt).toLocaleString("en-AU", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true }) : fmtDate(data.profile.backedUp)) : "Not yet backed up"}</div>
               <div><b>Records backed up:</b> {data.profile.backedUp ? (data.profile.backedUpCount || total) : 0}</div>
-              <div><b>Stored in:</b> {driveConnected ? "Google Drive" : "Google Drive not connected"}</div>
+              <div><b>Stored in:</b> {driveConnected ? providerLabel(providerNow || "google") : "Not connected"}</div>
               <div><b>Status:</b> {backupFailed ? <span style={{color:"var(--warn)"}}>Backup failed</span> : driveConnected && data.profile.backedUp && total === (data.profile.backedUpCount || total) ? <span style={{color:"var(--good)"}}>Up to date ✓</span> : total === 0 ? "Nothing to back up yet" : <span style={{color:"var(--warn)"}}>Backup pending</span>}</div>
             </div>
           </div>

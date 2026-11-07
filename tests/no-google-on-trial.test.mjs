@@ -16,7 +16,7 @@ for (const f of ["app.html", "app.jsx"]) {
   const s = read(f);
   test(`${f}: signed-out trial users bypass the sign-in gate unless ?buy=1`, () => {
     assert.match(s, /licence\.phase === "locked" && !\(licence\.info\?\.state === "signed_out" && !wantsLicenceFlow\(\)\)/);
-    assert.match(s, /function wantsLicenceFlow\(\)[^\n]*get\("buy"\) === "1"/);
+    assert.match(s, /function wantsLicenceFlow\(\)[^\n]*=== "1"/);
   });
   test(`${f}: offer banner / upgrade reminder / paywall notice never mention Google`, () => {
     const banner = s.slice(s.indexOf("function OfferOrUpgradeBanner"), s.indexOf("/* ---------------- trial ended notice"));

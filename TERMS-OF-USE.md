@@ -77,7 +77,7 @@ Loss, damage, replacement, reset or failure of your device, clearing browser or 
 
 Where encrypted backup functionality is available, you are strongly encouraged to use it regularly.
 
-You are responsible for keeping your backup passphrase secure. The developer cannot recover an encrypted backup if you lose its passphrase.
+Encrypted backups can be stored in your own Google Drive, Dropbox, or OneDrive. The file is encrypted on your device before upload. You are responsible for keeping your backup password and recovery key secure. The developer does not receive either secret and cannot recover an encrypted backup if you lose both.
 
 ## 8. Security
 
@@ -133,7 +133,7 @@ That development-time assistance is separate from Claimable's runtime API use.
 
 ## 14. Limitation of responsibility
 
-To the extent permitted by Australian law, the developer is not responsible for losses resulting from incorrect information entered by a user, failure to check an invoice or calculation, loss or failure of a user's device, failure to maintain backups, loss of a backup passphrase, unauthorised access resulting from inadequate device security, changes to NDIS or taxation rules, or failures involving third-party services.
+To the extent permitted by Australian law, the developer is not responsible for losses resulting from incorrect information entered by a user, failure to check an invoice or calculation, loss or failure of a user's device, failure to maintain backups, loss of a backup password and recovery key, unauthorised access resulting from inadequate device security, changes to NDIS or taxation rules, or failures involving third-party services.
 
 Nothing in these Terms excludes, restricts or modifies any consumer guarantee, right or remedy that cannot lawfully be excluded under the Australian Consumer Law or other applicable legislation.
 

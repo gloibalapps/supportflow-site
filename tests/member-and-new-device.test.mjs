@@ -29,16 +29,17 @@ for (const f of ["app.html", "app.jsx"]) {
     const ls = s.slice(s.indexOf("function LockScreen"), s.indexOf("function LockScreen") + 4000);
     assert.doesNotMatch(ls, /google|LicenceGoogleButton/i);
   });
-  test(`${f}: new device - Google button only inside the signed_out gate branch; PIN prompt after linking`, () => {
-    const uses = [...s.matchAll(/<LicenceGoogleButton/g)].length;
-    assert.equal(uses, 1);
-    const at = s.indexOf("<LicenceGoogleButton");
-    assert.ok(s.lastIndexOf('if (state === "signed_out")', at) > s.lastIndexOf("function LicenceGate", at));
+  test(`${f}: account sign-in is on the purchase and restore paths, with a PIN prompt after linking`, () => {
+    const signIn = s.slice(s.indexOf("function LicenceAccountSignIn"), s.indexOf("function LicencePlans"));
+    assert.match(signIn, /<LicenceGoogleButton/);
+    assert.match(signIn, /type="password"/);
+    assert.match(signIn, /Create account and continue/);
+    assert.equal([...s.matchAll(/<LicenceAccountSignIn/g)].length, 3);
     assert.match(s, /out\?\.state === "active"\) \{ try \{ if \(!readLock\(\)\) localStorage\.setItem\(ASK_PIN_FLAG, "1"\)/);
     assert.match(s, /<PinSetupPrompt/);
   });
   test(`${f}: new device with no licence gets the trial (gate not forced), with an opt-in 'Already a member?' link`, () => {
-    assert.match(s, /href=\{BUY_URL\}[^>]*>Already a member\?<\/a>/);
+    assert.match(s, /href="\/app\?buy=restore"[^>]*>Already a member\?<\/a>/);
   });
 }
 

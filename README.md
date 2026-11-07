@@ -140,8 +140,15 @@ shows ATO links instead, and the tidy button disappears.
 
 Before deploying build 257, run `EARLY-ACCESS-TESTER-MIGRATION.sql` once in the existing Supabase project. The tester system uses the existing `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, and `RESEND_API_KEY` Netlify environment variables. Optional `AUTO_RELEASE_TESTER_SPOTS=true` enables automatic recycling after 10 inactive days; leave it unset/false initially to mark testers release-eligible without automatically recycling their code. The daily lifecycle function runs at 02:15 UTC.
 
-## Google Drive automatic backup
-Set `GOOGLE_CLIENT_ID` in Netlify to the OAuth 2.0 Web application Client ID from Google Cloud. Enable the Google Drive API and add `https://supportflow.work` (and any deployment/test origin you intentionally use) as an Authorized JavaScript origin. SupportFlow requests only the `https://www.googleapis.com/auth/drive.file` scope. Backups are encrypted locally before upload; Google receives the encrypted backup file, not the SupportFlow backup password.
+## Cloud backup (Google Drive, Dropbox, OneDrive)
+
+Backups are encrypted on the device (AES-256) before upload. The backup password and the recovery key are not sent to SupportFlow or to the storage provider. The user chooses one provider. Disconnect does not delete files already stored.
+
+- **Google Drive.** Set `GOOGLE_CLIENT_ID` in Netlify to the OAuth 2.0 Web application Client ID. Enable the Google Drive API and add `https://supportflow.work` as an Authorized JavaScript origin. Scope: `https://www.googleapis.com/auth/drive.file`.
+- **Dropbox.** Set `DROPBOX_CLIENT_ID` to the app key (public). Create the app with **App folder** access, not Full Dropbox. Scopes: `files.content.read`, `files.content.write`, `files.metadata.read`. Redirect URI: `https://supportflow.work/oauth-callback.html`.
+- **OneDrive.** Set `ONEDRIVE_CLIENT_ID` (or `MICROSOFT_CLIENT_ID`) to the Application (client) ID. Do not put a client secret in the app. Scopes: `offline_access` and `Files.ReadWrite.AppFolder`. Redirect URI: `https://supportflow.work/oauth-callback.html`, registered as a **Single-page application** platform. Supported account types must include personal Microsoft accounts. Production stays off until the owner registers the app and sets the env var.
+
+No client secrets are committed. Token exchange is PKCE through `/.netlify/functions/backup-oauth`.
 
 
 ---

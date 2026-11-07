@@ -22,10 +22,6 @@ const PACKS = Object.freeze({
   // Hidden owner test pack (A$0.50, Stripe's AUD minimum) for checking the
   // live purchase flow end to end. Only offered on /pricing?test=1.
   test: { credits: 1, env: "STRIPE_PRICE_TEST" },
-  // Basic one-off shown as A$79. STRIPE_PRICE_49 is that Basic price
-  // (Netlify: price_1UYPOdKJKDCaYKVvkt6oGJbD). STRIPE_PRICE_LIFETIME is the
-  // legacy A$49 price and must not be charged for this pack.
-  lifetime: { credits: 99999, env: "STRIPE_PRICE_49" },
 });
 
 const json = (obj, status = 200) =>
@@ -60,6 +56,12 @@ export default async (req) => {
   // `plan` accepted as an alias so an older app build sending the pack name
   // under that field still works.
   const packName = String(body?.pack ?? body?.plan ?? "").trim().toLowerCase();
+  // Basic (shown as A$79, formerly the lifetime pack) is a Google-account
+  // licence. It is started from the app via licence checkout product "one",
+  // never from this anonymous device-ref endpoint.
+  if (packName === "lifetime" || packName === "basic" || packName === "one") {
+    return json({ error: "Basic is purchased after Google sign-in. Open SupportFlow and choose Basic." }, 400);
+  }
   const pack = PACKS[packName];
   if (!pack) {
     return json({ error: "Unknown product. Please choose the Lifetime licence." }, 400);

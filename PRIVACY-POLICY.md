@@ -103,15 +103,19 @@ Under normal operation, the developer cannot view your locally stored participan
 
 This local-first design is intentional and is intended to reduce unnecessary central collection of participant information.
 
-SupportFlow does not operate a central participant-record database or account synchronisation service. During onboarding, the user connects their own Google Drive for encrypted backups. SupportFlow encrypts the backup on the device before upload. Google stores the encrypted backup file in the user’s Drive; the SupportFlow backup password is not sent with the file. If SupportFlow later introduces central storage or account synchronisation, this privacy policy will be updated before that feature is introduced.
+SupportFlow does not operate a central participant-record database or account synchronisation service. During onboarding, you choose one cloud account for encrypted backups: Google Drive, Dropbox, or OneDrive. SupportFlow encrypts the backup on the device before upload. The provider stores the encrypted file. The backup password and the recovery key are not sent with the file. SupportFlow cannot decrypt a backup for you. You can reset the backup password yourself with the recovery key you saved. If you lose both, the backup cannot be decrypted.
 
-### Google Drive backups
+### Cloud backups: Google Drive, Dropbox, and OneDrive
 
-When you connect Google Drive, SupportFlow requests access for the backup files the app creates or uses. This access is used only to create, find, update and restore SupportFlow backup files in your Google Drive. SupportFlow does not request unrestricted access to browse or manage unrelated files in your Drive.
+When you connect Google Drive, SupportFlow requests access only for the backup files the app creates or uses (`drive.file`). It does not request unrestricted access to unrelated files.
 
-Before upload, the backup is encrypted on your device. Google receives and stores the encrypted backup file in your Google Drive. Your SupportFlow backup password is not included in the backup file or sent to Google. When you restore a backup, the encrypted file is retrieved from your Drive and decrypted on your device after you enter the correct backup password.
+When you connect Dropbox, SupportFlow requests access only inside the app folder (`files.content.read`, `files.content.write`, `files.metadata.read` on an App folder app).
 
-You can disconnect SupportFlow from Google through your Google Account permissions. Disconnecting stops future Drive access but does not automatically delete backup files already stored in your Drive.
+When you connect OneDrive, SupportFlow requests `Files.ReadWrite.AppFolder` and `offline_access`. That is limited to the app's own folder.
+
+Before upload, the backup is encrypted on your device with AES-256. The provider stores the encrypted file. Your backup password and recovery key are not included and are not sent to the provider or to SupportFlow. Restore downloads the file and decrypts it on your device with the backup password or the recovery key for that file.
+
+Disconnecting a provider in Settings stops future backups from this device. It does not delete backup files already stored.
 
 ## 4. Hosting and Netlify
 
@@ -184,9 +188,9 @@ You decide what happens to that file. For example, you may:
 
 The developer does not receive a copy of your backup as part of this process.
 
-Your backup passphrase is not transmitted to or stored by the developer.
+Your backup password and recovery key are not transmitted to or stored by the developer.
 
-If you lose your backup passphrase, the developer cannot recover or decrypt the backup for you.
+The developer cannot recover or decrypt the backup for you. You can reset the backup password yourself if you still have the recovery key for that file. If you lose both, the backup cannot be decrypted. Backups made before recovery keys still open with the password they were made with.
 
 If you choose to send or store the encrypted backup using another service, that provider's own privacy and data-handling terms apply.
 

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SupportFlow sign-in</title>
+  <meta name="robots" content="noindex">
+</head>
+<body>
+  <p id="m">Finishing sign-in…</p>
+  <script>
+    (function () {
+      var p = new URLSearchParams(location.search);
+      var payload = {
+        type: "sf-backup-oauth",
+        code: p.get("code") || "",
+        state: p.get("state") || "",
+        error: p.get("error") || ""
+      };
+      var msg = document.getElementById("m");
+      if (payload.error) msg.textContent = "Sign-in was cancelled. You can close this window.";
+      else msg.textContent = "Signed in. You can close this window.";
+      try {
+        if (window.opener) window.opener.postMessage(payload, location.origin);
+      } catch (e) {}
+      setTimeout(function () { try { window.close(); } catch (e) {} }, 400);
+    })();
+  </script>
+</body>
+</html>

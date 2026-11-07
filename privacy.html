@@ -138,11 +138,13 @@
 </ul>
 <p>Under normal operation, the developer cannot view your locally stored participant records, shifts, invoices, expenses or notes.</p>
 <p>This local-first design is intentional and is intended to reduce unnecessary central collection of participant information.</p>
-<p>SupportFlow does not operate a central participant-record database or account synchronisation service. During onboarding, the user connects their own Google Drive for encrypted backups. SupportFlow encrypts the backup on the device before upload. Google stores the encrypted backup file in the user’s Drive; the SupportFlow backup password is not sent with the file. If SupportFlow later introduces central storage or account synchronisation, this privacy policy will be updated before that feature is introduced.</p>
-<h3>Google Drive backups</h3>
-<p>When you connect Google Drive, SupportFlow requests access for the backup files the app creates or uses. This access is used only to create, find, update and restore SupportFlow backup files in your Google Drive. SupportFlow does not request unrestricted access to browse or manage unrelated files in your Drive.</p>
-<p>Before upload, the backup is encrypted on your device. Google receives and stores the encrypted backup file in your Google Drive. Your SupportFlow backup password is not included in the backup file or sent to Google. When you restore a backup, the encrypted file is retrieved from your Drive and decrypted on your device after you enter the correct backup password.</p>
-<p>You can disconnect SupportFlow from Google through your Google Account permissions. Disconnecting stops future Drive access but does not automatically delete backup files already stored in your Drive.</p>
+<p>SupportFlow does not operate a central participant-record database or account synchronisation service. During onboarding, you choose one cloud account for encrypted backups: Google Drive, Dropbox, or OneDrive. SupportFlow encrypts the backup on the device before upload. The provider stores the encrypted file in your account. The backup password and the recovery key are not sent with the file. SupportFlow cannot decrypt a backup for you. You can reset the backup password yourself with the recovery key you saved. If you lose both, the backup cannot be decrypted. A licence sign-in (Google, or email and password) is separate: it ties a purchase to that account and does not hold your participant records or your backup secrets.</p>
+<h3>Cloud backups: Google Drive, Dropbox, and OneDrive</h3>
+<p>When you connect Google Drive, SupportFlow requests access only for the backup files the app creates or uses (<code>drive.file</code>). It does not request unrestricted access to browse unrelated files in your Drive.</p>
+<p>When you connect Dropbox, SupportFlow requests access only inside the app folder created for SupportFlow (<code>files.content.read</code>, <code>files.content.write</code>, <code>files.metadata.read</code> on an App folder app). It does not request access to the rest of your Dropbox.</p>
+<p>When you connect OneDrive, SupportFlow requests <code>Files.ReadWrite.AppFolder</code> (and <code>offline_access</code> so the connection can be refreshed). That scope is limited to the app's own folder in your OneDrive. It does not request access to the rest of your files.</p>
+<p>Before upload, the backup is encrypted on your device with AES-256. The provider receives and stores the encrypted file. Your backup password and recovery key are not included in the file and are not sent to the provider or to SupportFlow. When you restore, the encrypted file is downloaded and decrypted on your device after you enter the backup password or the recovery key for that file.</p>
+<p>Disconnecting a provider in Settings stops future backups from this device. It does not delete backup files already stored in Google Drive, Dropbox, or OneDrive. You can also remove SupportFlow's access from the provider's own account settings.</p>
 <h2>4. Hosting and Netlify</h2>
 <p>SupportFlow™ is hosted using <strong>Netlify</strong>, a third-party web hosting and application delivery provider.</p>
 <p>When you open or use SupportFlow, your device must communicate with Netlify's infrastructure so that the application can be delivered to your device.</p>
@@ -205,7 +207,7 @@
 <p>The SupportFlow Assistant (the <strong>?</strong> button in the header) is an optional help chat. It explains how to use the app and can take you to a screen. When you send a question it sends: the question you type, the name of the screen you are on, short extracts from the built-in manual, and your last few messages in that chat. These go via the SupportFlow server to an external AI service (Anthropic's Claude API) to generate an answer.</p>
 <p>The Assistant does not read your participant records, invoices or notes. If a question looks like it contains personal details such as an NDIS number, the app warns you before anything is sent. <strong>Do not enter participant names, NDIS numbers, health information or other personal information into the Assistant.</strong></p>
 <h3>5.2 Backups</h3>
-<p>When you create a SupportFlow backup, the backup file is encrypted on your device using AES-256 and a passphrase you choose before the encrypted backup file is exported.</p>
+<p>When you create a SupportFlow backup, the backup file is encrypted on your device using AES-256 before the encrypted file is exported. The file can be opened with the backup password or, for backups made after recovery keys were introduced, with the recovery key you saved. The developer does not hold either secret and cannot decrypt the file. Older backups that were protected only by a password still open with that password.</p>
 <p>You decide what happens to that file. For example, you may:</p>
 <ul>
 <li>Save it locally</li>
@@ -214,8 +216,8 @@
 <li>Transfer it using another service available on your device</li>
 </ul>
 <p>The developer does not receive a copy of your backup as part of this process.</p>
-<p>Your backup passphrase is not transmitted to or stored by the developer.</p>
-<p>If you lose your backup passphrase, the developer cannot recover or decrypt the backup for you.</p>
+<p>Your backup password and recovery key are not transmitted to or stored by the developer.</p>
+<p>The developer cannot recover or decrypt the backup for you. You can reset the backup password yourself if you still have the recovery key for that file. If you lose both the password and the recovery key, the backup cannot be decrypted.</p>
 <p>If you choose to send or store the encrypted backup using another service, that provider's own privacy and data-handling terms apply.</p>
 <h3>5.3 Shift notes and records you choose to share</h3>
 <p>If you choose to share or send a shift note or other record, SupportFlow uses the sharing or communication options available on your device.</p>
@@ -290,9 +292,11 @@
 <p>SupportFlow is designed to keep participant records on your device. The two main circumstances in which overseas processing may occur are:</p>
 <ul>
 <li><strong>Netlify (United States)</strong> — Netlify hosts the SupportFlow application. When you open the app or any SupportFlow web page, your browser connects to Netlify's servers to download the application files. Netlify may process standard technical connection data such as your IP address and browser information as described in section 4. Your participant records are not sent to Netlify as part of this process.</li>
-<li><strong>Google (United States, and other countries where Google operates)</strong> — If you connect Google Drive, the encrypted backup file created on your device is stored in your own Google Drive account. Google processes that file under its own terms. SupportFlow does not send your backup password to Google. When the app is loaded, Google Fonts may also receive a standard font request as described in section 4. Your locally stored participant records are not intentionally uploaded to Google as part of normal operation.</li>
+<li><strong>Google (United States, and other countries where Google operates)</strong> — If you connect Google Drive, the encrypted backup file created on your device is stored in your own Google Drive account. Google processes that file under its own terms. SupportFlow does not send your backup password or recovery key to Google. When the app is loaded, Google Fonts may also receive a standard font request as described in section 4. Your locally stored participant records are not intentionally uploaded to Google as part of normal operation. You may also sign in with Google to attach a licence to that Google account.</li>
+<li><strong>Dropbox (United States, and other countries where Dropbox operates)</strong> — If you connect Dropbox, the encrypted backup file is stored in the SupportFlow app folder of your Dropbox account. Dropbox processes that file under its own terms. SupportFlow does not send your backup password or recovery key to Dropbox.</li>
+<li><strong>Microsoft (United States, and other countries where Microsoft operates)</strong> — If you connect OneDrive, the encrypted backup file is stored in the SupportFlow app folder of your OneDrive. Microsoft processes that file under its own terms. SupportFlow does not send your backup password or recovery key to Microsoft.</li>
 </ul>
-<p>This does not mean your locally stored participant database is uploaded to either provider. The overseas connection relates to hosting, font delivery and, where you choose to use it, encrypted Drive backup — not to routine participant record storage.</p>
+<p>This does not mean your locally stored participant database is uploaded to those providers. The overseas connection relates to hosting, font delivery and, where you choose to use it, an encrypted backup in Google Drive, Dropbox, or OneDrive — not to routine participant record storage.</p>
 <p>You may also choose to use third-party services to store or transmit information exported from SupportFlow, such as your own cloud-storage, email, file-sharing or device-backup service.</p>
 <p>Those services operate under their own privacy and data-handling terms.</p>
 <h2>12. Children and participants under 18</h2>
