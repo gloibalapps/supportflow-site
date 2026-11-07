@@ -3425,6 +3425,21 @@ function TrialEndedNotice({ onClose, startInRestore = false }) {
   const [restoreBusy, setRestoreBusy] = useState(false);
   const [restoreErr, setRestoreErr] = useState("");
   const [restoreDone, setRestoreDone] = useState(false);
+  const licence = React.useContext(LicenceContext);
+  const [googleErr, setGoogleErr] = useState("");
+  const [googleBusy, setGoogleBusy] = useState(false);
+
+  // Restore with the Google account the licence was bought with.
+  const googleRestore = async (credential) => {
+    if (!licence?.signIn) { setGoogleErr("Google sign-in isn't available right now. Use your checkout email instead."); return; }
+    setGoogleBusy(true); setGoogleErr("");
+    const out = await licence.signIn(credential);
+    setGoogleBusy(false);
+    if (out?.error) { setGoogleErr(out.error); return; }
+    if (out?.state === "active") { setRestoreDone(true); setTimeout(onClose, 900); return; }
+    if (out?.state === "disabled") { setGoogleErr("Google restore isn't switched on yet. Use your checkout email instead."); return; }
+    setGoogleErr("No licence found for that Google account. Try the email you used at checkout.");
+  };
 
   const subscribe = (plan) => {
     setBusy(true); setErr("");
@@ -3480,6 +3495,19 @@ function TrialEndedNotice({ onClose, startInRestore = false }) {
       <div className="panel" style={{ maxWidth: 440, width: "100%", margin: 16,
         borderColor: "var(--brass)" }} onClick={(e) => e.stopPropagation()}>
         <div className="disp" style={{ fontSize: 20, marginBottom: 8 }}>{startInRestore ? "Restore your licence" : "SupportFlow Lifetime"}</div>
+        {startInRestore ? <>
+          <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.7, marginBottom: 14 }}>
+            Sign in the same way you bought SupportFlow and this device will pick up your licence.
+          </div>
+          {restoreDone ? null : <>
+            <LicenceGoogleButton clientId={licence?.clientId || ""} onCredential={googleRestore} />
+            {googleBusy && <div style={{ fontSize: 12.5, color: "var(--tx-3)", marginTop: 8, textAlign: "center" }}>Checking your licence\u2026</div>}
+            {googleErr && <div style={{ fontSize: 12.5, color: "var(--warn)", marginTop: 8, textAlign: "center" }}>{googleErr}</div>}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "14px 0 4px", color: "var(--tx-3)", fontSize: 12 }}>
+              <span style={{ flex: 1, borderTop: "1px solid var(--line)" }} />or<span style={{ flex: 1, borderTop: "1px solid var(--line)" }} />
+            </div>
+          </>}
+        </> : <>
         <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.7, marginBottom: 16 }}>
           Basic is A$79, paid once. Unlimited invoices on any phone or PC. Everything you've
           already entered stays here, you can view, edit, back up and export all of it.
@@ -3490,6 +3518,7 @@ function TrialEndedNotice({ onClose, startInRestore = false }) {
           </button>
         </div>
         {err && <div style={{ fontSize: 12.5, color: "var(--warn)", marginBottom: 10 }}>{err}</div>}
+        </>}
 
         {!showRestore ? (
           <button className="btn ghost tiny" style={{ marginBottom: 4 }} onClick={() => setShowRestore(true)}>
@@ -3502,7 +3531,7 @@ function TrialEndedNotice({ onClose, startInRestore = false }) {
         ) : (
           <div style={{ marginTop: 4, marginBottom: 10, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
             <div style={{ fontSize: 12, color: "var(--tx-3)", marginBottom: 8 }}>
-              Enter the email you used at checkout. This device will pick up your existing credits or Lifetime licence.
+              {startInRestore ? "Restore with the email you used at checkout." : "Enter the email you used at checkout. This device will pick up your existing credits or Lifetime licence."}
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <input type="email" value={restoreEmail} onChange={(e) => setRestoreEmail(e.target.value)}
