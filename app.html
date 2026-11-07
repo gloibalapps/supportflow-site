@@ -196,21 +196,12 @@ html,body{overscroll-behavior-y:none;background:#14150F;height:100%;overflow-x:h
 /* Header light/dark pill. Fixed colours so the control itself reads as the
    mode it switches, beside the app theme tokens. Knob sits on the right
    for light and on the left for dark. */
-.themetoggle{position:relative;z-index:46;height:32px;border:0;border-radius:999px;padding:0;display:inline-flex;align-items:center;cursor:pointer;font-family:inherit;font-size:8.5px;font-weight:700;letter-spacing:.08em;line-height:1;text-transform:uppercase;white-space:nowrap;flex:0 0 auto;transition:background .22s ease,color .22s ease,box-shadow .22s ease}
-.themetoggle[data-mode="light"]{background:#fff;color:#8A9098;box-shadow:0 1px 2px rgba(20,24,32,.08), 0 1px 3px rgba(20,24,32,.05), inset 0 0 0 1px #E2E4E8;padding:0 32px 0 11px}
-.themetoggle[data-mode="dark"]{background:#2A3B50;color:#F7F8FA;box-shadow:0 2px 8px rgba(16,24,40,.28), inset 0 0 0 1px rgba(255,255,255,.06);padding:0 11px 0 32px}
-.themetoggle-label{display:block;min-width:62px;text-align:center}
-.themetoggle .knob{position:absolute;top:3px;width:26px;height:26px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(20,24,32,.18), 0 0 0 1px rgba(20,24,32,.05);transition:left .22s ease}
-.themetoggle[data-mode="dark"] .knob{left:3px}
-.themetoggle[data-mode="light"] .knob{left:calc(100% - 29px)}
+.themetoggle{width:32px;height:32px;border-radius:50%;border:1px solid var(--line);background:var(--bg-2);color:var(--tx-2);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;flex:0 0 auto;transition:all .18s ease;font-family:inherit}
+.themetoggle svg{display:block}
 .themetoggle:hover{filter:brightness(1.04)}
 .themetoggle:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
 @media(max-width:420px){
   .topactions{gap:6px}
-  .themetoggle{letter-spacing:.045em;font-size:7.5px}
-  .themetoggle-label{min-width:54px}
-  .themetoggle[data-mode="light"]{padding-left:8px}
-  .themetoggle[data-mode="dark"]{padding-right:8px}
 }
 .menuveil{position:fixed;inset:0;z-index:44}
 .menu{position:absolute;top:46px;right:0;z-index:45;min-width:210px;
@@ -4384,8 +4375,7 @@ function App() {
               onClick={() => { setMenuOpen(false); setHelpMenuOpen(false); toggleTheme(); }}
               aria-label={theme === "dark" ? "Dark mode. Switch to light mode" : "Light mode. Switch to dark mode"}
               title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
-              <span className="knob" aria-hidden="true">{theme === "dark" ? <ThemeMoonIcon /> : <ThemeSunIcon />}</span>
-              <span className="themetoggle-label">{theme === "dark" ? "Dark mode" : "Light mode"}</span>
+              <span aria-hidden="true" style={{ display: "flex" }}>{theme === "dark" ? <ThemeMoonIcon /> : <ThemeSunIcon />}</span>
             </button>
 
             <div style={{ position: "relative" }}>
