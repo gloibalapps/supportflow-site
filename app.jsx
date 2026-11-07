@@ -827,7 +827,8 @@ function LicenceGoogleButton({ clientId, onCredential }) {
       if (gone) return;
       if (!window.google?.accounts?.id || !clientId) { setErr("Google sign-in couldn't load. Check your connection and try again."); return; }
       const ios = /iPhone|iPad/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
-      const redirect = ios && licenceStandalone();
+      const android = /Android/.test(navigator.userAgent);
+      const redirect = (ios || android) && licenceStandalone();
       google.accounts.id.initialize({
         client_id: clientId,
         callback: (resp) => resp?.credential && onCredential(resp.credential),
