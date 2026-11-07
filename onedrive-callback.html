@@ -1,0 +1,15 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Connecting OneDrive</title>
+<meta name="robots" content="noindex">
+<body style="font-family:system-ui,sans-serif;padding:24px">Connecting OneDrive…
+<script>
+(function () {
+  try {
+    var q = new URLSearchParams(location.search);
+    var msg = { sfOneDrive: true, code: q.get("code"), state: q.get("state"), error: q.get("error") };
+    if (window.opener) window.opener.postMessage(msg, location.origin);
+  } catch (e) {}
+  setTimeout(function () { window.close(); }, 150);
+})();
+</script>

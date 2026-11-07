@@ -3951,7 +3951,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!loaded || !data.onboarded || !googleDriveConnected() || !hasBackupMasterKey()) return;
+    if (!loaded || !data.onboarded || !cloudBackupConnected() || !hasBackupMasterKey()) return;
     let pending=false; try { pending=localStorage.getItem("sf_backup_pending_v1")==="1"; } catch(_){}
     const changed=countRecords(data)!==(data.profile.backedUpCount||0);
     if (pending || changed) scheduleGoogleAutoBackup(data);
@@ -6379,7 +6379,7 @@ function Welcome({ onSetup }) {
         </div>
       </div>
       <div className="panel">
-        {["Secure the app with your PIN","Protect backups and connect Google Drive","Add your business and invoice details","Set up managers and your first participant"].map((x,i)=>(
+        {["Secure the app with your PIN","Protect backups and connect Google Drive or OneDrive","Add your business and invoice details","Set up managers and your first participant"].map((x,i)=>(
           <div key={x} style={{display:"flex",gap:10,padding:"8px 0",alignItems:"flex-start"}}>
             <span style={{color:"var(--brass)",fontWeight:800}}>{i+1}</span>
             <div style={{fontSize:13.5,lineHeight:1.55}}>{x}</div>
@@ -6489,7 +6489,7 @@ function Onboarding({ data, save, close, help, openPrivacy, startStep }) {
           <div>
             <div className="eyebrow">Guided setup · 2 of 5</div>
             <div className="disp" style={{ fontSize: 26, marginTop: 5 }}>Now protect your backup</div>
-            <div style={{ fontSize: 12.5, color: "var(--tx-3)", marginTop: 5 }}>Create your backup password and connect your Google Drive below. Continue unlocks only when both are ready.</div>
+            <div style={{ fontSize: 12.5, color: "var(--tx-3)", marginTop: 5 }}>Create your backup password and connect Google Drive or OneDrive below. Continue unlocks only when both are ready.</div>
           </div>
         </div>
         <div className="stepcard">
@@ -6504,7 +6504,7 @@ function Onboarding({ data, save, close, help, openPrivacy, startStep }) {
           <BackupPasswordSetup data={data} save={save} onReady={() => setBackupRefresh((n) => n + 1)} />
         </div>
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 }}>
-          <button className="btn" disabled={!hasBackupMasterKey() || !googleDriveConnected()} onClick={async () => { try { await performGoogleAutoBackup(data); setBackupDecided(true); } catch (e) { alert("The first encrypted Google Drive backup could not be completed. Check your connection and try again."); } }}>
+          <button className="btn" disabled={!hasBackupMasterKey() || !cloudBackupConnected()} onClick={async () => { try { await performGoogleAutoBackup(data); setBackupDecided(true); } catch (e) { alert("The first encrypted " + cloudBackupLabel() + " backup could not be completed. Check your connection and try again."); } }}>
             Continue
           </button>
         </div>
@@ -10464,6 +10464,7 @@ async function ensureSupportFlowDriveFolder() {
 }
 // Newest encrypted backups in the SupportFlow Backups folder, for Restore from Drive.
 async function listDriveBackups() {
+  if (backupProvider() === "onedrive") return listOneDriveBackups();
   try {
     const folderId = await ensureSupportFlowDriveFolder();
     const q = encodeURIComponent(`'${folderId}' in parents and trashed=false`);
@@ -10474,6 +10475,7 @@ async function listDriveBackups() {
   } catch (_) { return []; }
 }
 async function fetchDriveFile(fileId) {
+  if (backupProvider() === "onedrive") return fetchOneDriveFile(fileId);
   const r = await driveFetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`);
   if (!r.ok) throw new Error("drive-download-failed");
   return r.text();
@@ -10486,6 +10488,7 @@ function driveBackupLabel(f) {
   return d.toLocaleString("en-AU", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
 }
 async function uploadEncryptedBackupToDrive(encrypted) {
+  if (backupProvider() === "onedrive") return uploadEncryptedBackupToOneDrive(encrypted);
   const folderId = await ensureSupportFlowDriveFolder();
   const stamp = new Date().toISOString().replace(/[:.]/g,"-");
   const boundary = "sf_" + crypto.getRandomValues(new Uint32Array(2)).join("");
@@ -10511,27 +10514,134 @@ async function runSingleGoogleDriveBackup(data) {
   finally { googleBackupInFlight = null; }
 }
 async function performGoogleAutoBackup(data, saveFn=null) {
-  if (!hasBackupMasterKey() || !googleDriveConnected() || !navigator.onLine) return false;
+  if (!hasBackupMasterKey() || !cloudBackupConnected() || !navigator.onLine) return false;
   await runSingleGoogleDriveBackup(data);
-  const profile={...data.profile,backedUp:today(),backedUpCount:countRecords(data),backupHow:"Google Drive",remindedOn:today(),backupPending:false,lastBackupAt:new Date().toISOString()};
+  const profile={...data.profile,backedUp:today(),backedUpCount:countRecords(data),backupHow:cloudBackupLabel(),remindedOn:today(),backupPending:false,lastBackupAt:new Date().toISOString()};
   if(saveFn) await saveFn({...data,profile}, true); else { try { const next={...data,profile}; await storage.set("ndis:data",JSON.stringify(next)); } catch(_){} }
   return true;
 }
 function scheduleGoogleAutoBackup(data) {
-  if (!hasBackupMasterKey() || !googleDriveConnected()) return;
+  if (!hasBackupMasterKey() || !cloudBackupConnected()) return;
   clearTimeout(autoBackupTimer);
   try { localStorage.setItem("sf_backup_pending_v1","1"); } catch(_){}
   autoBackupTimer=setTimeout(async()=>{ try { await performGoogleAutoBackup(data); localStorage.removeItem("sf_backup_pending_v1"); } catch(e) { console.warn("Automatic backup pending",e); } },AUTO_BACKUP_DELAY_MS);
 }
 
+/* ---------------- OneDrive backup (Microsoft Graph, app folder only) ---------------- */
+const OD_AUTH_KEY = "sf_onedrive_auth_v1";
+const BACKUP_PROVIDER_KEY = "sf_backup_provider_v1";
+const OD_SCOPE = "Files.ReadWrite.AppFolder offline_access";
+const OD_AUTHORITY = "https://login.microsoftonline.com/common/oauth2/v2.0";
+const OD_GRAPH = "https://graph.microsoft.com/v1.0";
+let oneDriveClientIdCache = null;
+function readOneDriveAuth() { try { return JSON.parse(localStorage.getItem(OD_AUTH_KEY) || "null"); } catch (_) { return null; } }
+function oneDriveConnected() { return !!readOneDriveAuth(); }
+function setPref(v) { try { localStorage.setItem(BACKUP_PROVIDER_KEY, v); } catch (_) {} }
+function backupProvider() {
+  let pref = null; try { pref = localStorage.getItem(BACKUP_PROVIDER_KEY); } catch (_) {}
+  if (pref === "onedrive" && oneDriveConnected()) return "onedrive";
+  if (pref === "google" && googleDriveConnected()) return "google";
+  if (googleDriveConnected()) return "google";
+  if (oneDriveConnected()) return "onedrive";
+  return null;
+}
+function cloudBackupConnected() { return googleDriveConnected() || oneDriveConnected(); }
+function cloudBackupLabel() { return backupProvider() === "onedrive" ? "OneDrive" : "Google Drive"; }
+function disconnectOneDrive() {
+  try { localStorage.removeItem(OD_AUTH_KEY); if (localStorage.getItem(BACKUP_PROVIDER_KEY) === "onedrive") localStorage.removeItem(BACKUP_PROVIDER_KEY); } catch (_) {}
+}
+async function oneDriveClientId() {
+  if (oneDriveClientIdCache) return oneDriveClientIdCache;
+  const r = await fetch("/.netlify/functions/onedrive-config", { cache: "no-store" });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || !d.clientId) throw new Error("onedrive-not-configured");
+  oneDriveClientIdCache = d.clientId; return d.clientId;
+}
+const b64url = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+async function oneDriveTokenRequest(params) {
+  const r = await fetch(OD_AUTHORITY + "/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams(params) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || !d.access_token) throw new Error("onedrive-token-failed");
+  const auth = { accessToken: d.access_token, refreshToken: d.refresh_token || (readOneDriveAuth() || {}).refreshToken, expiresAt: Date.now() + (d.expires_in || 3600) * 1000 };
+  localStorage.setItem(OD_AUTH_KEY, JSON.stringify(auth));
+  return auth;
+}
+async function connectOneDrive() {
+  const clientId = await oneDriveClientId();
+  const redirect = location.origin + "/onedrive-callback.html";
+  const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
+  const challenge = b64url(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)));
+  const state = b64url(crypto.getRandomValues(new Uint8Array(12)));
+  const url = OD_AUTHORITY + "/authorize?" + new URLSearchParams({ client_id: clientId, response_type: "code", redirect_uri: redirect, response_mode: "query", scope: OD_SCOPE, state, code_challenge: challenge, code_challenge_method: "S256", prompt: "select_account" });
+  const w = window.open(url, "sf_onedrive", "width=520,height=680");
+  if (!w) throw new Error("onedrive-popup-blocked");
+  const code = await new Promise((resolve, reject) => {
+    const done = (fn, v) => { window.removeEventListener("message", on); clearInterval(timer); fn(v); };
+    const on = (ev) => {
+      if (ev.origin !== location.origin || !ev.data || !ev.data.sfOneDrive) return;
+      if (ev.data.state !== state || ev.data.error || !ev.data.code) return done(reject, new Error("onedrive-auth-failed"));
+      done(resolve, ev.data.code);
+    };
+    window.addEventListener("message", on);
+    const timer = setInterval(() => { if (w.closed) done(reject, new Error("onedrive-auth-cancelled")); }, 600);
+  });
+  await oneDriveTokenRequest({ client_id: clientId, grant_type: "authorization_code", code, redirect_uri: redirect, code_verifier: verifier, scope: OD_SCOPE });
+  setPref("onedrive");
+}
+async function validOneDriveToken() {
+  const a = readOneDriveAuth();
+  if (!a) throw new Error("onedrive-not-connected");
+  if (a.expiresAt > Date.now() + 60000) return a.accessToken;
+  if (!a.refreshToken) throw new Error("onedrive-reconnect");
+  try {
+    const clientId = await oneDriveClientId();
+    return (await oneDriveTokenRequest({ client_id: clientId, grant_type: "refresh_token", refresh_token: a.refreshToken, scope: OD_SCOPE })).accessToken;
+  } catch (_) { throw new Error("onedrive-reconnect"); }
+}
+async function oneDriveFetch(path, opts = {}) {
+  const token = await validOneDriveToken();
+  return fetch(OD_GRAPH + path, { ...opts, headers: { ...(opts.headers || {}), Authorization: "Bearer " + token } });
+}
+async function uploadEncryptedBackupToOneDrive(encrypted) {
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const name = `supportflow-backup-${stamp}.json`;
+  const r = await oneDriveFetch(`/me/drive/special/approot:/${name}:/content`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: encrypted });
+  if (!r.ok) throw new Error("onedrive-upload-failed");
+  const item = await r.json();
+  pruneOneDriveBackups().catch(() => {});
+  return { id: item.id, name: item.name, createdTime: item.createdDateTime };
+}
+async function listOneDriveBackupsRaw(top) {
+  const r = await oneDriveFetch(`/me/drive/special/approot/children?$orderby=lastModifiedDateTime desc&$top=${top}&$select=id,name,createdDateTime`);
+  if (!r.ok) return [];
+  const d = await r.json();
+  return (d.value || []).filter((f) => (f.name || "").startsWith("supportflow-backup-")).map((f) => ({ id: f.id, name: f.name, createdTime: f.createdDateTime }));
+}
+async function listOneDriveBackups() { try { return (await listOneDriveBackupsRaw(30)).slice(0, 10); } catch (_) { return []; } }
+async function pruneOneDriveBackups() {
+  const old = (await listOneDriveBackupsRaw(100)).slice(7);
+  for (const f of old) await oneDriveFetch(`/me/drive/items/${encodeURIComponent(f.id)}`, { method: "DELETE" }).catch(() => {});
+}
+async function fetchOneDriveFile(id) {
+  const r = await oneDriveFetch(`/me/drive/items/${encodeURIComponent(id)}/content`);
+  if (!r.ok) throw new Error("onedrive-download-failed");
+  return r.text();
+}
+
 function GoogleDriveSetup({ onConnected }) {
-  const [busy,setBusy]=useState(false), [msg,setMsg]=useState(""), [err,setErr]=useState("");
-  const connected=googleDriveConnected();
-  const connect=async()=>{setBusy(true);setErr("");setMsg("");try{await requestGoogleDriveToken("consent");setMsg("Google Drive connected ✓");onConnected&&onConnected();}catch(e){setErr(e.message==="google-drive-not-configured"?"Google Drive is not configured for this SupportFlow deployment yet.":"Couldn't connect Google Drive. Try again.");}finally{setBusy(false);}};
+  const [busy,setBusy]=useState(""), [msg,setMsg]=useState(""), [err,setErr]=useState("");
+  const [odReady,setOdReady]=useState(false);
+  const connected=cloudBackupConnected();
+  useEffect(()=>{ let gone=false; oneDriveClientId().then(()=>{ if(!gone) setOdReady(true); }).catch(()=>{}); return()=>{gone=true;}; },[]);
+  const connectGoogle=async()=>{setBusy("google");setErr("");setMsg("");try{await requestGoogleDriveToken("consent");setPref("google");setMsg("Google Drive connected ✓");onConnected&&onConnected();}catch(e){setErr(e.message==="google-drive-not-configured"?"Google Drive is not configured for this SupportFlow deployment yet.":"Couldn't connect Google Drive. Try again.");}finally{setBusy("");}};
+  const connectOd=async()=>{setBusy("onedrive");setErr("");setMsg("");try{await connectOneDrive();setMsg("OneDrive connected ✓");onConnected&&onConnected();}catch(e){setErr(e.message==="onedrive-popup-blocked"?"Your browser blocked the sign-in window. Allow pop-ups for SupportFlow and try again.":"Couldn't connect OneDrive. Try again.");}finally{setBusy("");}};
   return <div style={{background:"var(--bg)",border:"1px solid var(--line)",borderRadius:10,padding:"15px 16px",marginBottom:12}}>
-    <div className="eyebrow" style={{marginBottom:8}}>Google Drive</div>
-    <div style={{fontSize:12.5,color:"var(--tx-2)",lineHeight:1.6,marginBottom:12}}>SupportFlow uploads only encrypted backup files that it creates. It does not get broad access to your Drive.</div>
-    {connected?<div style={{color:"var(--good)",fontSize:12.5,fontWeight:600}}>Connected ✓</div>:<button className="btn" onClick={connect} disabled={busy}>{busy?"Connecting…":"Connect Google Drive"}</button>}
+    <div className="eyebrow" style={{marginBottom:8}}>Backup location</div>
+    <div style={{fontSize:12.5,color:"var(--tx-2)",lineHeight:1.6,marginBottom:12}}>Choose where your encrypted backups are kept. SupportFlow only uploads encrypted backup files that it creates. It does not get broad access to your cloud storage.</div>
+    {connected?<div style={{color:"var(--good)",fontSize:12.5,fontWeight:600}}>{cloudBackupLabel()} connected ✓</div>:<div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+      <button className="btn" onClick={connectGoogle} disabled={!!busy}>{busy==="google"?"Connecting…":"Connect Google Drive"}</button>
+      {odReady&&<button className="btn" onClick={connectOd} disabled={!!busy}>{busy==="onedrive"?"Connecting…":"Connect OneDrive"}</button>}
+    </div>}
     {msg&&<div style={{fontSize:12,color:"var(--good)",marginTop:8}}>{msg}</div>}{err&&<div style={{fontSize:12,color:"var(--warn)",marginTop:8}}>{err}</div>}
   </div>;
 }
@@ -10590,7 +10700,7 @@ function BackupPanel({ data, save, open, onToggle }) {
   const [unlockPass, setUnlockPass] = useState("");
   const [unlockFile, setUnlockFile] = useState(null);
   const [showPass, setShowPass] = useState(false);
-  const [driveConnected, setDriveConnected] = useState(() => googleDriveConnected());
+  const [driveConnected, setDriveConnected] = useState(() => cloudBackupConnected());
   const [backupFailed, setBackupFailed] = useState(false);
   const [driveBusy, setDriveBusy] = useState(false);
   const [driveFiles, setDriveFiles] = useState(null);
@@ -10608,7 +10718,7 @@ function BackupPanel({ data, save, open, onToggle }) {
       const text = await fetchDriveFile(f.id);
       setUnlockFile(text); setUnlockPass(""); setMode("unlock"); setShowDrivePicker(false);
     } catch (_) {
-      setErr("Couldn't download that backup from Google Drive. Check your connection and try again.");
+      setErr("Couldn't download that backup from " + cloudBackupLabel() + ". Check your connection and try again.");
     } finally { setDriveFetchingId(null); }
   };
   const backupLockRef = useRef(false);
@@ -10629,7 +10739,7 @@ function BackupPanel({ data, save, open, onToggle }) {
     setBusy(true);
     try {
       await runSingleGoogleDriveBackup(data);
-      stampSaved("Google Drive"); setBackupFailed(false); setMsg("Encrypted backup saved to Google Drive.");
+      stampSaved(cloudBackupLabel()); setBackupFailed(false); setMsg("Encrypted backup saved to " + cloudBackupLabel() + ".");
     } catch (e) { console.error("Google Drive backup failed", e); setBackupFailed(true); setErr("Backup couldn't be completed. Try again."); } finally { backupLockRef.current = false; setBusy(false); }
   };
 
@@ -10822,12 +10932,17 @@ function BackupPanel({ data, save, open, onToggle }) {
 
           <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--line)" }}>
             <div className="eyebrow" style={{marginBottom:8}}>Automatic backup</div>
-            <div style={{fontSize:12.5,color:driveConnected?"var(--good)":"var(--warn)",fontWeight:600,marginBottom:6}}>Google Drive: {driveConnected?"Connected ✓":"Not connected"}</div>
+            <div style={{fontSize:12.5,color:driveConnected?"var(--good)":"var(--warn)",fontWeight:600,marginBottom:6}}>{driveConnected?cloudBackupLabel():"Cloud backup"}: {driveConnected?"Connected ✓":"Not connected"}</div>
             <div style={{fontSize:11.5,color:"var(--tx-3)",lineHeight:1.65}}>SupportFlow automatically creates a new backup after important changes to your records. If you're offline, the backup will be completed the next time you open SupportFlow with an internet connection.</div>
             {driveConnected ? (
               <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}>
+                {backupProvider()==="onedrive" ? <>
+                <button className="btn ghost tiny" disabled={driveBusy} onClick={async()=>{setDriveBusy(true);setErr("");setMsg("");try{await connectOneDrive();setDriveConnected(true);setBackupFailed(false);setMsg("OneDrive reconnected. Use Back up now to create a backup.");}catch(e){setDriveConnected(cloudBackupConnected());setErr("Couldn't reconnect OneDrive. Try again.");}finally{setDriveBusy(false);}}}>{driveBusy?"Connecting…":"Reconnect OneDrive"}</button>
+                <button className="btn ghost tiny" disabled={driveBusy} onClick={()=>{if(!confirm("Disconnect OneDrive? Automatic backups will stop on this device. Existing backups in OneDrive will not be deleted."))return;disconnectOneDrive();setDriveConnected(cloudBackupConnected());setBackupFailed(false);setMsg("OneDrive disconnected. Existing backups were not deleted.");}}>Disconnect OneDrive</button>
+                </> : <>
                 <button className="btn ghost tiny" disabled={driveBusy} onClick={async()=>{setDriveBusy(true);setErr("");setMsg("");try{await changeGoogleDriveAccount();setDriveConnected(true);setBackupFailed(false);setMsg("Google account changed. Use Back up now to create a backup in this Drive.");}catch(e){setDriveConnected(googleDriveConnected());setErr("Couldn't change Google account. Try again.");}finally{setDriveBusy(false);}}}>{driveBusy?"Connecting…":"Change Google account"}</button>
                 <button className="btn ghost tiny" disabled={driveBusy} onClick={async()=>{if(!confirm("Disconnect Google Drive? Automatic backups will stop on this device. Existing backups in Google Drive will not be deleted."))return;setDriveBusy(true);setErr("");setMsg("");try{await disconnectGoogleDrive();setDriveConnected(false);setBackupFailed(false);setMsg("Google Drive disconnected. Existing backups were not deleted.");}finally{setDriveBusy(false);}}}>Disconnect Google Drive</button>
+                </>}
               </div>
             ) : <div style={{marginTop:10}}><GoogleDriveSetup onConnected={() => { setDriveConnected(true); setBackupFailed(false); }} /></div>}
 

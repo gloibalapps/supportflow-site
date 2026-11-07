@@ -143,6 +143,10 @@ Before deploying build 257, run `EARLY-ACCESS-TESTER-MIGRATION.sql` once in the 
 ## Google Drive automatic backup
 Set `GOOGLE_CLIENT_ID` in Netlify to the OAuth 2.0 Web application Client ID from Google Cloud. Enable the Google Drive API and add `https://supportflow.work` (and any deployment/test origin you intentionally use) as an Authorized JavaScript origin. SupportFlow requests only the `https://www.googleapis.com/auth/drive.file` scope. Backups are encrypted locally before upload; Google receives the encrypted backup file, not the SupportFlow backup password.
 
+### OneDrive backup (optional)
+
+Set `MICROSOFT_CLIENT_ID` in Netlify to the Application (client) ID of an Azure app registration. Supported account types: personal Microsoft accounts and any organisational directory. Add a **Single-page application** redirect URI of `https://supportflow.work/onedrive-callback.html`, and the delegated Microsoft Graph permissions `Files.ReadWrite.AppFolder` and `offline_access`. Backups go to the app folder in the user's own OneDrive, encrypted on the device first. Microsoft limits browser-app refresh tokens to 24 hours, so after a day idle the user is asked to reconnect before the next backup. The "Connect OneDrive" button only shows once the client ID is set.
+
 
 ---
 
