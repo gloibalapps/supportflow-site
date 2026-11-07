@@ -28,7 +28,13 @@ for (const f of ["app.jsx", "app.html"]) {
     assert.ok(chooser.length > 200, "BasicChooser missing");
     assert.match(chooser, /<LicenceAccountSignIn/);
     assert.match(chooser, /!signedIn/);
-    assert.match(chooser, /checkout\("one"\)/);
+    const unsigned = chooser.slice(chooser.indexOf("!signedIn"), chooser.indexOf(": licensed"));
+    const signed = chooser.slice(chooser.indexOf(": licensed"));
+    assert.match(unsigned, /LicenceAccountSignIn/);
+    assert.doesNotMatch(unsigned, /onClick=\{buy\}|Buy Basic/);
+    assert.match(signed, /onClick=\{buy\}/);
+    assert.match(signed, /Buy Basic — A\$79|Buy Basic \\u2014 A\$79/);
+    assert.match(chooser.slice(0, chooser.indexOf("!signedIn")), /checkout\("one"\)/);
     assert.match(chooser, /Buy Basic — A\$79|Buy Basic \\u2014 A\$79/);
     assert.doesNotMatch(chooser, /create-checkout|clientReferenceId|tracker_full/);
     assert.match(s, /<BasicChooser licence=\{licence\} \/>/);
