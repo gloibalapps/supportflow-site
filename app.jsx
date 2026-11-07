@@ -3690,6 +3690,19 @@ function HomeDashboard({ data, m, go }) {
   );
 }
 
+// Anonymous feature-use counts: only how many records were added, never their content. Skips Do Not Track.
+function trackUsage(prev, next) {
+  if (!prev || !next || !prev.onboarded || navigator.doNotTrack === "1") return;
+  const out = {};
+  ["shifts", "invoices", "notes", "expenses", "trips", "incidents"].forEach((k) => {
+    const d = (next[k] || []).length - (prev[k] || []).length;
+    if (d > 0 && d <= 50) out[k] = d;
+  });
+  if (!Object.keys(out).length) return;
+  const body = JSON.stringify(out), u = "/.netlify/functions/track-usage";
+  try { if (!(navigator.sendBeacon && navigator.sendBeacon(u, new Blob([body], { type: "text/plain" })))) fetch(u, { method: "POST", body, keepalive: true, credentials: "omit" }).catch(() => {}); } catch (_) {}
+}
+
 function App() {
   // Device licensing. phase "off" (switch off) leaves everything as before.
   const licence = useLicence();
@@ -3958,6 +3971,7 @@ function App() {
   }, [loaded]);
 
   const save = async (next, skipAutoBackup = false) => {
+    try { trackUsage(data, next); } catch (_) {}
     setData(next);
     try { await storage.set("ndis:data", JSON.stringify(next)); } catch (e) { console.error(e); }
     if (!skipAutoBackup && next.onboarded) scheduleGoogleAutoBackup(next);
