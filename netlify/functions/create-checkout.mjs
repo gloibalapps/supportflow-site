@@ -22,10 +22,10 @@ const PACKS = Object.freeze({
   // Hidden owner test pack (A$0.50, Stripe's AUD minimum) for checking the
   // live purchase flow end to end. Only offered on /pricing?test=1.
   test: { credits: 1, env: "STRIPE_PRICE_TEST" },
-  // Basic one-off shown as A$79. STRIPE_PRICE_49 is that Basic price
+  // Basic one-off shown as A$79. STRIPE_PRICE_79 is that Basic price (STRIPE_PRICE_49 is the old name, still read)
   // (Netlify: price_1UYPOdKJKDCaYKVvkt6oGJbD). STRIPE_PRICE_LIFETIME is the
   // legacy A$49 price and must not be charged for this pack.
-  lifetime: { credits: 99999, env: "STRIPE_PRICE_49" },
+  lifetime: { credits: 99999, env: "STRIPE_PRICE_79", envFallback: "STRIPE_PRICE_49" },
 });
 
 const json = (obj, status = 200) =>
@@ -64,7 +64,7 @@ export default async (req) => {
   if (!pack) {
     return json({ error: "Unknown product. Please choose the Lifetime licence." }, 400);
   }
-  const price = process.env[pack.env];
+  const price = process.env[pack.env] || (pack.envFallback && process.env[pack.envFallback]);
   if (!price) {
     return json({ error: "That product isn't available yet." }, 500);
   }

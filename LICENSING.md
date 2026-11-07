@@ -8,7 +8,7 @@ SupportFlow can sell a one-off licence that belongs to a **Google account**:
 | Second device add-on | A$29 | 2 |
 | Premium | A$149 (A$129 until the end of 31 January 2027, Australia/Adelaide) | 2, and includes the Payment tracker |
 
-The buy screen does not sell a separate A$69 two-device bundle. `STRIPE_PRICE_69` remains only so an older checkout name still resolves. Basic checkout still uses `STRIPE_PRICE_49`, which is the A$79 price (the env name is historical).
+The buy screen does not sell a separate A$69 two-device bundle. `STRIPE_PRICE_69` remains only so an older checkout name still resolves. Basic checkout still uses `STRIPE_PRICE_79` (the old name `STRIPE_PRICE_49` still works as a fallback).
 
 There are no licence keys, redeem codes, share links, subscriptions or trials.
 Everything sits behind an **owner switch**. While the switch is off, every
@@ -25,7 +25,7 @@ the existing credit packs / Lifetime flow keep working.
    existing table.
 2. **Stripe** (AUD, *one-time* prices, not recurring). Create three prices and
    copy each Price ID (`price_...`):
-   * "SupportFlow: Basic" A$79 → `STRIPE_PRICE_49` (historical env name; do not change this checkout)
+   * "SupportFlow: Basic" A$79 → `STRIPE_PRICE_79` (formerly `STRIPE_PRICE_49`, still read)
    * "SupportFlow: Second device" A$29 → `STRIPE_PRICE_UPGRADE`
    * Premium is not one of these licence Prices. It is the Payment tracker Premium checkout in [`PAYMENT-TRACKER.md`](PAYMENT-TRACKER.md): A$149, charged at A$129 until the end of 31 January 2027 (Australia/Adelaide).
 3. **Stripe webhook**: on the existing endpoint
@@ -38,7 +38,7 @@ the existing credit packs / Lifetime flow keep working.
    | Variable | Value |
    |---|---|
    | `LICENCE_SECRET` | A long random string (at least 24 characters, e.g. the output of `openssl rand -base64 48`). Signs sign-in sessions and the 7-day offline leases. Changing it signs everyone out once and makes old leases invalid. |
-   | `STRIPE_PRICE_49` | Price ID of the Basic A$79 price. The env name is historical. (Fallbacks: `STRIPE_PRICE_LICENCE_ONE`, then the existing `STRIPE_PRICE_LIFETIME`.) |
+   | `STRIPE_PRICE_79` | Price ID of the Basic A$79 price. Old name `STRIPE_PRICE_49` still works. (Fallbacks: `STRIPE_PRICE_LICENCE_ONE`, then the existing `STRIPE_PRICE_LIFETIME`.) |
    | `STRIPE_PRICE_69` | Not offered on the buy screen. Fallback name `STRIPE_PRICE_LICENCE_TWO` if an older two-device Price still exists. |
    | `STRIPE_PRICE_UPGRADE` | Price ID of the A$29 price (fallback name `STRIPE_PRICE_LICENCE_UPGRADE`) |
    | `LICENCE_EMAIL_FROM` | Optional. Sender for the "licence moved" email, e.g. `SupportFlow <no-reply@supportflow.work>` (must be a Resend-verified domain). |
