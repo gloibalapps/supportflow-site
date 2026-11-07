@@ -138,6 +138,28 @@ export function signSession({ sub, email, name, ev }) {
   return `${payload}.${sig}`;
 }
 export const RENEW_GRACE_DAYS = 365;
+// One-use-style email links for restoring a purchase onto a new device. The
+// token proves the person controls the checkout inbox: it is only ever sent
+// to that address. Signed with its own key, valid for 15 minutes.
+export const RESTORE_LINK_MINUTES = 15;
+export function signRestoreToken({ accountId, email }) {
+  const payload = enc(JSON.stringify({ v: 1, a: accountId, e: String(email || "").toLowerCase(), exp: Date.now() + RESTORE_LINK_MINUTES * 60000, n: crypto.randomBytes(8).toString("hex") }));
+  const sig = enc(crypto.createHmac("sha256", subKey("supportflow-restore-v1")).update(payload).digest());
+  return `${payload}.${sig}`;
+}
+export function verifyRestoreToken(token) {
+  if (typeof token !== "string" || token.length > 2000) return null;
+  const [payload, sig] = token.split(".");
+  if (!payload || !sig) return null;
+  const expected = crypto.createHmac("sha256", subKey("supportflow-restore-v1")).update(payload).digest();
+  const got = dec(sig);
+  if (got.length !== expected.length || !crypto.timingSafeEqual(got, expected)) return null;
+  try {
+    const p = JSON.parse(dec(payload).toString("utf8"));
+    if (p.v !== 1 || !p.a || !p.exp || p.exp < Date.now() || !isUuid(p.a)) return null;
+    return p;
+  } catch { return null; }
+}
 export function verifySession(token, { allowExpiredDays = 0 } = {}) {
   if (typeof token !== "string" || token.length > 4000) return null;
   const [payload, sig] = token.split(".");

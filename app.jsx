@@ -3329,6 +3329,48 @@ function OfferOrUpgradeBanner({ paid, freeOffer, known }) {
   </div>;
 }
 
+/* ---------------- restore link (opened from the confirmation email) ---------------- */
+function RestoreLinkHandler() {
+  const [state, setState] = useState(() => {
+    try { return /sf_restore=/.test(location.hash || "") ? "working" : "idle"; } catch (e) { return "idle"; }
+  });
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    if (state !== "working") return;
+    const m = (location.hash || "").match(/sf_restore=([^&]+)/);
+    try { history.replaceState(null, "", location.pathname + location.search); } catch (e) { }
+    if (!m) { setState("idle"); return; }
+    fetch("/.netlify/functions/restore-purchase", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: decodeURIComponent(m[1]) }),
+    })
+      .then((r) => r.json().then((data) => ({ ok: r.ok, data })))
+      .then(({ ok, data }) => {
+        if (ok && data && data.deviceRef) {
+          try { localStorage.setItem("ndis:deviceRef", data.deviceRef); } catch (e) { }
+          setState("done");
+          setTimeout(() => window.location.reload(), 1200);
+          return;
+        }
+        throw new Error((data && data.error) || "That link didn't work. Ask for a new one.");
+      })
+      .catch((e) => { setErr(e.message || "Something went wrong."); setState("failed"); });
+  }, []);
+  if (state === "idle") return null;
+  return <div role="dialog" aria-modal="true" aria-label="Restore licence" style={{ position: "fixed", inset: 0, zIndex: 95, background: "rgba(0,0,0,.6)", display: "grid", placeItems: "center", padding: 16 }}>
+    <div className="panel" style={{ maxWidth: 400, width: "100%", textAlign: "center", borderColor: "var(--brass)" }}>
+      <div className="disp" style={{ fontSize: 20, marginBottom: 8 }}>Restore your licence</div>
+      {state === "working" && <div style={{ fontSize: 13.5, color: "var(--tx-2)" }}>Checking your link\u2026</div>}
+      {state === "done" && <div style={{ fontSize: 13.5, color: "var(--good, #3F7B57)" }}>Licence found. Reconnecting this device\u2026</div>}
+      {state === "failed" && <>
+        <div style={{ fontSize: 13.5, color: "var(--warn)", marginBottom: 12 }}>{err}</div>
+        <button className="btn ghost tiny" onClick={() => setState("idle")}>Close</button>
+      </>}
+    </div>
+  </div>;
+}
+
 /* ---------------- trial ended notice ---------------- */
 function TrialEndedNotice({ onClose, startInRestore = false }) {
   const [busy, setBusy] = useState(false);
@@ -3338,6 +3380,22 @@ function TrialEndedNotice({ onClose, startInRestore = false }) {
   const [restoreBusy, setRestoreBusy] = useState(false);
   const [restoreErr, setRestoreErr] = useState("");
   const [restoreDone, setRestoreDone] = useState(false);
+  const [restoreSent, setRestoreSent] = useState("");
+  const licence = React.useContext(LicenceContext);
+  const [googleErr, setGoogleErr] = useState("");
+  const [googleBusy, setGoogleBusy] = useState(false);
+
+  // Restore with the Google account the licence was bought with.
+  const googleRestore = async (credential) => {
+    if (!licence?.signIn) { setGoogleErr("Google sign-in isn't available right now. Use your checkout email instead."); return; }
+    setGoogleBusy(true); setGoogleErr("");
+    const out = await licence.signIn(credential);
+    setGoogleBusy(false);
+    if (out?.error) { setGoogleErr(out.error); return; }
+    if (out?.state === "active") { setRestoreDone(true); setTimeout(onClose, 900); return; }
+    if (out?.state === "disabled") { setGoogleErr("Google restore isn't switched on yet. Use your checkout email instead."); return; }
+    setGoogleErr("No licence found for that Google account. Try the email you used at checkout.");
+  };
 
   const subscribe = (plan) => {
     setBusy(true); setErr("");
@@ -3375,13 +3433,8 @@ function TrialEndedNotice({ onClose, startInRestore = false }) {
     })
       .then((r) => r.json().then((data) => ({ ok: r.ok, data })))
       .then(({ ok, data }) => {
-        if (ok && data && data.deviceRef) {
-          try { localStorage.setItem("ndis:deviceRef", data.deviceRef); } catch (e) { }
-          setRestoreDone(data.lifetime ? "lifetime" : true);
-          setTimeout(() => window.location.reload(), 900);
-          return;
-        }
-        throw new Error((data && data.error) || "Couldn't find a licence for that email.");
+        if (ok && data && data.sent) { setRestoreSent(email); setRestoreBusy(false); return; }
+        throw new Error((data && data.error) || "Couldn't send the link. Try again.");
       })
       .catch((e) => { setRestoreErr(e.message || "Something went wrong."); setRestoreBusy(false); });
   };
@@ -3393,6 +3446,19 @@ function TrialEndedNotice({ onClose, startInRestore = false }) {
       <div className="panel" style={{ maxWidth: 440, width: "100%", margin: 16,
         borderColor: "var(--brass)" }} onClick={(e) => e.stopPropagation()}>
         <div className="disp" style={{ fontSize: 20, marginBottom: 8 }}>{startInRestore ? "Restore your licence" : "SupportFlow Lifetime"}</div>
+        {startInRestore ? <>
+          <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.7, marginBottom: 14 }}>
+            Sign in the same way you bought SupportFlow and this device will pick up your licence.
+          </div>
+          {restoreDone ? null : <>
+            <LicenceGoogleButton clientId={licence?.clientId || ""} onCredential={googleRestore} />
+            {googleBusy && <div style={{ fontSize: 12.5, color: "var(--tx-3)", marginTop: 8, textAlign: "center" }}>Checking your licence\u2026</div>}
+            {googleErr && <div style={{ fontSize: 12.5, color: "var(--warn)", marginTop: 8, textAlign: "center" }}>{googleErr}</div>}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "14px 0 4px", color: "var(--tx-3)", fontSize: 12 }}>
+              <span style={{ flex: 1, borderTop: "1px solid var(--line)" }} />or<span style={{ flex: 1, borderTop: "1px solid var(--line)" }} />
+            </div>
+          </>}
+        </> : <>
         <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.7, marginBottom: 16 }}>
           Basic is A$79, paid once. Unlimited invoices on any phone or PC. Everything you've
           already entered stays here, you can view, edit, back up and export all of it.
@@ -3403,11 +3469,16 @@ function TrialEndedNotice({ onClose, startInRestore = false }) {
           </button>
         </div>
         {err && <div style={{ fontSize: 12.5, color: "var(--warn)", marginBottom: 10 }}>{err}</div>}
+        </>}
 
         {!showRestore ? (
           <button className="btn ghost tiny" style={{ marginBottom: 4 }} onClick={() => setShowRestore(true)}>
             Already have a licence on another device?
           </button>
+        ) : restoreSent ? (
+          <div style={{ fontSize: 12.5, color: "var(--tx-2)", lineHeight: 1.6, marginBottom: 10, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
+            <b>Check your email.</b> If {restoreSent} was used for a purchase, we've sent a link. Open it on this device within 15 minutes to restore your licence. Nothing arrived? Check spam, or <button className="btn ghost tiny" onClick={() => setRestoreSent("")}>try again</button>
+          </div>
         ) : restoreDone ? (
           <div style={{ fontSize: 12.5, color: "var(--good, #3F7B57)", marginBottom: 10 }}>
             {restoreDone === "lifetime" ? "Lifetime licence found \u2014 reconnecting this device..." : "Found it, reconnecting this device..."}
@@ -3415,7 +3486,7 @@ function TrialEndedNotice({ onClose, startInRestore = false }) {
         ) : (
           <div style={{ marginTop: 4, marginBottom: 10, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
             <div style={{ fontSize: 12, color: "var(--tx-3)", marginBottom: 8 }}>
-              Enter the email you used at checkout. This device will pick up your existing credits or Lifetime licence.
+              {startInRestore ? "Restore with the email you used at checkout." : "Enter the email you used at checkout. This device will pick up your existing credits or Lifetime licence."}
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <input type="email" value={restoreEmail} onChange={(e) => setRestoreEmail(e.target.value)}
@@ -4477,6 +4548,7 @@ function App() {
       {askPin && licence.phase === "ok" && !readLock() && <PinSetupPrompt onDone={() => { try { localStorage.removeItem(ASK_PIN_FLAG); } catch (e) { } setAskPin(false); }} />}
       <OfferOrUpgradeBanner paid={licence.phase === "ok" || isLifetime} freeOffer={freeOffer} known={statusKnown} />
 
+      <RestoreLinkHandler />
       {showTrialNotice && <TrialEndedNotice startInRestore={trialNoticeRestore} onClose={() => { setShowTrialNotice(false); setTrialNoticeRestore(false); }} />}
 
       {FEATURES.supportFlowAssistant && showAssistant && (
