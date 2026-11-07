@@ -1470,6 +1470,26 @@ function formatAbn(v) {
   return `${d.slice(0, 2)} ${d.slice(2, 5)} ${d.slice(5, 8)} ${d.slice(8, 11)}`;
 }
 
+function AbnValidateButton({ value, onValid }) {
+  const [res, setRes] = useState(null);
+  useEffect(() => { setRes(null); }, [value]);
+  const check = (e) => {
+    e.preventDefault();
+    if (!abnDigits(value)) { setRes("empty"); return; }
+    const ok = isValidAbn(value);
+    setRes(ok ? "ok" : "bad");
+    if (ok && onValid) onValid();
+  };
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 7, flexWrap: "wrap" }}>
+      <button type="button" className="btn ghost tiny" onClick={check}>Validate ABN</button>
+      {res === "ok" && <span style={{ fontSize: 12, color: "var(--good)" }}>{"\u2713"} Valid ABN (format and checksum)</span>}
+      {res === "bad" && <span style={{ fontSize: 12, color: "var(--warn)" }}>Not a valid ABN. Check the digits.</span>}
+      {res === "empty" && <span style={{ fontSize: 12, color: "var(--warn)" }}>Enter an ABN first.</span>}
+    </div>
+  );
+}
+
 /* ---------------- text case normalisation ---------------- */
 // One shared function, applied on blur/save, never mid-keystroke. Business
 // and person names are left exactly as typed, since forcing sentence case
@@ -6657,6 +6677,7 @@ function Onboarding({ data, save, close, help, openPrivacy, startStep }) {
                       Doesn't check out as a valid ABN.
                     </em>
                   )}
+                  <AbnValidateButton value={mf.abn} />
                 </label>
                 <label className="f" style={{ marginBottom: 0 }}>
                   <span style={{ color: mf.terms ? undefined : "var(--req)" }}>Payment terms in days, required</span>
@@ -7491,6 +7512,7 @@ function Directory({ data, save, view, setView, openId, clearOpen, canCreate, on
                       Doesn't check out as a valid ABN, worth a second look.
                     </em>
                   )}
+                  <AbnValidateButton value={r.abn} />
                 </label>
                 <label className="f">
                   <span style={{ color: r.terms ? undefined : "var(--req)" }}>Payment terms in days, required</span>
@@ -10956,6 +10978,7 @@ function BusinessDetailsFields({ p, setP, variant, data, save, turnover }) {
               Doesn't check out as a valid ABN, worth a second look.
             </em>
           )}
+          <AbnValidateButton value={p.abn} />
         </label>
       </div>
 
