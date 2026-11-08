@@ -158,6 +158,13 @@ html,body{overscroll-behavior-y:none;background:#14150F;height:100%;overflow-x:h
 .checkout-toast .tm{flex:1;line-height:1.5;font-weight:500}
 .checkout-toast .tc{background:none;border:none;color:currentColor;opacity:.55;cursor:pointer;padding:0;font-size:20px;line-height:1;flex-shrink:0;margin-top:-1px}
 .checkout-toast .tc:hover{opacity:1}
+.demo-banner{position:fixed;top:0;left:50%;transform:translateX(-50%);z-index:500;width:min(100%,820px);padding:10px 16px;background:var(--brass);color:var(--brass-ink);display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600}
+.demo-banner button{background:var(--brass-ink);color:var(--brass);border:none;border-radius:8px;padding:6px 14px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;margin-left:auto}
+.demo-banner button:hover{opacity:.85}
+.sl[data-demo] .top{top:40px}
+.sl[data-demo] .pinhead{top:100px}
+.sl[data-demo] .page{padding-top:40px}
+.sl[data-demo] .mob{bottom:0}
 @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 .lockwrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;
   justify-content:center;padding:40px 26px;text-align:center;background:var(--bg)}
@@ -4364,6 +4371,12 @@ function App() {
   if (licence.phase === "locked" && !(licence.info?.state === "signed_out" && !wantsLicenceFlow())
       && !(isMemberDevice() && licence.info?.state === "offline")) return <LicenceGate licence={licence} theme={theme} />;
 
+  const exitDemo = () => {
+    const blank = { ...BLANK, profile: { ...BLANK.profile, welcomed: true, introTourVersion: 2 } };
+    save(blank);
+    setTab("setup");
+  };
+
   return (
     <LicenceContext.Provider value={licence}>
     <UpgradeChooser licence={licence} />
@@ -4385,7 +4398,13 @@ function App() {
         <button className="tc" onClick={() => setCheckoutToastOpen(false)} aria-label="Dismiss">×</button>
       </div>
     )}
-    <div className="sl" data-theme={theme}>
+    <div className="sl" data-theme={theme} data-demo={data._demo ? "1" : undefined}>
+      {data._demo && (
+        <div className="demo-banner">
+          <span>Demo mode — this data is not real</span>
+          <button onClick={exitDemo}>Start setup for real</button>
+        </div>
+      )}
       <div className="top">
         <div className="topin">
           <div className="mark">
@@ -4619,6 +4638,7 @@ function App() {
         {tab === "welcome" && (
           <Welcome
             onSetup={() => { save({ ...data, profile: { ...data.profile, welcomed: true, introTourVersion: 2 } }); setTab("setup"); }}
+            onDemo={() => { const demo = buildDemoData(); save(demo); setTab("home"); }}
           />
         )}
 
@@ -6419,11 +6439,65 @@ function SendPanel({ inv, profile, r, onSent }) {
 
 
 
+/* ---------------- demo data ---------------- */
+function buildDemoData() {
+  const d = (offset) => { const dt = new Date(); dt.setDate(dt.getDate() + offset); return dt.toISOString().slice(0, 10); };
+  const id = () => Math.random().toString(36).slice(2, 10);
+  const mgr1 = id(), mgr2 = id();
+  const p1 = id(), p2 = id(), p3 = id();
+  const s1 = id(), s2 = id(), s3 = id(), s4 = id(), s5 = id(), s6 = id();
+  return {
+    profile: {
+      name: "Sam Taylor", abn: "51 824 753 556", email: "sam@example.com", phone: "0412 345 678",
+      bankName: "CommBank", bsb: "065-000", account: "1234 5678",
+      nextInv: 4, gstRegistered: true, gstLookupConflict: null,
+      backupEvery: "daily", backupAt: "18:00", welcomed: true, introTourVersion: 2,
+    },
+    managers: [
+      { id: mgr1, name: "Plan Partners Australia", contact: "Jane Lee", email: "accounts@planpartners.example.com", phone: "08 8100 2000", abn: "22 111 222 333", address: "100 King William St, Adelaide SA 5000", terms: "14", notes: "" },
+      { id: mgr2, name: "My Plan Manager", contact: "Tom Nguyen", email: "invoices@myplanmgr.example.com", phone: "1300 000 123", abn: "33 444 555 666", address: "50 Flinders St, Melbourne VIC 3000", terms: "21", notes: "" },
+    ],
+    participants: [
+      { id: p1, name: "Alex Johnson", ndisNumber: "431234567", nonNdis: false, planType: "plan", managerId: mgr1, terms: "", defaultCode: "01_011_0107_1_1", defaultRate: "73.58", agreement: true, agreementDate: d(-60), agreementReview: d(305), agreementWhere: "", email: "alex.j@example.com", phone: "0423 111 222", address: "12 Sunrise Ave, Adelaide SA 5000", planEnd: d(180), notes: "Likes routine. Morning shifts preferred." },
+      { id: p2, name: "Morgan Chen", ndisNumber: "432345678", nonNdis: false, planType: "plan", managerId: mgr2, terms: "", defaultCode: "04_104_0125_6_1", defaultRate: "73.58", agreement: true, agreementDate: d(-90), agreementReview: d(275), agreementWhere: "", email: "morgan.c@example.com", phone: "0434 222 333", address: "7 Elm Rd, Glenelg SA 5045", planEnd: d(90), notes: "Community access focus. Enjoys art activities." },
+      { id: p3, name: "Riley Williams", ndisNumber: "433456789", nonNdis: false, planType: "self", managerId: "", terms: "7", defaultCode: "01_011_0107_1_1", defaultRate: "73.58", agreement: false, agreementDate: "", agreementReview: "", agreementWhere: "", email: "riley.w@example.com", phone: "0445 333 444", address: "3/20 Beach Rd, Brighton SA 5048", planEnd: d(120), notes: "" },
+    ],
+    shifts: [
+      { id: s1, date: d(-7), participantId: p1, start: "08:00", end: "14:00", publicHoliday: false, family: "selfcare", notes: "Morning routine and shopping", status: "done", cancelledOn: "" },
+      { id: s2, date: d(-5), participantId: p2, start: "10:00", end: "14:00", publicHoliday: false, family: "community", notes: "Art class at the community centre", status: "done", cancelledOn: "" },
+      { id: s3, date: d(-3), participantId: p1, start: "08:00", end: "12:00", publicHoliday: false, family: "selfcare", notes: "", status: "done", cancelledOn: "" },
+      { id: s4, date: d(-1), participantId: p3, start: "09:00", end: "15:00", publicHoliday: false, family: "selfcare", notes: "Helped with meal prep", status: "done", cancelledOn: "" },
+      { id: s5, date: d(0), participantId: p2, start: "13:00", end: "17:00", publicHoliday: false, family: "community", notes: "", status: "", cancelledOn: "" },
+      { id: s6, date: d(2), participantId: p1, start: "08:00", end: "14:00", publicHoliday: false, family: "selfcare", notes: "", status: "", cancelledOn: "" },
+    ],
+    trips: [
+      { id: id(), date: d(-7), participantId: p1, kmMode: "manual", km: "18", odoStart: "", odoEnd: "", travelMins: "25", billable: true, taxDeductible: true },
+      { id: id(), date: d(-5), participantId: p2, kmMode: "manual", km: "12", odoStart: "", odoEnd: "", travelMins: "20", billable: true, taxDeductible: true },
+    ],
+    expenses: [
+      { id: id(), date: d(-10), cat: "Phone", desc: "Monthly phone plan", amount: "49.00", gstAmount: "4.45", businessUsePct: 50 },
+      { id: id(), date: d(-4), cat: "Fuel", desc: "Petrol", amount: "85.00", gstAmount: "7.73", businessUsePct: 60 },
+    ],
+    notes: [
+      { id: id(), date: d(-7), participantId: p1, shared: false, rough: "Alex had a great morning. Completed shopping list independently for the first time.", tidied: false, supportProvided: "Verbal prompting and transport", participantInvolvement: "Alex chose all items and handled payment", progress: "Growing independence with community errands", observations: "", followUp: "" },
+    ],
+    invoices: [],
+    incidents: [],
+    claimCache: {},
+    onboarded: true,
+    clients: [],
+    chaseEvents: [],
+    trackerSettings: null,
+    priorTotals: null,
+    _demo: true,
+  };
+}
+
 /* ---------------- welcome ---------------- */
 // The first thing a new user sees. Not the manual — a wall of text before
 // anyone has seen the app loses more people than it helps — but an honest
 // orientation, with the manual one tap away and no wrong first move.
-function Welcome({ onSetup }) {
+function Welcome({ onSetup, onDemo }) {
   return (
     <>
       <div className="hero" style={{ marginBottom: 18 }}>
@@ -6444,6 +6518,10 @@ function Welcome({ onSetup }) {
         ))}
       </div>
       <button className="btn" style={{width:"100%",marginTop:16}} onClick={onSetup}>Start guided setup</button>
+      <button className="btn ghost" style={{width:"100%",marginTop:10}} onClick={onDemo}>Try with demo data first</button>
+      <div style={{ fontSize: 11.5, color: "var(--tx-3)", textAlign: "center", marginTop: 8, lineHeight: 1.5 }}>
+        Demo loads sample participants, shifts and expenses so you can explore every screen. Nothing is real — start setup when you're ready and it all gets replaced.
+      </div>
     </>
   );
 }
