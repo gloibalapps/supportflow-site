@@ -4601,10 +4601,10 @@ function App() {
               <div className="shortgrid">
                 <ShortcutCard icon="invoice" tone="blue" title="Invoices" sub="Raise, send and mark invoices paid." onClick={() => go("summary", "invoices")}
                   badge={(() => { const n = data.invoices.filter(isOverdue).length; return n ? `${n} overdue` : null; })()}/>
-                <ShortcutCard icon="document" tone="teal" title="Payment tracker" sub="See who owes you and chase it." onClick={() => go("summary", "tracker")}/>
+                {!TEST_MODE && <ShortcutCard icon="document" tone="teal" title="Payment tracker" sub="See who owes you and chase it." onClick={() => go("summary", "tracker")}/>}
                 <ShortcutCard icon="expense" tone="pink" title="Expenses" sub="Open your existing expenses screen." onClick={() => go("summary", "expenses")}/>
-                <ShortcutCard icon="tax" tone="yellow" title="Tax" sub="Set-aside, claim check and accountant pack." onClick={() => { setClaimSeed(""); go("summary", "position"); }} wide={!data.profile.gstRegistered}/>
-                {data.profile.gstRegistered && <ShortcutCard icon="tax" tone="yellow" title="BAS" sub="Open the existing BAS worksheet." onClick={() => go("summary", "bas")}/>}
+                <ShortcutCard icon="tax" tone="yellow" title="Tax" sub="Set-aside, claim check and accountant pack." onClick={() => { setClaimSeed(""); go("summary", "position"); }} wide={TEST_MODE || !data.profile.gstRegistered}/>
+                {!TEST_MODE && data.profile.gstRegistered && <ShortcutCard icon="tax" tone="yellow" title="BAS" sub="Open the existing BAS worksheet." onClick={() => go("summary", "bas")}/>}
               </div>
             </div>
           </div>
