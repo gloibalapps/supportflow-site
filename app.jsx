@@ -7253,7 +7253,7 @@ function Directory({ data, save, view, setView, openId, clearOpen, canCreate, on
                   ? { ...r, name: toProperName(r.name), ndisNumber: ndisDigits(r.ndisNumber) }
                   : { ...r, abn: formatAbn(r.abn) });
               }}
-              disabled={!r.name || (isP && (r.nonNdis ? (!(r.defaultDescription || "").trim() || !r.defaultRate) : !r.defaultCode)) || (isP && r.planType !== "plan" && !r.terms) ||
+              disabled={!r.name || (isP && (r.nonNdis ? (!(r.defaultDescription || "").trim() || !r.defaultRate) : !r.defaultCode)) || (isP && (r.planType === "plan" ? !r.managerId : !r.terms)) ||
                 (isP && !r.nonNdis && !isValidNdisNumber(r.ndisNumber)) ||
                 (!isP && (!r.terms || !r.contact?.trim() || !r.email?.trim() || !r.phone?.trim() || !isValidAbn(r.abn)))}>Save</button>
           </div>
