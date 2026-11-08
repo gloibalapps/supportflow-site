@@ -3909,6 +3909,14 @@ function App() {
   // The one shared guard. Every "create a new record" action calls this
   // first; every edit, view, backup and export path never touches it at all.
   const [showTrialNotice, setShowTrialNotice] = useState(false);
+  // /app?buy=1 (the "Get Basic" buttons on the site): open the buy screen, which asks for Google sign-in first.
+  useEffect(() => {
+    try {
+      const sp = new URLSearchParams(location.search);
+      if (sp.get("buy") !== "1") return;
+      setShowTrialNotice(true);
+    } catch (e) { }
+  }, []);
   const [trialNoticeRestore, setTrialNoticeRestore] = useState(false); // open straight into "Restore licence"
   const guardCreate = (fn) => (...args) => {
     if (!canCreate) { setShowTrialNotice(true); return; }
