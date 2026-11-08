@@ -74,7 +74,8 @@ async function checkout(session, deviceId, body) {
     success_url: `${site}/app?tracker=success`,
     cancel_url: `${site}/app?tracker=cancelled`,
   };
-  if (!isSub) params.customer_creation = "always"; // subscription mode always creates a customer
+  params["automatic_tax[enabled]"] = "true"; // GST shown at Checkout (prices are GST inclusive)
+  if (!isSub) { params.customer_creation = "always"; params["invoice_creation[enabled]"] = "true"; } // subscription mode always creates a customer
   if (session.email) params.customer_email = session.email;
   const metaKey = isSub ? "subscription_data[metadata]" : "payment_intent_data[metadata]";
   for (const [k, v] of Object.entries(meta)) { params[`metadata[${k}]`] = v; params[`${metaKey}[${k}]`] = v; }

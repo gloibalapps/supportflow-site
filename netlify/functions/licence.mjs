@@ -72,7 +72,7 @@ function deviceArgs(body) {
 }
 
 async function stateFor(session, dev, extra = {}) {
-  if (!(await enforcedFor(session.email))) return json({ state: "disabled" });
+  if (!(await enforcedFor(session.email))) return json({ state: "disabled", ...(extra.session ? { session: extra.session, account: { email: session.email, name: session.name } } : {}) });
   const result = await evaluate({ sub: session.sub, email: session.email, emailVerified: session.ev === true, ...dev });
   // Re-issue the session when it's past halfway, so an app in daily use never
   // has to bounce through Google again.
@@ -102,6 +102,9 @@ async function checkout(session, dev, body) {
   const meta = { kind: "licence", product, google_sub: session.sub, device_id: dev.deviceId };
   const params = {
     mode: "payment",
+    // Stripe Tax: prices are GST inclusive, so Checkout shows the GST component and the receipt is a tax invoice.
+    "automatic_tax[enabled]": "true",
+    "invoice_creation[enabled]": "true",
     "line_items[0][price]": price,
     "line_items[0][quantity]": 1,
     client_reference_id: session.sub,
@@ -171,6 +174,9 @@ export default async (req) => {
     }
 
     if (action === "heartbeat") return await stateFor(session, dev);
+
+    // Buying always ties the licence to the signed-in Google account, even before enforcement is switched on.
+    if (action === "checkout") return await checkout(session, dev, body);
 
     if (!(await enforcedFor(session.email))) return json({ state: "disabled" });
 

@@ -84,6 +84,9 @@ export default async (req) => {
 
   const params = {
     mode: "payment",
+    // Stripe Tax: prices are GST inclusive, so Checkout shows the GST component and the receipt is a tax invoice.
+    "automatic_tax[enabled]": "true",
+    "invoice_creation[enabled]": "true",
     "line_items[0][price]": price,
     "line_items[0][quantity]": 1,
     client_reference_id: clientReferenceId,

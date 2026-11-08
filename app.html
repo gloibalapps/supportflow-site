@@ -3471,6 +3471,22 @@ function TrialEndedNotice({ onClose, startInRestore = false }) {
   const [googleBusy, setGoogleBusy] = useState(false);
   const [premiumBusy, setPremiumBusy] = useState(false);
   const [premium, setPremium] = useState(() => premiumQuoteFrom(null));
+  // Buying ties the licence to a Google account, so sign in with Google first when that is available.
+  const needGoogle = !!licence?.clientId && !licence?.account;
+  const googleBuy = async (credential) => {
+    if (!licence?.signIn) return;
+    setGoogleBusy(true); setGoogleErr("");
+    const out = await licence.signIn(credential);
+    setGoogleBusy(false);
+    if (out?.error) { setGoogleErr(out.error); return; }
+    if (out?.state === "active") { setRestoreDone(true); setTimeout(onClose, 900); }
+  };
+  const buyBasic = async () => {
+    if (!licence?.account || !licence?.checkout) { subscribe("lifetime"); return; }
+    setBusy(true); setErr("");
+    const r = await licence.checkout("one");
+    if (r?.error) { setErr(r.error); setBusy(false); }
+  };
   useEffect(() => {
     let gone = false;
     fetch(TRACKER_API + "?action=config", { cache: "no-store" }).then((r) => r.json()).then((d) => { if (!gone) setPremium(premiumQuoteFrom(d)); }).catch(() => {});
@@ -3563,7 +3579,14 @@ function TrialEndedNotice({ onClose, startInRestore = false }) {
             </div>
           </>}
         </> : <>
-        <LicencePlans busy={busy ? "one" : (premiumBusy ? "premium" : "")} onBuy={() => subscribe("lifetime")} onPremium={buyPremium} premium={premium} />
+        {needGoogle ? <>
+          <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.7, marginBottom: 14 }}>
+            Your licence is tied to your Google account, so sign in with Google before you pay. It also lets you restore the licence on any phone later.
+          </div>
+          <LicenceGoogleButton clientId={licence.clientId} onCredential={googleBuy} />
+          {googleBusy && <div style={{ fontSize: 12.5, color: "var(--tx-3)", marginTop: 8, textAlign: "center" }}>Signing you in\u2026</div>}
+          {googleErr && <div style={{ fontSize: 12.5, color: "var(--warn)", marginTop: 8, textAlign: "center" }}>{googleErr}</div>}
+        </> : <LicencePlans busy={busy ? "one" : (premiumBusy ? "premium" : "")} onBuy={buyBasic} onPremium={buyPremium} premium={premium} />}
         {err && <div style={{ fontSize: 12.5, color: "var(--warn)", marginTop: 10 }}>{err}</div>}
         </>}
 
