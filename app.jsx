@@ -4495,19 +4495,9 @@ function App() {
                 <div className="greet">{greeting}, {firstName}</div>
                 <div className="sub">Let's get organised today.</div>
               </div>
-              <div className="shortcutmeta">
-                <div className="shortcuttitle">Quick start</div>
-                <div className="shortcuthelp">Shortcuts open the SupportFlow screens you already use.</div>
-              </div>
             </div>
             <div className="hubscroll">
               <HomeDashboard data={data} m={m} go={go} />
-              <div className="shortgrid">
-                <ShortcutCard noIcon icon="shift" tone="pink" title="Add a shift" sub="Open the existing Add Shift form." onClick={() => { setOpenNewShiftRequest(true); go("invoices", "shifts"); }}/>
-                <ShortcutCard noIcon icon="notes" tone="teal" title="Add a note" sub="Open the existing progress notes screen." onClick={() => go("invoices", "notes")}/>
-                <ShortcutCard noIcon icon="travel" tone="violet" title="Travel" sub="Open the existing travel screen." onClick={() => go("invoices", "travel")}/>
-                <ShortcutCard noIcon icon="invoice" tone="blue" title="Invoices" sub="Open the existing invoice screen." onClick={() => go("summary", "invoices")}/>
-              </div>
             </div>
           </div>
         )}
@@ -9292,7 +9282,7 @@ const MANUAL = [
       ["Step 3 – Participants",
        "For each person: name, NDIS number, and how their plan is managed. Plan managed means their manager is billed, so link them. Self managed and NDIA managed are billed directly, so they need their own payment terms. Set the item you usually bill them for, so new invoices open on the right code. Set their area, which decides your travel time cap."],
       ["Home and section shortcuts",
-       "Home gives you four Quick Start cards for common actions. Work, Money and People each open a clean shortcut page first. Tap a shortcut to open the existing feature, then use Back near the top to return. The fixed top header and bottom navigation stay available while the middle content scrolls."],
+       "Home shows your totals at a glance. Work, Money and People each open a clean shortcut page first. Tap a shortcut to open the existing feature, then use Back near the top to return. The fixed top header and bottom navigation stay available while the middle content scrolls."],
       ["Red means it still needs you",
        "Anything outlined in red is required and not yet done. It turns green with a tick once complete. The Summary screen keeps a numbered checklist of whatever is outstanding until it is all finished."],
     ],

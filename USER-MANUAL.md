@@ -76,16 +76,16 @@ SupportFlow now uses four fixed navigation areas at the bottom of every main scr
 
 | Area | What it does |
 |---|---|
-| **Home** | Your start page with four Quick Start shortcuts |
+| **Home** | Your start page: totals at a glance (uninvoiced work, today's shifts, hours, outstanding, income, expenses, tax estimate) |
 | **Work** | Opens the Work shortcut page: Shifts · Travel · Notes · Incidents |
 | **Money** | Opens the Money shortcut page: Invoices · Payment tracker · Expenses · Tax · BAS (when GST registered). The Payment tracker is an add-on: A$29 once on top of Basic, or included in Premium (A$129). See section 14a |
 | **Participants** | Opens the Participants shortcut page: Participants · Add participant · Plan managers · Service agreements |
 
 The **top header is fixed** as well. The **Light mode / Dark mode** pill, immediately left of **?**, switches the app between light and dark. Use **?** for Manual & Help, and use your profile initial at the top right for Settings and other account/device options. Until you use that pill, the app follows your phone's light or dark setting.
 
-### Home and Quick Start
+### Home
 
-Home is the fastest way into common tasks. The four large Quick Start cards are shortcuts only; they open the feature screens already built in SupportFlow. For example, **Add a shift** opens the existing Add Shift form, and **Invoices** opens the existing invoice screen.
+Home shows your numbers at a glance: uninvoiced work, today's shifts, hours this month, what's outstanding, income, expenses and your tax estimate. To do something, use **Work**, **Money** or **People** in the bottom bar.
 
 ### Work, Money and Participants shortcut pages
 
