@@ -3113,9 +3113,9 @@ function ShortcutIcon({ type, tone }) {
   return <span className={`shorticon ${tone || "yellow"}`}><svg viewBox="0 0 24 24" aria-hidden="true">{paths[type]}</svg></span>;
 }
 
-function ShortcutCard({ icon, tone, title, sub, onClick, wide, badge }) {
+function ShortcutCard({ icon, tone, title, sub, onClick, wide, badge, noIcon }) {
   return <button className={`shortcard${wide ? " wide" : ""}`} onClick={onClick} style={badge ? { position: "relative" } : undefined}>
-    <ShortcutIcon type={icon} tone={tone}/><b>{title}</b><small>{sub}</small><span className="shortchev">›</span>
+    {noIcon ? null : <ShortcutIcon type={icon} tone={tone}/>}<b>{title}</b><small>{sub}</small><span className="shortchev">›</span>
     {badge ? <span className="pill overdue lower" style={{ position: "absolute", top: 10, right: 10 }}>{badge}</span> : null}
   </button>;
 }
@@ -4503,10 +4503,10 @@ function App() {
             <div className="hubscroll">
               <HomeDashboard data={data} m={m} go={go} />
               <div className="shortgrid">
-                <ShortcutCard icon="shift" tone="pink" title="Add a shift" sub="Open the existing Add Shift form." onClick={() => { setOpenNewShiftRequest(true); go("invoices", "shifts"); }}/>
-                <ShortcutCard icon="notes" tone="teal" title="Add a note" sub="Open the existing progress notes screen." onClick={() => go("invoices", "notes")}/>
-                <ShortcutCard icon="travel" tone="violet" title="Travel" sub="Open the existing travel screen." onClick={() => go("invoices", "travel")}/>
-                <ShortcutCard icon="invoice" tone="blue" title="Invoices" sub="Open the existing invoice screen." onClick={() => go("summary", "invoices")}/>
+                <ShortcutCard noIcon icon="shift" tone="pink" title="Add a shift" sub="Open the existing Add Shift form." onClick={() => { setOpenNewShiftRequest(true); go("invoices", "shifts"); }}/>
+                <ShortcutCard noIcon icon="notes" tone="teal" title="Add a note" sub="Open the existing progress notes screen." onClick={() => go("invoices", "notes")}/>
+                <ShortcutCard noIcon icon="travel" tone="violet" title="Travel" sub="Open the existing travel screen." onClick={() => go("invoices", "travel")}/>
+                <ShortcutCard noIcon icon="invoice" tone="blue" title="Invoices" sub="Open the existing invoice screen." onClick={() => go("summary", "invoices")}/>
               </div>
             </div>
           </div>
