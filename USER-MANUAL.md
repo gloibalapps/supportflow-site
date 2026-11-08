@@ -78,7 +78,7 @@ SupportFlow now uses four fixed navigation areas at the bottom of every main scr
 |---|---|
 | **Home** | Your start page with four Quick Start shortcuts |
 | **Work** | Opens the Work shortcut page: Shifts · Travel · Notes · Incidents |
-| **Money** | Opens the Money shortcut page: Invoices · Expenses · Tax · BAS (when GST registered) |
+| **Money** | Opens the Money shortcut page: Invoices · Payment tracker · Expenses · Tax · BAS (when GST registered). The Payment tracker is an add-on: A$29 once on top of Basic, or included in Premium (A$129). See section 14a |
 | **Participants** | Opens the Participants shortcut page: Participants · Add participant · Plan managers · Service agreements |
 
 The **top header is fixed** as well. The **Light mode / Dark mode** pill, immediately left of **?**, switches the app between light and dark. Use **?** for Manual & Help, and use your profile initial at the top right for Settings and other account/device options. Until you use that pill, the app follows your phone's light or dark setting.
