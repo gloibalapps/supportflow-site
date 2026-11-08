@@ -1,6 +1,6 @@
 /* SupportFlow™ — service worker
    Bump CACHE when you deploy, or testers will keep the old build. */
-const CACHE = 'supportflow-v60-test-setup-progress';
+const CACHE = 'supportflow-v61-test-demo-mode';
 
 // Everything needed to open the app with no network at all.
 const CORE = [
