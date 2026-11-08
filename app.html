@@ -255,7 +255,7 @@ html,body{overscroll-behavior-y:none;background:#14150F;height:100%;overflow-x:h
 .sl[data-demo] .pinhead{top:100px}
 .sl[data-demo] .segbar{top:100px}
 .sl[data-demo] .hubpage{top:100px}
-.sl[data-demo] .page{padding-top:40px}
+.sl[data-demo] .wrap{padding-top:116px}
 .sl[data-demo] .mob{bottom:0}
 @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 .lockwrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;
@@ -1429,7 +1429,7 @@ const firstIncompleteStep = (data) => {
 const gstTurnover = (data) => {
   const end = new Date(today() + "T00:00:00");
   const start = new Date(end); start.setMonth(start.getMonth() - 11); start.setDate(1);
-  const from = start.toISOString().slice(0, 10);
+  const from = localIso(start);
   return data.invoices.filter((i) => i.date && i.date >= from).reduce((n, i) => n + invTotal(i), 0);
 };
 
@@ -1943,7 +1943,10 @@ const dueFrom = (date, pt, data) => {
   return t ? addDays(date, t) : "";
 };
 
-const addDays = (iso, n) => { const x = new Date(iso + "T00:00:00"); x.setDate(x.getDate() + Number(n || 0)); return x.toISOString().slice(0, 10); };
+// Local calendar arithmetic. toISOString() converts to UTC, which shifts a
+// local midnight back a day in Australia (UTC+9:30 to +11).
+const localIso = (x) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
+const addDays = (iso, n) => { const x = new Date(iso + "T00:00:00"); x.setDate(x.getDate() + Number(n || 0)); return localIso(x); };
 
 
 // Every participant carries the item you usually bill them for, so a new
@@ -5046,8 +5049,12 @@ function Summary({ data, save, m, go, newInvoice, resume, snoozeBackup, dismissB
   // taxableIncome, not income: once a prior total exists it includes both,
   // so "what's genuinely yours" reflects the whole year, not just the part
   // tracked here, and doesn't silently understate itself.
-  const keep = m.taxableIncome - m.setAside;
-  const pct = m.taxableIncome > 0 ? (m.setAside / m.taxableIncome) * 100 : 0;
+  // Cash left after paying expenses and setting tax aside. The vehicle
+  // (cents-per-km) deduction lowers taxable income but is not money spent, so
+  // it is not subtracted here.
+  const cashExpenses = m.deductions - m.car;
+  const keep = m.taxableIncome - cashExpenses - m.setAside;
+  const pct = m.taxable > 0 ? (m.setAside / m.taxable) * 100 : 0;
   const feed = [
     ...data.invoices.map((i) => ({ d: i.date, t: "invoice", label: resolve(i, data).client || "Invoice", v: invTotal(i), s: i.status })),
     ...data.expenses.map((e) => ({ d: e.date, t: "expense", label: e.desc || e.cat, v: -Number(e.amount || 0) })),
@@ -5088,7 +5095,7 @@ function Summary({ data, save, m, go, newInvoice, resume, snoozeBackup, dismissB
         <div className="disp num bignum">{money0(m.setAside)}</div>
         <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.55, marginTop: 12, maxWidth: "48ch", position: "relative" }}>
           {m.taxableIncome > 0
-            ? <>On {money0(m.taxable)} taxable income (receipts less expenses{m.car > 0 ? " and vehicle deduction" : ""}), set aside about {m.eff.toFixed(1)}%. That leaves roughly <b style={{ color: "var(--tx)" }}>{money0(keep)}</b> after tax{m.car > 0 ? <>, including {money0(m.car)} of vehicle deduction</> : null}.</>
+            ? <>On {money0(m.taxable)} taxable income (receipts less expenses{m.car > 0 ? " and vehicle deduction" : ""}), set aside about {m.eff.toFixed(1)}%. After expenses and tax, roughly <b style={{ color: "var(--tx)" }}>{money0(keep)}</b> is left{m.car > 0 ? <>. The {money0(m.car)} vehicle deduction cuts your tax but isn't cash you spent</> : null}.</>
             : <>Nothing to set aside yet. This updates the moment you mark your first invoice as paid.</>}
         </div>
         {data.priorTotals && data.priorTotals.fy === fyOf(today()) && (m.priorIncome > 0 || m.priorExpenses > 0) && (
@@ -5101,7 +5108,11 @@ function Summary({ data, save, m, go, newInvoice, resume, snoozeBackup, dismissB
           <>
             <div className="bar" style={{ marginTop: 18, position: "relative" }}><i style={{ width: pct + "%" }} /></div>
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: 11.5, color: "var(--tx-3)", position: "relative" }}>
-              <span>{money0(keep)} yours</span><span>{money0(m.setAside)} the ATO's</span>
+              <span>{money0(keep)} left after expenses and tax</span><span>{money0(m.setAside)} set aside for tax</span>
+            </div>
+            <div style={{ fontSize: 11.5, color: "var(--tx-3)", lineHeight: 1.6, marginTop: 10, position: "relative" }}>
+              Received {money0(m.taxableIncome)} − expenses {money0(cashExpenses)} − tax set aside {money0(m.setAside)} = {money0(keep)} left.
+              {m.car > 0 ? <> Taxable income is lower ({money0(m.taxable)}) because the {money0(m.car)} vehicle deduction also counts.</> : null}
             </div>
           </>
         )}
@@ -6658,7 +6669,7 @@ function SendPanel({ inv, profile, r, onSent }) {
 
 /* ---------------- demo data ---------------- */
 function buildDemoData() {
-  const d = (offset) => { const dt = new Date(); dt.setDate(dt.getDate() + offset); return dt.toISOString().slice(0, 10); };
+  const d = (offset) => { const dt = new Date(); dt.setDate(dt.getDate() + offset); return localIso(dt); };
   const id = () => Math.random().toString(36).slice(2, 10);
   const mgr1 = id(), mgr2 = id();
   const p1 = id(), p2 = id(), p3 = id();
@@ -9020,7 +9031,7 @@ function Notes({ data, save, prefill, onPrefillConsumed }) {
   const tidy = async () => {
     const source = f.tidied ? assembleBody(f) : f.rough;
     if (!source.trim()) return;
-    setBusy(true);
+    setBusy(true); setTidyErr("");
     try {
       const { text: out } = await askModel(
         `You are helping an Australian NDIS support worker write a case note. Sort the rough notes below into a clear, factual, professional note. Objective and observational only, no diagnosis or clinical judgement. Plain language, past tense, third person for the participant. Return the result using exactly these five headings, each on its own line followed by a colon, skip a heading entirely if there's genuinely nothing in the rough notes to say for it, don't invent content for a heading that isn't there: ${HEADINGS.join(", ")}.\n\nRough notes:\n${source}`
@@ -9036,7 +9047,13 @@ function Notes({ data, save, prefill, onPrefillConsumed }) {
       }
     } catch (e) {
       if (e && e.message === "daily-cap") setTidyErr(`That's today's ${AI_CAPS.tidy} tidy-ups. Your note is saved as written.`);
-      else console.error(e);
+      else {
+        console.error(e);
+        const msg = e && e.message;
+        setTidyErr(msg === "busy" ? "The tidy-up service is busy. Try again in a moment. Your note is unchanged."
+          : msg && msg !== "not-configured" && !/^Lookup failed/.test(msg) ? msg
+          : "Couldn't tidy that just now. Your note is unchanged.");
+      }
     }
     setBusy(false);
   };
