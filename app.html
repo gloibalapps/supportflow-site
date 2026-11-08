@@ -4657,10 +4657,10 @@ function App() {
             <div className="hubscroll">
               <HomeDashboard data={data} m={m} go={go} />
               <div className="shortgrid">
-                <ShortcutCard noIcon={TEST_MODE} icon="shift" tone="pink" title="Add a shift" sub="Open the existing Add Shift form." onClick={() => { setOpenNewShiftRequest(true); go("invoices", "shifts"); }}/>
-                <ShortcutCard noIcon={TEST_MODE} icon="notes" tone="teal" title="Add a note" sub="Open the existing progress notes screen." onClick={() => go("invoices", "notes")}/>
-                <ShortcutCard noIcon={TEST_MODE} icon="travel" tone="violet" title="Travel" sub="Open the existing travel screen." onClick={() => go("invoices", "travel")}/>
-                <ShortcutCard noIcon={TEST_MODE} icon="invoice" tone="blue" title="Invoices" sub="Open the existing invoice screen." onClick={() => go("summary", "invoices")}/>
+                <ShortcutCard noIcon icon="shift" tone="pink" title="Add a shift" sub="Open the existing Add Shift form." onClick={() => { setOpenNewShiftRequest(true); go("invoices", "shifts"); }}/>
+                <ShortcutCard noIcon icon="notes" tone="teal" title="Add a note" sub="Open the existing progress notes screen." onClick={() => go("invoices", "notes")}/>
+                <ShortcutCard noIcon icon="travel" tone="violet" title="Travel" sub="Open the existing travel screen." onClick={() => go("invoices", "travel")}/>
+                <ShortcutCard noIcon icon="invoice" tone="blue" title="Invoices" sub="Open the existing invoice screen." onClick={() => go("summary", "invoices")}/>
               </div>
             </div>
           </div>
