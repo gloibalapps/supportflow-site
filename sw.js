@@ -1,6 +1,6 @@
 /* SupportFlow™ — service worker
    Bump CACHE when you deploy, or testers will keep the old build. */
-const CACHE = 'supportflow-v61-test-demo-mode';
+const CACHE = 'supportflow-v62-test-logo-fix'; (Fix logo colours and remove payment tracker description from Premium)
 
 // Everything needed to open the app with no network at all.
 const CORE = [
