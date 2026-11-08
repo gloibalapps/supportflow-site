@@ -1,6 +1,6 @@
 /* SupportFlow™ — service worker
    Bump CACHE when you deploy, or testers will keep the old build. */
-const CACHE = 'supportflow-v50-home-no-cards';
+const CACHE = 'supportflow-v51-incidents-people';
 
 // Everything needed to open the app with no network at all.
 const CORE = [
