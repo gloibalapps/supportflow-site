@@ -1428,7 +1428,10 @@ function medicare(t) {
 
 const money = (n) => "$" + (Number(n) || 0).toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const money0 = (n) => "$" + Math.round(Number(n) || 0).toLocaleString("en-AU");
-const today = () => new Date().toISOString().slice(0, 10);
+// Local calendar date — an Australian-only app, so the user's local date
+// is always what matters, not UTC (which is still "yesterday" before
+// ~10:30am AEST/ACDT).
+const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 const uid = () => Math.random().toString(36).slice(2, 10);
 
 /* ---------------- ABN validation ---------------- */
@@ -2037,9 +2040,8 @@ function trackerNdiaDraft(payerType, vars) {
 }
 /* @@TRACKER_RULES_END */
 
-// Local calendar date. today() is UTC, which is still "yesterday" before
-// 10:30am in Adelaide; the tracker counts the worker's own days.
-const localToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+// Alias — today() is now local too, but kept for tracker code clarity.
+const localToday = today;
 // ONE definition of overdue, used everywhere (app-flow-review #3): sent,
 // not paid, and past its due date. Drafts are never overdue or "owed".
 const isOverdue = (i) => i.status === "sent" && !!i.due && i.due < localToday();
@@ -3760,7 +3762,7 @@ function HomeDashboard({ data, m, go }) {
   };
   const unbilled = data.shifts.filter((x) => isBillable(x) && !shiftInvoice(x, data.invoices));
   const unbilledTrips = data.trips.filter((x) => x.billable && x.participantId && !tripInvoice(x, data.invoices));
-  const uninvoiced = unbilled.reduce((n, x) => n + shiftValue(x), 0) + unbilledTrips.reduce((n, x) => n + Number(x.km || 0) * m.kmRate, 0);
+  const uninvoiced = unbilled.reduce((n, x) => n + shiftValue(x), 0) + unbilledTrips.reduce((n, x) => n + tripValue(x, data.participants, m.kmRate), 0);
   const uninvoicedHours = unbilled.reduce((n, x) => n + shiftHours(x), 0);
   const todayShifts = data.shifts.filter((x) => x.date === t && statusOf(x) !== "cancelled");
   const todayHours = todayShifts.reduce((n, x) => n + shiftHours(x), 0);
@@ -4106,7 +4108,10 @@ function App() {
 
   const m = useMemo(() => {
     const inv = data.invoices.filter((i) => inFY(i.date, fy));
-    const income = inv.filter((i) => i.status === "paid").reduce((s, i) => s + invAmountPaid(i), 0);
+    // Cash-basis: income is attributed to the FY in which payment was received,
+    // not when the invoice was issued. An invoice issued in one FY but paid in
+    // another belongs to the FY the money arrived.
+    const income = data.invoices.filter((i) => i.status === "paid" && inFY(i.paidAt || i.date, fy)).reduce((s, i) => s + invAmountPaid(i), 0);
     const invoiced = inv.reduce((s, i) => s + invTotal(i), 0);
     const expenses = data.expenses.filter((e) => inFY(e.date, fy)).reduce((s, e) => s + Number(e.amount || 0), 0);
     const km = data.trips.filter((t) => inFY(t.date, fy)).reduce((s, t) => s + Number(t.km || 0), 0);
@@ -4966,7 +4971,7 @@ function Summary({ data, save, m, go, newInvoice, resume, snoozeBackup, dismissB
         <div className="disp num bignum">{money0(m.setAside)}</div>
         <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.55, marginTop: 12, maxWidth: "48ch", position: "relative" }}>
           {m.taxableIncome > 0
-            ? <>On {money0(m.taxable)} net income so far, an effective rate of {m.eff.toFixed(1)}%. That leaves <b style={{ color: "var(--tx)" }}>{money0(keep)}</b> genuinely yours{m.car > 0 ? <>, after {money0(m.car)} of vehicle deduction</> : null}.</>
+            ? <>On {money0(m.taxable)} taxable income (receipts less expenses{m.car > 0 ? " and vehicle deduction" : ""}), set aside about {m.eff.toFixed(1)}%. That leaves roughly <b style={{ color: "var(--tx)" }}>{money0(keep)}</b> after tax{m.car > 0 ? <>, including {money0(m.car)} of vehicle deduction</> : null}.</>
             : <>Nothing to set aside yet. This updates the moment you mark your first invoice as paid.</>}
         </div>
         {data.priorTotals && data.priorTotals.fy === fyOf(today()) && (m.priorIncome > 0 || m.priorExpenses > 0) && (
@@ -5310,7 +5315,7 @@ function Summary({ data, save, m, go, newInvoice, resume, snoozeBackup, dismissB
       <div className="eyebrow" style={{ margin: "18px 0 14px" }}>Deductions</div>
       <Claimable data={data} save={save} seed={claimSeed} />
 
-      <div className="callout" style={{ marginTop: 16 }}>Estimates use 2025–26 resident rates and ignore other income, HELP debt and PAYG instalments. Confirm with a registered tax agent.</div>
+      <div className="callout" style={{ marginTop: 16 }}>Estimates use current Australian resident tax rates and the Medicare levy. They ignore other income, HELP debt and PAYG instalments. Confirm with a registered tax agent.</div>
     </>
   );
 }
@@ -5740,7 +5745,7 @@ function PaymentTracker({ data, save, go, access }) {
           <div style={{ fontSize: 12, color: "var(--tx-3)", marginBottom: 10 }}>{"{bdays}"} and {"{reply_by}"} are filled in on the day it's sent. The participant is named by first name and initial unless you turn on NDIS numbers in settings.</div>
           <div style={{ display: "grid", gap: 8 }}>
             {!toWorker && <a className="btn" style={{ minHeight: 48, display: "flex", alignItems: "center", justifyContent: "center" }}
-              href={`mailto:${encodeURIComponent(msgs.to || "")}?subject=${encodeURIComponent(fill(m.subject))}&body=${encodeURIComponent(fill(m.body) + "\n\n(Invoice attached)")}`}
+              href={`mailto:${encodeURIComponent(msgs.to || "")}?subject=${encodeURIComponent(fill(m.subject))}&body=${encodeURIComponent(fill(m.body) + "\n\n(Remember to attach the invoice PDF before sending)")}`}
               onClick={() => setTimeout(() => { if (confirm("Did you send it?")) addEvent({ invoiceId: inv.id, type: stageSel === 1 ? "nudge1" : "nudge2", summary: "from my email" }); }, 1200)}>Send now from my email</a>}
             <button className="btn ghost" style={{ minHeight: 44 }} onClick={() => copyText(fill(m.subject) + "\n\n" + fill(m.body))}>Copy text</button>
             {!toWorker && <button className="btn ghost" style={{ minHeight: 44 }} onClick={() => addEvent({ invoiceId: inv.id, type: stageSel === 1 ? "nudge1" : "nudge2", summary: "sent another way" })}>I sent it another way</button>}
@@ -6019,7 +6024,7 @@ function InvoiceList({ data, m, fy, save, newInvoice, open, go, billTick, setBil
     if (!c || !c.item) return n;
     const rate = (pt && pt.defaultCode === c.item.code && pt.defaultRate) ? Number(pt.defaultRate) : c.item.rate;
     return n + c.hours * rate;
-  }, 0) + tickedTrips.reduce((n, t) => n + Number(t.km || 0) * m.kmRate, 0);
+  }, 0) + tickedTrips.reduce((n, t) => n + tripValue(t, data.participants, m.kmRate), 0);
 
   return (
     <>
@@ -6303,6 +6308,24 @@ function Editor({ inv, setInv, onSave, onCancel, onDelete, profile, data, go }) 
 
       <SendPanel inv={inv} profile={profile} r={r} onSent={() => { const next = { ...inv, status: "sent", sentAt: inv.sentAt && !inv.sentAtEstimated ? inv.sentAt : localToday(), sentAtEstimated: false }; setInv(next); onSave(next); }} />
 
+      {(() => {
+        const gaps = [];
+        if (!profile.name) gaps.push("business name");
+        if (!profile.abn) gaps.push("ABN");
+        if (!profile.bsb || !profile.acc) gaps.push("bank details");
+        if (r.pt?.planType === "plan" && !r.mgr) gaps.push("plan manager for " + (r.client || "this participant"));
+        if (gaps.length > 0 && inv.status !== "draft") return (
+          <div className="callout" style={{ borderColor: "var(--req)", marginTop: 8, marginBottom: 4 }}>
+            <b>Missing details for a real invoice:</b> {gaps.join(", ")}.
+            <div style={{ marginTop: 6, fontSize: 12.5, color: "var(--tx-2)" }}>
+              You can save as a draft, but fill these in before sending.
+              <button className="btn ghost tiny" style={{ marginLeft: 8 }} onClick={() => go("settings")}>Open Settings</button>
+              {r.pt?.planType === "plan" && !r.mgr && <button className="btn ghost tiny" style={{ marginLeft: 6 }} onClick={() => go("people", "managers")}>Add manager</button>}
+            </div>
+          </div>
+        );
+        return null;
+      })()}
       <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
         <button className="btn ghost" onClick={onCancel}>Cancel</button>
         <button className="btn" onClick={() => onSave(inv)} disabled={!inv.participantId || !inv.due}>Save</button>
@@ -9196,6 +9219,24 @@ const TRAVEL_CAPS = [
 ];
 const travelCap = (zone) => (TRAVEL_CAPS.find((z) => z.zone === zone) || TRAVEL_CAPS[0]).cap;
 
+// Estimate total value of a trip including km and capped travel time.
+// Used by Home and Ready to bill so their totals match what the invoice
+// builder actually produces (F05 consistency fix).
+const tripValue = (trip, participants, kmRate) => {
+  let v = Number(trip.km || 0) * kmRate;
+  const pt = participants.find((p) => p.id === trip.participantId);
+  if (pt && pt.nonNdis) return v; // private clients: km only
+  const mins = Number(trip.travelMins || 0);
+  if (mins > 0) {
+    const cap = travelCap(pt?.zone || "mmm13");
+    const capped = cap ? Math.min(mins, cap) : mins;
+    const base = (pt && pt.defaultCode && SUPPORT_ITEMS.find((x) => x.code === pt.defaultCode)) || SUPPORT_ITEMS[0];
+    const rate = (pt && pt.defaultRate) ? Number(pt.defaultRate) : base.rate;
+    v += (Math.round((capped / 60) * 100) / 100) * rate;
+  }
+  return v;
+};
+
 // Short notice cancellation: 7 days for disability support worker supports.
 const CANCEL_NOTICE_DAYS = 7;
 function cancellationCheck(scheduled, cancelledOn) {
@@ -9441,7 +9482,7 @@ const MANUAL = [
     d: "Set up SupportFlow and get ready to record your work.",
     q: [
       ["What this app does, and doesn't",
-       "It handles the paperwork around support work: invoices with the right NDIS codes, a running figure for the tax you'll owe, your kilometres, and your service agreements. It is not a rostering system, it records shifts you have done, it does not arrange them. It does not lodge anything with the ATO, prepare a BAS, or replace an accountant."],
+       "It handles the paperwork around support work: invoices with the right NDIS codes, a running figure for the tax you'll owe, your kilometres, and your service agreements. It is not a rostering system, it records shifts you have done, it does not arrange them. It provides a BAS worksheet with your quarterly GST figures, but it does not lodge anything with the ATO or replace an accountant."],
       ["What SupportFlow costs",
        "SupportFlow is a one-off Lifetime licence \u2014 no subscription. New accounts start with 5 free invoice credits for 30 days to try the app; one credit is used the first time you preview a new invoice. After the free credits, buy the lifetime licence from the pricing page or via the profile menu. Once you own it, the menu shows Lifetime and invoicing has no limit. Moving to a new phone or PC is covered under Backups and troubleshooting."],
       ["The first thing you see",
@@ -11042,9 +11083,23 @@ function BackupPanel({ data, save, open, onToggle }) {
       {isOpen && (
       <>
       <div style={{ fontSize: 13, color: "var(--tx-2)", lineHeight: 1.65, marginBottom: 16 }}>
-        <div style={{ fontWeight: 700, color: "var(--tx)", marginBottom: 6 }}>Your data is protected</div>
-        SupportFlow keeps your records on this device and automatically backs them up securely to your connected Google Drive.
-        <div style={{ marginTop: 8 }}>Your backups are <b>encrypted before they leave your device</b> and can only be restored using your backup password.</div>
+        {data.profile.backedUp && driveConnected && hasBackupMasterKey() ? (
+          <>
+            <div style={{ fontWeight: 700, color: "var(--good)", marginBottom: 6 }}>Your data is protected</div>
+            SupportFlow keeps your records on this device and automatically backs them up securely to your connected {cloudBackupLabel()}.
+            <div style={{ marginTop: 8 }}>Your backups are <b>encrypted before they leave your device</b> and can only be restored using your backup password.</div>
+          </>
+        ) : (
+          <>
+            <div style={{ fontWeight: 700, color: "var(--warn)", marginBottom: 6 }}>Backup not set up</div>
+            SupportFlow keeps your records on this device only. Set up encrypted backup to protect your data.
+            <div style={{ marginTop: 8 }}>
+              {!hasBackupMasterKey() && <div>⚠ <b>Backup password</b> — not set. Required before you can back up.</div>}
+              {!driveConnected && <div>⚠ <b>Cloud backup</b> — not connected.</div>}
+              {!data.profile.backedUp && <div>⚠ <b>Last backup</b> — never backed up.</div>}
+            </div>
+          </>
+        )}
       </div>
 
       {pending ? (
@@ -11672,7 +11727,7 @@ function Settings({ data, save, wipeAll, rerun, startPane, helpInitialView }) {
 
       <div className="band" style={{ marginTop: 22 }}>
         <div className="callout">
-          Income tax only, this app doesn't calculate GST amounts or prepare your BAS. It tracks your turnover against the $75,000 threshold and formats invoices to match your registration status, but the BAS itself is on you or your accountant.
+          Income tax only. The BAS worksheet on Money summarises your quarterly GST figures (G1, 1A, 1B) from your paid invoices and expenses, but it is a worksheet, not a lodgement — you or your accountant still lodge the actual BAS through myGov or a tax agent portal.
         </div>
       </div>
     </>
