@@ -249,8 +249,12 @@ html,body{overscroll-behavior-y:none;background:#14150F;height:100%;overflow-x:h
 .demo-banner{position:fixed;top:0;left:50%;transform:translateX(-50%);z-index:500;width:min(100%,820px);padding:10px 16px;background:var(--brass);color:var(--brass-ink);display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600}
 .demo-banner button{background:var(--brass-ink);color:var(--brass);border:none;border-radius:8px;padding:6px 14px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;margin-left:auto}
 .demo-banner button:hover{opacity:.85}
+.demo-banner{height:40px;box-sizing:border-box;white-space:nowrap;overflow:hidden}
+.demo-banner span{overflow:hidden;text-overflow:ellipsis;min-width:0}
 .sl[data-demo] .top{top:40px}
 .sl[data-demo] .pinhead{top:100px}
+.sl[data-demo] .segbar{top:100px}
+.sl[data-demo] .hubpage{top:100px}
 .sl[data-demo] .page{padding-top:40px}
 .sl[data-demo] .mob{bottom:0}
 @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
@@ -557,8 +561,14 @@ function aiBump(kind) {
 }
 const aiLeft = (kind) => Math.max(0, AI_CAPS[kind] - aiUsed(kind));
 
+// Set by App on every render. Demo data is sample-only: it never spends a real
+// invoice credit or an AI call, and says so plainly instead of surfacing a
+// licence error.
+let SF_DEMO_ACTIVE = false;
+
 async function askModel(prompt, opts) {
   if (!AI.enabled()) throw new Error("not-configured");
+  if (SF_DEMO_ACTIVE) throw new Error("AI features are switched off in demo mode. Start setup for real to use them.");
   const kind = (opts && opts.kind) || "check";
   if (aiLeft(kind) <= 0) throw new Error("daily-cap");
   if (aiLeft() === 0) throw new Error("daily-cap");
@@ -1546,6 +1556,18 @@ function normalisePhone(v) {
     return `${local.slice(0, 4)} ${local.slice(4, 7)} ${local.slice(7)}`;
   }
   return t.replace(/\s+/g, " ");
+}
+
+// Save-time validation. Format only: these cannot prove a mailbox or number
+// exists, just reject obviously wrong entries like "not-an-email" or "123".
+function isValidEmail(v) { return /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test((v || "").trim()); }
+function isValidPhone(v) {
+  const t = (v || "").trim();
+  if (!/^\+?[\d\s()\-.]+$/.test(t)) return false;
+  const d = t.replace(/\D/g, "");
+  if (t.startsWith("+")) return d.length >= 8 && d.length <= 15;
+  const local = d.startsWith("61") && d.length === 11 ? "0" + d.slice(2) : d;
+  return /^0[2-478]\d{8}$/.test(local) || /^(13|18)\d{4}$/.test(local) || /^1[38]00\d{6}$/.test(local);
 }
 
 /* ---------------- name and address casing ---------------- */
@@ -3923,8 +3945,15 @@ function App() {
   useEffect(() => {
     const onCredits = (e) => {
       const d = (e && e.detail) || {};
-      if (typeof d.balance === "number") { setCreditBalance(d.balance); if (d.balance > 0) setCreditsExpired(false); }
-      else if (typeof d.delta === "number") setCreditBalance((b) => (typeof b === "number" ? Math.max(0, b + d.delta) : b));
+      // Keep the free-offer banner in step with the header pill; they read the
+      // same balance and must never disagree.
+      if (typeof d.balance === "number") {
+        setCreditBalance(d.balance); if (d.balance > 0) setCreditsExpired(false);
+        setFreeOffer((f) => (f ? { ...f, remaining: d.balance } : f));
+      } else if (typeof d.delta === "number") {
+        setCreditBalance((b) => (typeof b === "number" ? Math.max(0, b + d.delta) : b));
+        setFreeOffer((f) => (f ? { ...f, remaining: Math.max(0, Number(f.remaining || 0) + d.delta) } : f));
+      }
     };
     window.addEventListener("sf:credits", onCredits);
     return () => window.removeEventListener("sf:credits", onCredits);
@@ -4491,7 +4520,7 @@ function App() {
         <button className="tc" onClick={() => setCheckoutToastOpen(false)} aria-label="Dismiss">×</button>
       </div>
     )}
-    <div className="sl" data-theme={theme} data-demo={data._demo ? "1" : undefined}>
+    <div className="sl" data-theme={theme} data-demo={(SF_DEMO_ACTIVE = !!data._demo) ? "1" : undefined}>
       {data._demo && (
         <div className="demo-banner">
           <span>Demo mode — this data is not real</span>
@@ -5366,7 +5395,7 @@ function BAS({ data, fy }) {
   })();
   const quarterHasData = (q) => {
     const has = (d) => d && d >= q.start && d <= q.end;
-    return data.invoices.some((i) => i.status === "paid" && has(i.date)) || data.expenses.some((e) => has(e.date));
+    return data.invoices.some((i) => i.status === "paid" && has(i.paidAt || i.date)) || data.expenses.some((e) => has(e.date));
   };
   const initialQ = quarterHasData(quarters[currentQ]) ? currentQ : (() => {
     const withData = quarters.findIndex(quarterHasData);
@@ -5377,8 +5406,9 @@ function BAS({ data, fy }) {
 
   const inPeriod = (d) => d && d >= q.start && d <= q.end;
 
-  // G1 — Total sales: use paid invoice date as cash-basis receipt date.
-  const paidInPeriod = data.invoices.filter((i) => i.status === "paid" && inPeriod(i.date));
+  // G1 — Total sales: cash basis, attributed by the date the money arrived
+  // (paidAt), never the invoice issue date.
+  const paidInPeriod = data.invoices.filter((i) => i.status === "paid" && inPeriod(i.paidAt || i.date));
   const G1 = paidInPeriod.reduce((s, i) => s + invTotal(i), 0);
   // G3 — All GST-free (NDIS supports, s38-38). G2 (exports) = $0 for this use case.
   const G3 = G1;
@@ -6288,7 +6318,7 @@ function Editor({ inv, setInv, onSave, onCancel, onDelete, profile, data, go }) 
         <div className="lineitem" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: inv.lines.length ? 8 : 0 }}>
           <div>
             <div className="eyebrow">Total due</div>
-            <div style={{ fontSize: 11.5, color: "var(--tx-3)", marginTop: 4 }}>No GST, supplier not registered</div>
+            <div style={{ fontSize: 11.5, color: "var(--tx-3)", marginTop: 4 }}>{profile.gstRegistered ? "GST-free NDIS supports, supplier registered for GST" : "No GST, supplier not registered"}</div>
           </div>
           <div className="disp num" style={{ fontSize: 34 }}>{money(total)}</div>
         </div>
@@ -6329,7 +6359,7 @@ function Editor({ inv, setInv, onSave, onCancel, onDelete, profile, data, go }) 
         const gaps = [];
         if (!profile.name) gaps.push("business name");
         if (!profile.abn) gaps.push("ABN");
-        if (!profile.bsb || !profile.acc) gaps.push("bank details");
+        if (!profile.bankName || !profile.bsb || !profile.account) gaps.push("bank details");
         if (r.pt?.planType === "plan" && !r.mgr) gaps.push("plan manager for " + (r.client || "this participant"));
         if (gaps.length > 0 && inv.status !== "draft") return (
           <div className="callout" style={{ borderColor: "var(--req)", marginTop: 8, marginBottom: 4 }}>
@@ -6403,6 +6433,7 @@ function announceCredits(detail) {
 async function chargeInvoiceCredit(invoiceNumber) {
   const num = String(invoiceNumber || "").trim();
   if (!num) return "ok";
+  if (SF_DEMO_ACTIVE) return "ok"; // demo invoices are free and never touch real credits
   if (readCharged().includes(num)) return "ok"; // already paid for: free, works offline
   let resp;
   try {
@@ -6565,8 +6596,8 @@ function buildDemoData() {
       backupEvery: "daily", backupAt: "18:00", welcomed: true, introTourVersion: 2,
     },
     managers: [
-      { id: mgr1, name: "Plan Partners Australia", contact: "Jane Lee", email: "accounts@planpartners.example.com", phone: "08 8100 2000", abn: "22 111 222 333", address: "100 King William St, Adelaide SA 5000", terms: "14", notes: "" },
-      { id: mgr2, name: "My Plan Manager", contact: "Tom Nguyen", email: "invoices@myplanmgr.example.com", phone: "1300 000 123", abn: "33 444 555 666", address: "50 Flinders St, Melbourne VIC 3000", terms: "21", notes: "" },
+      { id: mgr1, name: "Plan Partners Australia", contact: "Jane Lee", email: "accounts@planpartners.example.com", phone: "08 8100 2000", abn: "43 111 222 333", address: "100 King William St, Adelaide SA 5000", terms: "14", notes: "" },
+      { id: mgr2, name: "My Plan Manager", contact: "Tom Nguyen", email: "invoices@myplanmgr.example.com", phone: "1300 000 123", abn: "13 444 555 666", address: "50 Flinders St, Melbourne VIC 3000", terms: "21", notes: "" },
     ],
     participants: [
       { id: p1, name: "Alex Johnson", ndisNumber: "431234567", nonNdis: false, planType: "plan", managerId: mgr1, terms: "", defaultCode: "01_011_0107_1_1", defaultRate: "73.58", agreement: true, agreementDate: d(-60), agreementReview: d(305), agreementWhere: "", email: "alex.j@example.com", phone: "0423 111 222", address: "12 Sunrise Ave, Adelaide SA 5000", planEnd: d(180), notes: "Likes routine. Morning shifts preferred." },
@@ -6827,16 +6858,22 @@ function Onboarding({ data, save, close, help, openPrivacy, startStep }) {
               </div>
               <div className="two">
                 <label className="f">
-                  <span style={{ color: mf.email?.trim() ? undefined : "var(--req)" }}>Accounts email, required</span>
-                  <input type="email" style={mf.email?.trim() ? {} : { borderColor: "var(--req)" }}
+                  <span style={{ color: isValidEmail(mf.email) ? undefined : "var(--req)" }}>Accounts email, required</span>
+                  <input type="email" style={isValidEmail(mf.email) ? {} : { borderColor: "var(--req)" }}
                     value={mf.email || ""} onChange={(e) => setMf({ ...mf, email: e.target.value })}
                     onBlur={() => setMf({ ...mf, email: normaliseEmail(mf.email) })} />
+                  {mf.email?.trim() && !isValidEmail(mf.email) && (
+                    <em style={{ fontSize: 11.5, color: "var(--warn)", fontStyle: "normal", marginTop: 5, display: "block" }}>Enter a valid email address.</em>
+                  )}
                 </label>
                 <label className="f">
-                  <span style={{ color: mf.phone?.trim() ? undefined : "var(--req)" }}>Phone, required</span>
-                  <input style={mf.phone?.trim() ? {} : { borderColor: "var(--req)" }}
+                  <span style={{ color: isValidPhone(mf.phone) ? undefined : "var(--req)" }}>Phone, required</span>
+                  <input style={isValidPhone(mf.phone) ? {} : { borderColor: "var(--req)" }}
                     value={mf.phone || ""} onChange={(e) => setMf({ ...mf, phone: e.target.value })}
                     onBlur={() => setMf({ ...mf, phone: normalisePhone(mf.phone) })} />
+                  {mf.phone?.trim() && !isValidPhone(mf.phone) && (
+                    <em style={{ fontSize: 11.5, color: "var(--warn)", fontStyle: "normal", marginTop: 5, display: "block" }}>Enter a full phone number with area code.</em>
+                  )}
                 </label>
               </div>
               <div className="two" style={{ marginBottom: 0 }}>
@@ -6860,7 +6897,7 @@ function Onboarding({ data, save, close, help, openPrivacy, startStep }) {
               </div>
               <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
                 <button className="btn" onClick={addMgr}
-                  disabled={!mf.name.trim() || !mf.contact?.trim() || !mf.email?.trim() || !mf.phone?.trim() || !isValidAbn(mf.abn) || !mf.terms}>Add manager</button>
+                  disabled={!mf.name.trim() || !mf.contact?.trim() || !isValidEmail(mf.email) || !isValidPhone(mf.phone) || !isValidAbn(mf.abn) || !mf.terms}>Add manager</button>
                 <button className="btn ghost" onClick={() => setMf(null)}>Cancel</button>
               </div>
             </div>
@@ -7013,19 +7050,25 @@ function Onboarding({ data, save, close, help, openPrivacy, startStep }) {
               </label>
               <div className="two" style={{ marginBottom: 0 }}>
                 <label className="f req" style={{ marginBottom: 0 }}>
-                  <span style={{ color: (pf.email || "").trim() ? undefined : "var(--req)" }}>Their email, required</span>
-                  <input type="email" style={(pf.email || "").trim() ? {} : { borderColor: "var(--req)" }} {...F(pf, setPf)("email")} />
+                  <span style={{ color: isValidEmail(pf.email) ? undefined : "var(--req)" }}>Their email, required</span>
+                  <input type="email" style={isValidEmail(pf.email) ? {} : { borderColor: "var(--req)" }} {...F(pf, setPf)("email")} />
+                  {(pf.email || "").trim() && !isValidEmail(pf.email) && (
+                    <em style={{ fontSize: 11.5, color: "var(--warn)", fontStyle: "normal", marginTop: 5, display: "block" }}>Enter a valid email address.</em>
+                  )}
                 </label>
                 <label className="f req" style={{ marginBottom: 0 }}>
-                  <span style={{ color: (pf.phone || "").trim() ? undefined : "var(--req)" }}>Their phone, required</span>
-                  <input style={(pf.phone || "").trim() ? {} : { borderColor: "var(--req)" }} {...F(pf, setPf)("phone")} />
+                  <span style={{ color: isValidPhone(pf.phone) ? undefined : "var(--req)" }}>Their phone, required</span>
+                  <input style={isValidPhone(pf.phone) ? {} : { borderColor: "var(--req)" }} {...F(pf, setPf)("phone")} />
+                  {(pf.phone || "").trim() && !isValidPhone(pf.phone) && (
+                    <em style={{ fontSize: 11.5, color: "var(--warn)", fontStyle: "normal", marginTop: 5, display: "block" }}>Enter a full phone number with area code.</em>
+                  )}
                 </label>
               </div>
               <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
                 <button className="btn" onClick={addPart}
                   disabled={!pf.name.trim() || (pf.nonNdis ? (!(pf.defaultDescription || "").trim() || !pf.defaultRate) : !pf.defaultCode) ||
                     (pf.planType === "plan" ? !pf.managerId : !pf.terms) ||
-                    (!pf.nonNdis && !isValidNdisNumber(pf.ndisNumber)) || !(pf.email || "").trim() || !(pf.phone || "").trim()}>Add participant</button>
+                    (!pf.nonNdis && !isValidNdisNumber(pf.ndisNumber)) || !isValidEmail(pf.email) || !isValidPhone(pf.phone)}>Add participant</button>
                 <button className="btn ghost" onClick={() => setPf(null)}>Cancel</button>
               </div>
             </div>
@@ -7472,7 +7515,7 @@ function Directory({ data, save, view, setView, openId, clearOpen, canCreate, on
               }}
               disabled={!r.name || (isP && (r.nonNdis ? (!(r.defaultDescription || "").trim() || !r.defaultRate) : !r.defaultCode)) || (isP && (r.planType === "plan" ? !r.managerId : !r.terms)) ||
                 (isP && !r.nonNdis && !isValidNdisNumber(r.ndisNumber)) ||
-                (!isP && (!r.terms || !r.contact?.trim() || !r.email?.trim() || !r.phone?.trim() || !isValidAbn(r.abn)))}>Save</button>
+                (!isP && (!r.terms || !r.contact?.trim() || !isValidEmail(r.email) || !isValidPhone(r.phone) || !isValidAbn(r.abn)))}>Save</button>
           </div>
         </div>
 
@@ -7662,16 +7705,22 @@ function Directory({ data, save, view, setView, openId, clearOpen, canCreate, on
               </div>
               <div className="two">
                 <label className="f">
-                  <span style={{ color: r.email?.trim() ? undefined : "var(--req)" }}>Accounts email, required</span>
-                  <input type="email" style={r.email?.trim() ? {} : { borderColor: "var(--req)" }}
+                  <span style={{ color: isValidEmail(r.email) ? undefined : "var(--req)" }}>Accounts email, required</span>
+                  <input type="email" style={isValidEmail(r.email) ? {} : { borderColor: "var(--req)" }}
                     value={r.email || ""} onChange={(e) => set({ email: e.target.value })}
                     onBlur={() => set({ email: normaliseEmail(r.email) })} placeholder="accounts@…" />
+                  {r.email?.trim() && !isValidEmail(r.email) && (
+                    <em style={{ fontSize: 11.5, color: "var(--warn)", fontStyle: "normal", marginTop: 5, display: "block" }}>Enter a valid email address.</em>
+                  )}
                 </label>
                 <label className="f">
-                  <span style={{ color: r.phone?.trim() ? undefined : "var(--req)" }}>Phone, required</span>
-                  <input style={r.phone?.trim() ? {} : { borderColor: "var(--req)" }}
+                  <span style={{ color: isValidPhone(r.phone) ? undefined : "var(--req)" }}>Phone, required</span>
+                  <input style={isValidPhone(r.phone) ? {} : { borderColor: "var(--req)" }}
                     value={r.phone || ""} onChange={(e) => set({ phone: e.target.value })}
                     onBlur={() => set({ phone: normalisePhone(r.phone) })} />
+                  {r.phone?.trim() && !isValidPhone(r.phone) && (
+                    <em style={{ fontSize: 11.5, color: "var(--warn)", fontStyle: "normal", marginTop: 5, display: "block" }}>Enter a full phone number with area code.</em>
+                  )}
                 </label>
               </div>
               <div className="two">
