@@ -82,6 +82,17 @@ html,body{overscroll-behavior-y:none;background:#14150F;height:100%;overflow-x:h
 .dots{display:flex;gap:6px;margin-bottom:20px}
 .dots i{height:3px;flex:1;border-radius:2px;background:var(--line);transition:background .3s}
 .dots i[data-on="1"]{background:var(--brass)}
+.setup-progress{display:flex;align-items:center;gap:0;margin-bottom:24px;padding:0}
+.setup-step{display:flex;flex-direction:column;align-items:center;flex:1;position:relative;z-index:1}
+.setup-step .circle{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;font-family:'Instrument Sans',sans-serif;border:2.5px solid var(--line);background:var(--bg-2);color:var(--tx-3);transition:all .3s}
+.setup-step[data-state="done"] .circle{background:var(--good);border-color:var(--good);color:#fff}
+.setup-step[data-state="active"] .circle{background:var(--brass);border-color:var(--brass);color:#fff;box-shadow:0 0 0 4px color-mix(in srgb,var(--brass) 22%,transparent)}
+.setup-step .slabel{font-size:10px;font-weight:600;color:var(--tx-3);margin-top:6px;text-align:center;line-height:1.2;max-width:68px;letter-spacing:.01em}
+.setup-step[data-state="active"] .slabel{color:var(--brass);font-weight:700}
+.setup-step[data-state="done"] .slabel{color:var(--good)}
+.setup-bar{flex:1;height:3px;background:var(--line);margin:0 -4px;position:relative;top:-10px;z-index:0;transition:background .3s}
+.setup-bar[data-done="1"]{background:var(--good)}
+@media(max-width:430px){.setup-step .circle{width:30px;height:30px;font-size:12px}.setup-step .slabel{font-size:9px;max-width:56px}}
 .top{position:fixed;top:0;left:0;right:0;z-index:50;background:var(--bg);border-bottom:1px solid var(--line);padding:0 22px;transition:background .35s ease}
 /* Sits directly under .top (same sticky pattern, offset by its 60px
    height) so the Work/Money/People switcher stays reachable no matter how
@@ -4683,6 +4694,7 @@ function App() {
         {tab === "settings" && <Settings data={data} save={save} wipeAll={wipeAll} rerun={() => setTab("setup")} startPane={openPane || "settings"} helpInitialView={helpInitialView} />}
       </div>
 
+      {(!data.onboarded && !(licence.phase === "ok" || isMemberDevice())) ? null : (
       <div className="mob">
         {NAV.map(([k, l]) => (
           <button key={k} className="mobnav" data-on={navActive(k) ? 1 : 0} onClick={() => goHub(k)}>
@@ -4692,6 +4704,7 @@ function App() {
           </button>
         ))}
       </div>
+      )}
 
       {askPin && licence.phase === "ok" && !readLock() && <PinSetupPrompt onDone={() => { try { localStorage.removeItem(ASK_PIN_FLAG); } catch (e) { } setAskPin(false); }} />}
       <OfferOrUpgradeBanner paid={licence.phase === "ok" || isLifetime} freeOffer={freeOffer} known={statusKnown} />
@@ -6516,7 +6529,24 @@ const STEPS = [
   { n: 3, title: "Participants", lead: "Required", hint: "Add the people you support and flag how each plan is managed. Plan managed links to the manager who pays you; self or NDIA managed needs their own payment terms. Set the item you usually bill them for and new invoices open on it." },
 ];
 
+const SETUP_LABELS = ["PIN", "Backup", "Details", "Managers", "Participants"];
+function SetupProgress({ current, total }) {
+  const items = [];
+  for (let i = 1; i <= total; i++) {
+    if (i > 1) items.push(<div className="setup-bar" key={"b" + i} data-done={i <= current ? "1" : "0"} />);
+    items.push(
+      <div className="setup-step" key={i} data-state={i < current ? "done" : i === current ? "active" : ""}>
+        <div className="circle">{i < current ? "✓" : i}</div>
+        <div className="slabel">{SETUP_LABELS[i - 1]}</div>
+      </div>
+    );
+  }
+  return <div className="setup-progress">{items}</div>;
+}
+
 function Onboarding({ data, save, close, help, openPrivacy, startStep }) {
+  const licence = React.useContext(LicenceContext);
+  const isPaid = licence && (licence.phase === "ok" || isMemberDevice());
   // Security is asked about before any business or participant data, not
   // buried further down Settings where a new user has no reason to look
   // for it yet. Deliberately its own gate, not step "0" in the numbered
@@ -6574,9 +6604,9 @@ function Onboarding({ data, save, close, help, openPrivacy, startStep }) {
   if (!lockDecided) {
     return (
       <>
+        <SetupProgress current={1} total={5} />
         <div className="bandhead" style={{ marginBottom: 16 }}>
           <div>
-            <div className="eyebrow">Guided setup · 1 of 5</div>
             <div className="disp" style={{ fontSize: 26, marginTop: 5 }}>First, secure SupportFlow</div>
             <div style={{ fontSize: 12.5, color: "var(--tx-3)", marginTop: 5 }}>Create your PIN here. When it is set, we will take you to the next step.</div>
           </div>
@@ -6591,8 +6621,8 @@ function Onboarding({ data, save, close, help, openPrivacy, startStep }) {
           </div>
           <LockPanel onChange={setLockCfg} />
         </div>
-        <div style={{ display: "flex", gap: 8, justifyContent: "space-between", marginTop: 4 }}>
-          <button className="btn ghost" onClick={close}>Cancel</button>
+        <div style={{ display: "flex", gap: 8, justifyContent: isPaid ? "space-between" : "flex-end", marginTop: 4 }}>
+          {isPaid && <button className="btn ghost" onClick={close}>Cancel</button>}
           <button className="btn" disabled={!lockCfg} onClick={() => setLockDecided(true)}>
             {lockCfg ? "PIN set — continue" : "Set your PIN above to continue"}
           </button>
@@ -6604,9 +6634,9 @@ function Onboarding({ data, save, close, help, openPrivacy, startStep }) {
   if (!backupDecided) {
     return (
       <>
+        <SetupProgress current={2} total={5} />
         <div className="bandhead" style={{ marginBottom: 16 }}>
           <div>
-            <div className="eyebrow">Guided setup · 2 of 5</div>
             <div className="disp" style={{ fontSize: 26, marginTop: 5 }}>Now protect your backup</div>
             <div style={{ fontSize: 12.5, color: "var(--tx-3)", marginTop: 5 }}>Create your backup password and connect Google Drive or OneDrive below. Continue unlocks only when both are ready.</div>
           </div>
@@ -6633,9 +6663,9 @@ function Onboarding({ data, save, close, help, openPrivacy, startStep }) {
 
   return (
     <>
+      <SetupProgress current={step + 2} total={5} />
       <div className="bandhead" style={{ marginBottom: 16 }}>
         <div>
-          <div className="eyebrow">Guided setup · {step + 2} of 5</div>
           <div className="disp" style={{ fontSize: 26, marginTop: 5 }}>
             {step === 1 ? "Add your business details" : step === 2 ? "Add plan managers" : "Add your first participant"}
           </div>
@@ -6645,10 +6675,8 @@ function Onboarding({ data, save, close, help, openPrivacy, startStep }) {
              "Add the first person you support. This shows you exactly where participant information belongs."}
           </div>
         </div>
-        
-      </div>
 
-      <div className="dots">{[1, 2, 3].map((i) => <i key={i} data-on={i <= step ? 1 : 0} />)}</div>
+      </div>
 
       {/* ---- 1 ---- */}
       {step === 1 && (
@@ -6901,8 +6929,8 @@ function Onboarding({ data, save, close, help, openPrivacy, startStep }) {
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 8, justifyContent: "space-between", marginTop: 4 }}>
-        <button className="btn ghost" onClick={() => (step > 1 ? setStep(step - 1) : close())}>{step > 1 ? "Back" : "Cancel"}</button>
+      <div style={{ display: "flex", gap: 8, justifyContent: step > 1 || isPaid ? "space-between" : "flex-end", marginTop: 4 }}>
+        {(step > 1 || isPaid) && <button className="btn ghost" onClick={() => (step > 1 ? setStep(step - 1) : close())}>{step > 1 ? "Back" : "Cancel"}</button>}
         {step < 3
           ? <button className="btn" onClick={() => { if (step === 1) saveProfile(); setStep(step + 1); }}
               disabled={(step === 1 && !profileOK) || (step === 2 && !mgrDecided)}>Continue</button>
