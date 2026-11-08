@@ -77,9 +77,9 @@ SupportFlow now uses four fixed navigation areas at the bottom of every main scr
 | Area | What it does |
 |---|---|
 | **Home** | Your start page: totals at a glance (uninvoiced work, today's shifts, hours, outstanding, income, expenses, tax estimate) |
-| **Work** | Opens the Work shortcut page: Shifts · Travel · Notes · Incidents |
+| **Work** | Opens the Work shortcut page: Shifts · Travel · Notes |
 | **Money** | Opens the Money shortcut page: Invoices · Payment tracker · Expenses · Tax · BAS (when GST registered). The Payment tracker is an add-on: A$29 once on top of Basic, or included in Premium (A$129). See section 14a |
-| **Participants** | Opens the Participants shortcut page: Participants · Add participant · Plan managers · Service agreements |
+| **Participants** | Opens the Participants shortcut page: Participants · Add participant · Plan managers · Service agreements · Incidents |
 
 The **top header is fixed** as well. The **Light mode / Dark mode** pill, immediately left of **?**, switches the app between light and dark. Use **?** for Manual & Help, and use your profile initial at the top right for Settings and other account/device options. Until you use that pill, the app follows your phone's light or dark setting.
 
@@ -1051,7 +1051,7 @@ SupportFlow is an independent software product and is not affiliated with, endor
 
 ## Incidents
 
-Use **Work → Incidents** to keep an incident register. Record the affected person, date/time, when you became aware, location, factual description, harm/impact, immediate actions, people involved or witnesses, participant support, follow-up and corrective/preventative actions.
+Use **People → Incidents** to keep an incident register. Record the affected person, date/time, when you became aware, location, factual description, harm/impact, immediate actions, people involved or witnesses, participant support, follow-up and corrective/preventative actions.
 
 Under **Settings → Business & invoice details**, set whether you are a registered NDIS provider. Registered-provider mode adds reportable-incident prompts using the current NDIS Commission categories and common notification timeframes. Most listed reportable incidents show a 24-hour timeframe; unauthorised restrictive practice shows five business days, with a 24-hour warning when harm is recorded. SupportFlow does not decide legal reportability and does not submit a report for you. Use the official Commission guidance/portal. If anyone is in immediate danger, call 000.
 

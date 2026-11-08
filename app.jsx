@@ -4578,7 +4578,6 @@ function App() {
                 <ShortcutCard icon="shift" tone="pink" title="Shifts" sub="Add and manage shifts." onClick={() => go("invoices", "shifts")}/>
                 <ShortcutCard icon="travel" tone="violet" title="Travel" sub="Log trips and kilometres." onClick={() => go("invoices", "travel")}/>
                 <ShortcutCard icon="notes" tone="teal" title="Notes" sub="Record progress notes." onClick={() => go("invoices", "notes")}/>
-                <ShortcutCard icon="incident" tone="orange" title="Incidents" sub="Record and manage incidents." onClick={() => go("invoices", "incidents")}/>
               </div>
             </div>
           </div>
@@ -4612,6 +4611,7 @@ function App() {
                 <ShortcutCard icon="people" tone="violet" title="Participants" sub="View and manage participants." onClick={() => go("people", "participants")}/>
                 <ShortcutCard icon="document" tone="blue" title="Plan managers" sub="Manage plan manager details." onClick={() => go("people", "managers")}/>
                 <ShortcutCard icon="agreement" tone="pink" title="Service agreements" sub="Manage participant agreements." onClick={() => go("people", "agreements")}/>
+                <ShortcutCard icon="incident" tone="orange" title="Incidents" sub="Record and manage incidents." onClick={() => go("invoices", "incidents")}/>
               </div>
             </div>
           </div>
@@ -9390,7 +9390,7 @@ const MANUAL = [
     d: "Record incidents, immediate safety actions, reporting prompts and follow-up.",
     q: [
       ["Recording an incident",
-       "Work → Incidents → New incident. Record the affected person, incident date and time, when you became aware, location, what happened, any harm, immediate actions, people involved or witnesses, participant support, follow-up and corrective action. Keep it factual. Incident records stay with the rest of your local SupportFlow records and are included in your encrypted backup."],
+       "People → Incidents → New incident. Record the affected person, incident date and time, when you became aware, location, what happened, any harm, immediate actions, people involved or witnesses, participant support, follow-up and corrective action. Keep it factual. Incident records stay with the rest of your local SupportFlow records and are included in your encrypted backup."],
       ["Registered provider setting",
        "Settings → Business & invoice details asks whether you are a registered NDIS provider. Turn this on only if you are registered. It changes the incident-reporting prompts; it does not decide whether you are required to register."],
       ["Reportable incident prompts",
@@ -9398,7 +9398,7 @@ const MANUAL = [
       ["SupportFlow does not report for you",
        "SupportFlow never automatically sends an incident to the NDIS Commission, police, emergency services, a participant, plan manager or anyone else. If anyone is in immediate danger call 000. If an incident may be reportable, use the Commission guidance link in the incident screen and make the required notification yourself."],
       ["Incident register PDF",
-       "Work → Incidents → Export register PDF creates a local PDF summary from the incident records on this device. It can help with review or audit preparation, but you should check the exported information before relying on it."],
+       "People → Incidents → Export register PDF creates a local PDF summary from the incident records on this device. It can help with review or audit preparation, but you should check the exported information before relying on it."],
     ],
   },
   {
