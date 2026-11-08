@@ -4527,9 +4527,9 @@ function App() {
                 <ShortcutCard icon="invoice" tone="blue" title="Invoices" sub="Raise, send and mark invoices paid." onClick={() => go("summary", "invoices")}
                   badge={(() => { const n = data.invoices.filter(isOverdue).length; return n ? `${n} overdue` : null; })()}/>
                 <ShortcutCard icon="document" tone="teal" title="Payment tracker" sub="See who owes you and chase it." onClick={() => go("summary", "tracker")}/>
-                <ShortcutCard icon="expense" tone="pink" title="Expenses" sub="Open your existing expenses screen." onClick={() => go("summary", "expenses")}/>
-                <ShortcutCard icon="tax" tone="yellow" title="Tax" sub="Set-aside, claim check and accountant pack." onClick={() => { setClaimSeed(""); go("summary", "position"); }} wide={!data.profile.gstRegistered}/>
-                {data.profile.gstRegistered && <ShortcutCard icon="tax" tone="yellow" title="BAS" sub="Open the existing BAS worksheet." onClick={() => go("summary", "bas")}/>}
+                <ShortcutCard icon="expense" tone="pink" title="Expenses" sub="Log and review expenses." onClick={() => go("summary", "expenses")}/>
+                <ShortcutCard icon="tax" tone="yellow" title="Tax" sub="Set-aside, claim check and accountant pack." onClick={() => { setClaimSeed(""); go("summary", "position"); }}/>
+                <ShortcutCard icon="tax" tone="yellow" title="BAS" sub="GST and BAS worksheet." onClick={() => go("summary", "bas")} wide/>
               </div>
             </div>
           </div>
