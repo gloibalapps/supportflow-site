@@ -593,7 +593,7 @@ const APP_VERSION = "21";
    On the test site every paywall / gate is OPEN, but each time one WOULD have
    stopped the user, a dialog says which gate it was and the user taps OK to
    carry on. Locked to the test hostname: never active on supportflow.work. */
-const TEST_MODE = (() => { try { const h = location.hostname; return h === "supportflows.netlify.app" || h.endsWith("--supportflows.netlify.app"); } catch (e) { return false; } })();
+const TEST_MODE = (() => { try { const h = location.hostname; return h === "supportflows.netlify.app" || h.endsWith("--supportflows.netlify.app") || h === "test-mode-open-gates--ndissupportflow.netlify.app"; } catch (e) { return false; } })();
 let testGateChain = Promise.resolve();
 const testGateSeen = new Set();
 function testGate(title, detail) {
