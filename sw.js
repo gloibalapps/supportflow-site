@@ -1,6 +1,6 @@
 /* SupportFlow™ — service worker
    Bump CACHE when you deploy, or testers will keep the old build. */
-const CACHE = 'supportflow-v44-premium-129';
+const CACHE = 'supportflow-v45-google-buy';
 
 // Everything needed to open the app with no network at all.
 const CORE = [
