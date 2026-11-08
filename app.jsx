@@ -1423,6 +1423,8 @@ const ABN_WEIGHTS = [10, 1, 3, 5, 7, 9, 11, 13, 15, 17, 19];
 function abnDigits(v) { return (v || "").replace(/\D/g, ""); }
 function isValidAbn(v) {
   const d = abnDigits(v);
+  // TEST VERSION: any figure is accepted so demos can use made-up numbers.
+  if (TEST_MODE) return d.length > 0;
   if (d.length !== 11) return false;
   const digits = d.split("").map(Number);
   digits[0] -= 1;
@@ -1448,7 +1450,7 @@ function AbnValidateButton({ value, onValid }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 7, flexWrap: "wrap" }}>
       <button type="button" className="btn ghost tiny" onClick={check}>Validate ABN</button>
-      {res === "ok" && <span style={{ fontSize: 12, color: "var(--good)" }}>{"\u2713"} Valid ABN (format and checksum)</span>}
+      {res === "ok" && <span style={{ fontSize: 12, color: "var(--good)" }}>{"\u2713"} {TEST_MODE ? "ABN confirmed" : "Valid ABN (format and checksum)"}</span>}
       {res === "bad" && <span style={{ fontSize: 12, color: "var(--warn)" }}>Not a valid ABN. Check the digits.</span>}
       {res === "empty" && <span style={{ fontSize: 12, color: "var(--warn)" }}>Enter an ABN first.</span>}
     </div>
@@ -4534,9 +4536,9 @@ function App() {
                       <span style={{ fontSize: 16, fontWeight: 700, color: "var(--ink)", lineHeight: 1.2 }}>Restore licence</span>
                     </button>
                   )}
-                  <button onClick={() => { setMenuOpen(false); setHelpInitialView("support"); setOpenPane("help"); go("settings"); }}>
-                    Feedback &amp; support
-                  </button>
+                  {!TEST_MODE && <button onClick={() => { setMenuOpen(false); setHelpInitialView("support"); setOpenPane("help"); go("settings"); }}>
+                      Feedback &amp; support
+                    </button>}
                   <button onClick={() => { setMenuOpen(false); setOpenPane(null); go("settings"); }}>Settings</button>
                   <button onClick={() => { setMenuOpen(false); setOpenPane("privacy-security"); go("settings"); }}>Privacy &amp; security</button>
                   {!!readLock() && (
@@ -10037,7 +10039,7 @@ function Help({ data, initialView = "manual" }) {
       ) : (
       <>
       <div className="tabnav" style={{ marginTop: 6 }}>
-        {[["manual", "How it works"], ["faq", "Questions"], ["sources", "Sources"], ["support", "Support"]].map(([k, l]) => (
+        {[["manual", "How it works"], ["faq", "Questions"], ["sources", "Sources"], ["support", "Support"]].filter(([k]) => !(TEST_MODE && k === "support")).map(([k, l]) => (
           <button key={k} data-on={view === k ? 1 : 0} onClick={() => { setView(k); setOpen(null); }}>{l}</button>
         ))}
       </div>
@@ -10067,7 +10069,7 @@ function Help({ data, initialView = "manual" }) {
         </div>
       ) : null}
 
-      {view === "support" ? <Support data={data} /> : view === "sources" ? (
+      {view === "support" && !TEST_MODE ? <Support data={data} /> : view === "sources" ? (
         <>
           {SOURCES.map((x) => (
             <a className="row tap" key={x.u} href={x.u} target="_blank" rel="noreferrer"
