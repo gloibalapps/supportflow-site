@@ -3235,11 +3235,12 @@ function PinSetupPrompt({ onDone }) {
 const REMIND_KEY = "ndis:upgradeRemindAt";
 const BUY_URL = "/app?buy=1";
 function wantsLicenceFlow() { try { const b = new URLSearchParams(location.search).get("buy"); return b === "1" || b === "upgrade"; } catch (e) { return false; } }
+function wantsBuyChooser() { try { return new URLSearchParams(location.search).get("buy") === "1"; } catch (e) { return false; } }
 function wantsUpgradeChooser() { try { return new URLSearchParams(location.search).get("buy") === "upgrade"; } catch (e) { return false; } }
 // /app?buy=upgrade (Basic card "Upgrade" button, opens in a new tab): after
 // Google sign-in / licence restore, pick an upgrade and go to Stripe Checkout.
 function UpgradeChooser({ licence }) {
-  const [open, setOpen] = useState(() => wantsUpgradeChooser());
+  const [open, setOpen] = useState(() => wantsUpgradeChooser() || wantsBuyChooser());
   const [busy, setBusy] = useState(null);
   const [err, setErr] = useState("");
   const [premiumQuote, setPremiumQuote] = useState(() => premiumQuoteFrom(null));
@@ -3255,6 +3256,12 @@ function UpgradeChooser({ licence }) {
   };
   const plan = licence.info?.plan;
   const signedIn = !!licence.account;
+  const isBuy = wantsBuyChooser();
+  const buyBasicNow = async () => {
+    setBusy("one"); setErr("");
+    const r = await licence.checkout("one");
+    if (r?.error) { setErr(r.error); setBusy(null); }
+  };
   const addDevice = async () => {
     setBusy("upgrade"); setErr("");
     const r = await licence.checkout("upgrade");
@@ -3274,11 +3281,18 @@ function UpgradeChooser({ licence }) {
   };
   return <div role="dialog" aria-modal="true" aria-label="Upgrade" style={{ position: "fixed", inset: 0, zIndex: 90, background: "rgba(10,11,8,.72)", display: "grid", placeItems: "center", padding: 16 }}>
     <div className="panel" style={{ maxWidth: 440, width: "100%", maxHeight: "90vh", overflow: "auto" }}>
-      <div className="disp" style={{ fontSize: 20, marginBottom: 6 }}>Upgrade SupportFlow</div>
+      <div className="disp" style={{ fontSize: 20, marginBottom: 6 }}>{isBuy ? "Buy SupportFlow" : "Upgrade SupportFlow"}</div>
       <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.6, marginBottom: 14 }}>Choose the option you want. You'll pay securely on Stripe Checkout.</div>
       {!signedIn ? <>
-        <div style={{ fontSize: 13, color: "var(--tx-2)", lineHeight: 1.6, marginBottom: 12 }}>Sign in with the Google account you bought Basic with first.</div>
+        <div style={{ fontSize: 13, color: "var(--tx-2)", lineHeight: 1.6, marginBottom: 12 }}>{isBuy ? "Sign in with Google first. Your licence is linked to your Google account, so you can restore it on any phone later." : "Sign in with the Google account you bought Basic with first."}</div>
         <LicenceGoogleButton clientId={licence.clientId} onCredential={(c) => licence.signIn(c)} />
+      </> : isBuy && !plan ? <>
+        <button className="btn" style={{ width: "100%", minHeight: 48, marginBottom: 10 }} disabled={!!busy || licence.offline} onClick={buyBasicNow}>
+          {busy === "one" ? "Opening checkout\u2026" : "Buy Basic \u2014 A$79 (GST included)"}
+        </button>
+        <button className="btn" style={{ width: "100%", minHeight: 48, marginBottom: 10 }} disabled={!!busy || licence.offline} onClick={buyPremium}>
+          {busy === "premium" ? "Opening checkout\u2026" : `Buy Premium \u2014 A$${premiumQuote.priceAud}`}
+        </button>
       </> : <>
         <button className="btn" style={{ width: "100%", minHeight: 48, marginBottom: 10 }} disabled={!!busy || licence.offline || plan !== 1} onClick={addDevice}>
           {busy === "upgrade" ? "Opening checkout\u2026" : "Add a second device \u2014 A$29"}
@@ -3909,14 +3923,6 @@ function App() {
   // The one shared guard. Every "create a new record" action calls this
   // first; every edit, view, backup and export path never touches it at all.
   const [showTrialNotice, setShowTrialNotice] = useState(false);
-  // /app?buy=1 (the "Get Basic" buttons on the site): open the buy screen, which asks for Google sign-in first.
-  useEffect(() => {
-    try {
-      const sp = new URLSearchParams(location.search);
-      if (sp.get("buy") !== "1") return;
-      setShowTrialNotice(true);
-    } catch (e) { }
-  }, []);
   const [trialNoticeRestore, setTrialNoticeRestore] = useState(false); // open straight into "Restore licence"
   const guardCreate = (fn) => (...args) => {
     if (!canCreate) { setShowTrialNotice(true); return; }
