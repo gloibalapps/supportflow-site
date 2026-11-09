@@ -19,7 +19,7 @@
 // when TRACKER_AUTOSEND_ENABLED=true.
 import crypto from "node:crypto";
 import { json, supa, supaConfigured, signSession, verifySession, verifyGoogleIdToken, isUuid } from "../lib/licence.mjs";
-import { TRACKER_PRODUCTS, isTrackerProduct, isRetiredTrackerProduct, trackerOffer, trackerUnlock, trackerDeviceOk, autosendEnabled, seal, emailHash } from "../lib/tracker.mjs";
+import { TRACKER_PRODUCTS, trackerPriceId, isTrackerProduct, isRetiredTrackerProduct, trackerOffer, trackerUnlock, trackerDeviceOk, autosendEnabled, seal, emailHash } from "../lib/tracker.mjs";
 import { premiumCheckoutSelection, premiumPublic } from "../lib/premium.mjs";
 import { TRACKER_STATES } from "../../payment-tracker-rules.js";
 import { normaliseAuMobile, maskPhone, rawSend, smsEnabled, smsDryRun } from "../lib/sms.mjs";
@@ -50,7 +50,7 @@ async function checkout(session, deviceId, body) {
   if (!isTrackerProduct(product)) return json({ error: "Choose an option." }, 400);
   const have = await trackerUnlock(session.sub);
   const isSub = product === "tracker_sms";
-  let price = process.env[TRACKER_PRODUCTS[product].env];
+  let price = trackerPriceId(TRACKER_PRODUCTS[product]);
   if (product === "tracker_full") {
     const sel = premiumCheckoutSelection();
     if (sel.error) return json({ error: sel.error, comingSoon: true }, 503);

@@ -51,7 +51,7 @@ export function trackerOffer() {
       devices: p.devices || 0,
       recurring: p.recurring || null,
       items: p.items || null,
-      available: !!process.env[p.env],
+      available: !!trackerPriceId(p),
       retired: false,
     };
     if (id === "tracker_full") {
@@ -98,6 +98,8 @@ export async function trackerDeviceOk(sub, deviceId, cap) {
 
 /* ---------------- flags ---------------- */
 // Server-side auto-send is OFF unless the owner sets TRACKER_AUTOSEND_ENABLED=true.
+// The A$29 Payment tracker price has been set under two env names; accept either.
+export const trackerPriceId = (p) => String(process.env[p.env] || (p.env === "STRIPE_PRICE_TRACKER" ? process.env.STRIPE_PRICE_TRACKER_BASIC : "") || "").trim();
 export const autosendEnabled = () => String(process.env.TRACKER_AUTOSEND_ENABLED || "").toLowerCase() === "true";
 // Dry run: the scheduler works everything out and logs it, but sends nothing.
 export const autosendDryRun = () => String(process.env.TRACKER_AUTOSEND_DRY_RUN ?? "true").toLowerCase() !== "false";

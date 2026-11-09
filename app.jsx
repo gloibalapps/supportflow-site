@@ -3329,7 +3329,7 @@ function UpgradeChooser({ licence, theme }) {
   return <div role="dialog" aria-modal="true" aria-label="Upgrade" style={{ position: "fixed", inset: 0, zIndex: 90, background: "rgba(10,11,8,.72)", display: "grid", placeItems: "center", padding: 16 }}>
     <div className="sl" data-theme={theme || "dark"} style={{ maxWidth: 440, width: "100%", maxHeight: "90vh", overflow: "auto", background: "transparent", borderRadius: 14, minHeight: 0, alignSelf: "center" }}>
     <div className="panel">
-      <div className="disp" style={{ fontSize: 20, marginBottom: 6 }}>{isBuy ? "Buy SupportFlow" : "Upgrade SupportFlow"}</div>
+      <div className="disp" style={{ fontSize: 20, marginBottom: 6 }}>{isBuy && !plan ? "Buy SupportFlow" : "Add to your licence"}</div>
       <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.6, marginBottom: 14 }}>Choose the option you want. You'll pay securely on Stripe Checkout.</div>
       {!signedIn ? <>
         <div style={{ fontSize: 13, color: "var(--tx-2)", lineHeight: 1.6, marginBottom: 12 }}>{isBuy ? "Sign in with Google first. Your licence is linked to your Google account, so you can restore it on any phone later." : "Sign in with the Google account you bought Basic with first."}</div>
