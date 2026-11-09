@@ -637,46 +637,14 @@ const TEST_MODE = (() => { try { const h = location.hostname; return h === "supp
 let testGateChain = Promise.resolve();
 const testGateSeen = new Set();
 function testGate(title, detail) {
-  const run = () => new Promise((resolve) => {
-    try {
-      const wrap = document.createElement("div");
-      wrap.setAttribute("role", "alertdialog"); wrap.setAttribute("aria-modal", "true");
-      wrap.style.cssText = "position:fixed;inset:0;z-index:2147483000;background:rgba(15,20,30,.62);display:flex;align-items:center;justify-content:center;padding:20px;font-family:system-ui,-apple-system,Segoe UI,sans-serif";
-      const box = document.createElement("div");
-      box.style.cssText = "max-width:420px;width:100%;background:#fff;color:#1b2430;border-radius:14px;padding:22px;box-shadow:0 12px 40px rgba(0,0,0,.35);border-top:6px solid #d9822b;line-height:1.5";
-      const tag = document.createElement("div");
-      tag.textContent = "TEST VERSION";
-      tag.style.cssText = "font-size:11px;font-weight:700;letter-spacing:.08em;color:#b4621a;margin-bottom:6px";
-      const h = document.createElement("div");
-      h.textContent = "A gate would appear here: " + title;
-      h.style.cssText = "font-size:17px;font-weight:700;margin-bottom:8px";
-      const d = document.createElement("div");
-      d.textContent = detail + " In this test version nothing is blocked. Tap OK to carry on.";
-      d.style.cssText = "font-size:14px;margin-bottom:18px";
-      const ok = document.createElement("button");
-      ok.textContent = "OK";
-      ok.style.cssText = "min-height:46px;width:100%;border:0;border-radius:10px;background:#1b2430;color:#fff;font-size:16px;font-weight:600;cursor:pointer";
-      ok.onclick = () => { wrap.remove(); resolve(); };
-      box.append(tag, h, d, ok); wrap.append(box); document.body.appendChild(wrap);
-      ok.focus();
-    } catch (e) { resolve(); }
-  });
-  testGateChain = testGateChain.then(run, run);
-  return testGateChain;
+  // Gates stay open and silent: no pop-up, so the app can be filmed cleanly.
+  return Promise.resolve();
 }
 // For gates decided during render: show the dialog once per visit, not on every re-render.
 function testGateOnce(key, title, detail) {
   if (testGateSeen.has(key)) return;
   testGateSeen.add(key);
   setTimeout(() => { testGate(title, detail); }, 0);
-}
-if (TEST_MODE) {
-  try {
-    const b = document.createElement("div");
-    b.textContent = "TEST VERSION — gates open";
-    b.style.cssText = "position:fixed;left:8px;bottom:8px;z-index:2147482000;background:#d9822b;color:#fff;font:700 10.5px system-ui,sans-serif;letter-spacing:.06em;padding:4px 8px;border-radius:6px;opacity:.9;pointer-events:none";
-    document.body.appendChild(b);
-  } catch (e) { }
 }
 
 const LICENCE_API = "/.netlify/functions/licence";
@@ -4621,7 +4589,7 @@ function App() {
     <div className="sl" data-theme={theme} data-demo={(SF_DEMO_ACTIVE = !!data._demo) ? "1" : undefined}>
       {data._demo && (
         <div className="demo-banner">
-          <span>Demo mode — this data is not real</span>
+          <span>Demo mode — sample data</span>
           <button onClick={exitDemo}>Start setup for real</button>
         </div>
       )}
