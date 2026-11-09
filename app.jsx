@@ -360,10 +360,11 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 .shortcuttitle{font-size:13px;font-weight:700;margin-bottom:4px}
 .shortcuthelp{font-size:12px;color:var(--tx-3);line-height:1.5}
 .hdhero{display:block;width:100%;text-align:left;cursor:pointer;font:inherit;color:inherit;border:1px solid rgba(200,145,58,.45);border-radius:16px;padding:18px 19px;margin-bottom:11px;background:linear-gradient(145deg,var(--bg-3),var(--bg-2))}
-.hdtile.neutral{background:var(--bg-1,var(--bg-2));border-color:var(--line);opacity:.92}
-.hdtile.neutral .hdval{font-size:19px;color:var(--tx-2)}
+.hdtile.neutral{background:var(--bg-1,var(--bg-2));border-color:var(--line)}
+.hdtile.neutral .hdval{color:var(--tx-2)}
 .hdgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
-.hdtile{text-align:left;cursor:pointer;font:inherit;color:inherit;border:1px solid var(--line);border-radius:14px;padding:13px 14px;background:var(--bg-2)}
+.hdtile .eyebrow{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10.5px;letter-spacing:.12em}
+.hdtile{min-height:104px;display:flex;flex-direction:column;text-align:left;cursor:pointer;font:inherit;color:inherit;border:1px solid var(--line);border-radius:14px;padding:13px 14px;background:var(--bg-2)}
 .hdtile:hover,.hdhero:hover{border-color:rgba(200,145,58,.6)}
 .hdval{font-size:22px;margin-top:4px;line-height:1.1}
 .hdsub{font-size:12px;color:var(--tx-3);margin-top:5px;line-height:1.35}
@@ -3775,8 +3776,8 @@ function HomeDashboard({ data, m, go }) {
       <div className="hdgrid">
         <Tile label="Next shift" value={nextShift ? nextDay : "None"} sub={nextShift ? `${nextShift.start || ""}${nextShift.end ? "\u2013" + nextShift.end : ""}${nextPt ? " \u00b7 " + nextPt.name : ""}` : "Nothing scheduled"} onClick={() => go("invoices", "shifts")} />
         <Tile neutral label="Uninvoiced work" value={money0(uninvoiced)} sub={uninvoiced > 0 ? `${unbilled.length} shift${unbilled.length === 1 ? "" : "s"}${unbilledTrips.length ? ` + ${unbilledTrips.length} trip${unbilledTrips.length === 1 ? "" : "s"}` : ""} \u00b7 ${uninvoicedHours.toFixed(1)}h` : "All caught up"} onClick={() => go("summary", "invoices")} />
-        <Tile label={`Income · FY ${fyLabel(fy)}`} value={money0(fyIncome)} sub="Paid invoices this financial year" onClick={() => go("summary", "position")} />
-        <Tile label={`Expenses · FY ${fyLabel(fy)}`} value={money0(fyExpenses)} sub="Business costs this financial year" onClick={() => go("summary", "expenses")} />
+        <Tile label="Income this FY" value={money0(fyIncome)} sub={`Received · ${fyLabel(fy)}`} onClick={() => go("summary", "position")} />
+        <Tile label="Expenses this FY" value={money0(fyExpenses)} sub={`Business costs · ${fyLabel(fy)}`} onClick={() => go("summary", "expenses")} />
         <Tile neutral label="Outstanding" value={money0(owed)} sub={waiting.length ? `${waiting.length} invoice${waiting.length === 1 ? "" : "s"}${overdue ? ` \u00b7 ${overdue} overdue` : ""}` : "Nobody owes you"} tone={overdue ? "var(--warn)" : null} onClick={() => go("summary", "tracker")} />
         <Tile neutral label="Tax estimate" value={money0(m.setAside)} sub="Put aside this year" onClick={() => go("summary", "position")} />
       </div>
