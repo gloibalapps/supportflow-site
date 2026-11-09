@@ -370,7 +370,7 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 .hdtile{min-height:0;display:flex;flex-direction:column;text-align:left;cursor:pointer;font:inherit;color:inherit;border:1px solid var(--line);border-radius:14px;padding:10px 13px;background:var(--bg-2)}
 .hdtile:hover,.hdhero:hover{border-color:rgba(200,145,58,.6)}
 .hdval{font-size:20px;margin-top:2px;line-height:1.1}
-.hdsub{font-size:12px;color:var(--tx-3);margin-top:3px;line-height:1.35}
+.hdsub{font-size:12px;color:var(--tx-3);margin-top:3px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .shortgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
 .shortcard{position:relative;min-height:128px;text-align:left;border:1px solid var(--line);border-radius:16px;background:linear-gradient(145deg,var(--bg-3),var(--bg-2));padding:15px;color:var(--tx);font-family:inherit;cursor:pointer;transition:transform .16s,border-color .16s,background .16s;display:flex;flex-direction:column;align-items:flex-start}
 .shortcard:hover{transform:translateY(-1px);border-color:rgba(200,145,58,.5)}
@@ -3780,7 +3780,7 @@ function HomeDashboard({ data, m, go }) {
         <Tile label="Next shift" value={nextShift ? nextDay : "None"} sub={nextShift ? `${nextShift.start || ""}${nextShift.end ? "\u2013" + nextShift.end : ""}${nextPt ? " \u00b7 " + nextPt.name : ""}` : "Nothing scheduled"} onClick={() => go("invoices", "shifts")} />
         <Tile neutral label="Uninvoiced work" value={money0(uninvoiced)} sub={uninvoiced > 0 ? `${unbilled.length} shift${unbilled.length === 1 ? "" : "s"}${unbilledTrips.length ? ` + ${unbilledTrips.length} trip${unbilledTrips.length === 1 ? "" : "s"}` : ""} \u00b7 ${uninvoicedHours.toFixed(1)}h` : "All caught up"} onClick={() => go("summary", "invoices")} />
         <Tile label="Income this FY" value={money0(fyIncome)} sub={`Received · ${fyLabel(fy)}`} onClick={() => go("summary", "position")} />
-        <Tile label="Expenses this FY" value={money0(fyExpenses)} sub={`Business costs · ${fyLabel(fy)}`} onClick={() => go("summary", "expenses")} />
+        <Tile label="Expenses this FY" value={money0(fyExpenses)} sub={`Costs · ${fyLabel(fy)}`} onClick={() => go("summary", "expenses")} />
         <Tile neutral label="Outstanding" value={money0(owed)} sub={waiting.length ? `${waiting.length} invoice${waiting.length === 1 ? "" : "s"}${overdue ? ` \u00b7 ${overdue} overdue` : ""}` : "Nobody owes you"} tone={overdue ? "var(--warn)" : null} onClick={() => go("summary", "tracker")} />
         <Tile neutral label="Tax estimate" value={money0(m.setAside)} sub="Put aside this year" onClick={() => go("summary", "position")} />
       </div>
