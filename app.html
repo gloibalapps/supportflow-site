@@ -3942,7 +3942,13 @@ function App() {
   const [showAssistant, setShowAssistant] = useState(false);
   // Bumped when /rates.json loads so screens re-render with live CAR / TRAVEL_ITEM.
   const [liveRates, setLiveRates] = useState(null);
-  const [locked, setLocked] = useState(() => shouldLockNow());
+  const [locked, setLocked] = useState(() => {
+    const l = shouldLockNow();
+    // Opened without needing the PIN: forget the old "went to background" time so a
+    // later pull-to-refresh or reload can't re-lock using a stale timestamp.
+    if (!l) { try { localStorage.removeItem(LOCK_HIDDEN_AT_KEY); } catch (e) { } }
+    return l;
+  });
   const [askPin, setAskPin] = useState(() => { try { return localStorage.getItem(ASK_PIN_FLAG) === "1" || (isMemberDevice() && !readLock()); } catch (e) { return false; } });
   const [claimSeed, setClaimSeed] = useState("");
   const [editing, setEditing] = useState(null);
@@ -4508,7 +4514,7 @@ function App() {
   // PIN / fingerprint comes first on every open; licence checks run behind it.
   if (locked) return (
     <LockScreen
-      onUnlock={() => setLocked(false)}
+      onUnlock={() => { try { localStorage.removeItem(LOCK_HIDDEN_AT_KEY); } catch (e) { } setLocked(false); }}
       onForgot={() => {
         writeLock(null);
         try { localStorage.removeItem("ndis:data"); } catch (e) { }
@@ -4655,7 +4661,7 @@ function App() {
                   <button onClick={() => { setMenuOpen(false); setOpenPane(null); go("settings"); }}>Settings</button>
                   <button onClick={() => { setMenuOpen(false); setOpenPane("privacy-security"); go("settings"); }}>Privacy &amp; security</button>
                   {!!readLock() && (
-                    <button onClick={() => { setMenuOpen(false); setLocked(true); }}>Lock now</button>
+                    <button onClick={() => { setMenuOpen(false); try { localStorage.setItem(LOCK_HIDDEN_AT_KEY, "1"); } catch (e) { } setLocked(true); }}>Lock now</button>
                   )}
                 </div>
               </>
