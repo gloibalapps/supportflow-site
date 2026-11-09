@@ -3838,11 +3838,11 @@ function HomeDashboard({ data, m, go }) {
   const owed = waiting.reduce((n, i) => n + invTotal(i), 0);
   const overdue = waiting.filter(isOverdue).length;
   const fy = fyOf(t);
-  const issued = data.invoices.filter((i) => (i.status === "sent" || i.status === "paid") && ((i.sentAt || i.date || "").slice(0, 7) === month));
+  const invMonth = (i) => String(i.date || i.sentAt || "").slice(0, 7);
+  const issued = data.invoices.filter((i) => i.status !== "draft" && invMonth(i) === month);
   const grossMonth = issued.reduce((n, i) => n + invTotal(i), 0);
-  const monthPaid = data.invoices.filter((i) => i.status === "paid" && (i.paidAt || "").slice(0, 7) === month).reduce((n, i) => n + invAmountPaid(i), 0);
-  const fyIncome = data.invoices.filter((i) => i.status === "paid" && i.paidAt && fyOf(i.paidAt.slice(0, 10)) === fy).reduce((n, i) => n + invAmountPaid(i), 0);
-  const fyExpenses = data.expenses.filter((e) => e.date && fyOf(e.date.slice(0, 10)) === fy).reduce((n, e) => n + Number(e.amount || 0), 0);
+  const monthPaid = issued.reduce((n, i) => n + invAmountPaid(i), 0);
+  const fyIncome = m.income, fyExpenses = m.expenses; // same figures as the Money screen
   const monthName = new Date().toLocaleDateString("en-AU", { month: "long" });
   const Tile = ({ label, value, sub, tone, onClick, neutral }) => (
     <button className={"hdtile" + (neutral ? " neutral" : "")} onClick={onClick}>
