@@ -186,7 +186,7 @@ The developer does not receive a copy of your backup as part of this process.
 
 Your backup passphrase is not transmitted to or stored by the developer.
 
-If you lose your backup passphrase, the developer cannot recover or decrypt the backup for you.
+If you lose your backup passphrase, the developer cannot recover or decrypt the backup for you. SupportFlow also gives you a recovery code when you set the passphrase. It is generated on your device, shown to you once, and is not sent to or stored by the developer. If you lose both the passphrase and the recovery code, the developer cannot recover or decrypt the backup.
 
 If you choose to send or store the encrypted backup using another service, that provider's own privacy and data-handling terms apply.
 

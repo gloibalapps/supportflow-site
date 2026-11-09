@@ -76,7 +76,7 @@ SupportFlow now uses four fixed navigation areas at the bottom of every main scr
 
 | Area | What it does |
 |---|---|
-| **Home** | Your start page: totals at a glance (uninvoiced work, today's shifts, hours, outstanding, income, expenses, tax estimate) |
+| **Home** | Your start page: totals at a glance (gross income for the year and the month, next shift, uninvoiced work, expenses, outstanding, tax estimate). Only **Next shift** and **Outstanding** open anything when tapped |
 | **Work** | Opens the Work shortcut page: Shifts · Travel · Notes |
 | **Money** | Opens the Money shortcut page: Invoices · Payment tracker · Expenses · Tax · BAS (when GST registered). The Payment tracker is an add-on: A$29 once on top of Basic, or included in Premium (A$129). See section 14a |
 | **Participants** | Opens the Participants shortcut page: Participants · Add participant · Plan managers · Service agreements · Incidents |
@@ -85,7 +85,12 @@ The **top header is fixed** as well. The **Light mode / Dark mode** pill, immedi
 
 ### Home
 
-Home shows your numbers at a glance: uninvoiced work, today's shifts, hours this month, what's outstanding, income, expenses and your tax estimate. To do something, use **Work**, **Money** or **People** in the bottom bar.
+Home shows your numbers at a glance: gross income for the financial year (the large card) and for this month, your next shift, uninvoiced work, expenses this financial year, what's outstanding and your tax estimate.
+
+Only two tiles are tappable: **Next shift** opens your shifts, and **Outstanding** opens the Payment tracker's view of who owes you. Every other tile is display only, so you can't open something by accident while scrolling. To do anything else, use **Work**, **Money** or **People** in the bottom bar.
+
+The **eye icon** on the income card hides every dollar amount on Home (they show as dots) for when someone is looking over your shoulder. Tap it again to show them. The choice is remembered on that device.
+
 
 ### Work, Money and Participants shortcut pages
 
@@ -100,10 +105,12 @@ Only the middle content scrolls; the main top header and bottom navigation remai
 ## 1. The first time you open it
 
 You get a welcome screen, once, that explains the app in three lines and
-offers three ways in:
+offers two ways in:
 
-- **Set me up**: two quick security screens, then the three-step guide below
-- **Read how it works**: this manual, before you touch anything
+- **Start guided setup**: two quick security screens, then the three-step guide below
+- **Try with demo data first**: see [Demo mode](#demo-mode) below
+
+The manual is always available from the **?** in the top header if you'd rather read before you start.
 
 **Choosing "Set me up" doesn't go straight to your details.** Two screens come
 first, in this order:
@@ -113,7 +120,15 @@ first, in this order:
 
 The app lock can be skipped, but **backup password setup cannot be skipped**. A backup password must be created before the three-step setup continues. See [App lock](#13-app-lock) and [Backing up](#9-backing-up-important).
 
-The required onboarding steps must be completed before normal use. The backup password can be changed later in Settings, but SupportFlow cannot recover it for you.
+The required onboarding steps must be completed before normal use. When you create the backup password you are also given a **recovery code**, which opens your backups if you ever forget the password. See [Backing up](#9-backing-up-important).
+
+### Demo mode
+
+**Try with demo data first** loads a made-up business (Sam Taylor), three sample participants, shifts, trips and expenses so you can look at every screen before entering anything real.
+
+- A banner across the top says **Demo mode** and has a **Start setup for real** button.
+- Nothing in demo mode is real, and none of it is kept once you start your own setup: starting setup replaces the demo records.
+- Features that use the AI assistant (Tidy this up, the deduction checker and similar) are switched off in demo mode and say so. Invoices raised in demo mode don't use any of your free invoice credits.
 
 The manual is always in the menu at the top right, under **Manual & help**.
 
@@ -123,6 +138,8 @@ The manual is always in the menu at the top right, under **Manual & help**.
 
 **Two security screens come first** — Lock the app, then Secure your backups. The app lock is optional; the backup password is required before the three-step guide itself. See
 [The first time you open it](#1-the-first-time-you-open-it).
+
+A row of numbered steps (PIN, Backup, Details, Managers, Participants) stays pinned to the top of the screen as you scroll, with the current step highlighted and finished steps ticked, so you always know where you are.
 
 The three-step guide: anything outlined in **red** still needs
 you; it turns green with a tick when done. There's a **Read how it works first**
@@ -149,6 +166,8 @@ Every plan management company you invoice:
 
 Do this before participants so each one can be linked in a tap. If you deal with
 none, use **"I don't deal with any"**.
+
+Email addresses and phone numbers are checked as you type. A phone number must be a valid Australian mobile or landline, a 13/1300/1800 number, or an international number starting with **+**. If something doesn't look right, a message appears under the field and **Save** stays greyed out until it's fixed. The same checks apply when you add or edit a plan manager or a participant.
 
 ### Step 3 – Participants
 
@@ -361,6 +380,8 @@ switches them between the two modes at any time, from **Participants → Partici
 levy, on income less expenses and vehicle deduction, counting only **paid**
 invoices.
 
+The Tax screen shows how the figure is made up: income received, less your expenses and vehicle deduction, less the amount to set aside, leaving what is yours after expenses and tax. Your expenses are taken off **before** that "left over" figure, so it reflects what you actually keep.
+
 > Open a second bank account and move that money across as you're paid. Finding
 > it in October is much harder than setting it aside in July.
 
@@ -478,7 +499,7 @@ with a GST-free statement when registered, plain "Invoice" when not.
 
 **Once registered, the Money shortcut page adds BAS**: a quarterly summary of what
 you've invoiced and spent, built from records already entered, nothing typed
-twice. It opens on whichever quarter actually has activity in it rather than
+twice. Income is counted by **the date an invoice was paid**, in the quarter that date falls in, not the date it was issued (an invoice with no paid date falls back to its invoice date). It opens on whichever quarter actually has activity in it rather than
 always defaulting to the current one. It's a worksheet to lodge from, not a
 lodgement itself, the app doesn't submit anything to the ATO.
 
@@ -495,9 +516,24 @@ During onboarding you create **one backup password** and confirm it. That passwo
 
 SupportFlow does not keep the readable password and cannot recover or reset it. The device retains the derived encryption credential required to create later encrypted backups. Backup files are encrypted on the device with AES-256 before they are uploaded to the connected Google Drive.
 
-> **If you lose the backup password, SupportFlow cannot recover it for you.** Keep it in a password manager or somewhere secure away from the device.
+### Your recovery code (if you forget the password)
 
-If you change the backup password in **Settings → Backup**, new backups use the new password. Existing backup files still require the password that created them, so keep an old password until you no longer need backups protected by it.
+As soon as you set the backup password, SupportFlow shows you a **recovery code**, a random code that looks like `ABCD-EFGH-JKLM-NPQR-STUV`.
+
+- It opens your backups **instead of the password**. When you restore, the same box accepts either one.
+- It is shown **once**. SupportFlow does not keep a copy and cannot show it to you again. Use **Copy** or **Save as file**, then store it in a password manager or write it down.
+- Keep it **away from this device and away from where your backups are stored**. Anyone holding the code and a backup file can open that backup.
+- You must tick **"I've saved my recovery code"** before setup continues.
+
+**It works on backups made after the code was created.** The code is stored (still locked) inside each backup file, so a backup made *before* you had a recovery code can only be opened with the password that created it.
+
+**Already set a backup password before recovery codes existed?** Go to **Settings → Backup**. It shows **Recovery code: Not set up** with a **Create recovery code** button. Every backup from then on carries it.
+
+**Settings → Backup → New recovery code** replaces the code. The old one stops working for backups made from then on.
+
+> **If you lose both the backup password and the recovery code, SupportFlow cannot recover your backups for you.** Keep both somewhere secure, away from the device.
+
+If you change the backup password in **Settings → Backup**, you are given a **new recovery code** at the same time, and new backups use the new password and the new code. Existing backup files still require the password (or recovery code) that created them, so keep the old ones until you no longer need those backups.
 
 ### Backing up
 
@@ -507,11 +543,11 @@ SupportFlow waits about five minutes after meaningful changes so several edits c
 
 ### Restoring
 
-Tap **Restore**, choose the file, and enter the passphrase it was made with.
+Tap **Restore**, choose the file, and enter the **backup password or the recovery code** for it.
 Get it right and you'll see exactly what's in the file, how many
 participants, invoices, and so on, and how many of your current records would
-be overwritten, **before anything changes**. Get the passphrase wrong and it
-tells you plainly rather than showing you gibberish.
+be overwritten, **before anything changes**. Get it wrong and it
+tells you plainly rather than showing you gibberish. If the file is an older backup with no recovery code inside it, the message tells you that only its original password will open it.
 
 An older, unencrypted backup file still opens, it doesn't ask for a
 passphrase it never had.
@@ -522,7 +558,7 @@ passphrase it never had.
 
 From the same panel, **Change Google account** lets you connect a different Google Drive account, and **Disconnect Google Drive** stops automatic Drive backups on that device. Disconnecting does not delete backup files already stored in Google Drive. After changing accounts, use **Back up now** to create a fresh encrypted backup in the newly connected Drive.
 
-A reminder appears **the next time you open the app** after your chosen time. The PWA cannot guarantee work while it is completely closed.
+A PWA cannot reliably run while it is completely closed, so a backup that is waiting completes the next time SupportFlow is open and online.
 
 The panel always shows **when you last backed up** and **how many records you've
 added since**, whether reminders are on or off.
@@ -807,8 +843,12 @@ opens SupportFlow in a **new tab** (supportflow.work/app?buy=upgrade):
    - **Add a second device, A$29:** your Basic licence then covers two
      devices. Only available on a one-device (Basic) licence. This is separate
      from the Payment tracker.
-   - **Upgrade to Premium:** Premium's price is A$129, paid once. Premium adds
-     the Payment tracker and a two-device licence. SMS is not included.
+   - **Add Payment tracker, A$29:** adds the tracker to your Basic licence.
+     It does not add a second device.
+
+   Premium (A$129) is offered to people buying for the first time, not here:
+   if you already own Basic you add the second device and the tracker
+   separately, A$29 each.
 3. You're taken to **Stripe Checkout** to pay. When payment finishes you come
    back to the app and the upgrade is applied automatically.
 
@@ -832,6 +872,11 @@ your device, and buying a licence doesn't add a server-side copy of anything.
 ## 14a. Payment tracker (optional add-on)
 
 The Payment tracker lives at **Money → Payment tracker**. It shows who owes you, flags overdue invoices, and, if you switch it on, sends polite reminder emails to the payer at business day 7 and 12. At day 20 (day 15 for NDIA-managed) it prepares a complaint draft for you to review. Nothing is ever filed for you.
+
+**What you see depends on your licence.**
+
+- **Basic without the tracker:** a short card explaining what it does, with a single **Add Payment tracker · A$29 once** button. Signed out, it asks you to sign in first.
+- **Premium, or Basic with the tracker:** the tracker page itself. It opens on the invoices that need action (it opens on **All** if nothing does). A panel shows whether reminders are **On** or **Off**, with a **Set up** button to change that. If there are no unpaid invoices it says so rather than showing an empty page. The **Patterns**, **Report** and **Settings** tabs each start with a short line saying what they're for.
 
 ### Pricing
 

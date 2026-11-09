@@ -77,7 +77,7 @@ Loss, damage, replacement, reset or failure of your device, clearing browser or 
 
 Where encrypted backup functionality is available, you are strongly encouraged to use it regularly.
 
-You are responsible for keeping your backup passphrase secure. The developer cannot recover an encrypted backup if you lose its passphrase.
+You are responsible for keeping your backup passphrase secure. The same applies to the recovery code shown when you set the passphrase. The developer cannot recover an encrypted backup if you lose both its passphrase and its recovery code.
 
 ## 8. Security
 

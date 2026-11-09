@@ -47,6 +47,8 @@ The developer does not receive or store your passphrase and cannot recover it.
 
 **If you lose the passphrase, the encrypted backup cannot be recovered by the developer.**
 
+When you set your backup passphrase, SupportFlow also gives you a recovery code. The code is generated on your device and shown to you once; the developer does not receive or store it. It can open backups made after the code was created, as an alternative to the passphrase. Anyone who holds both the recovery code and a backup file can open that backup, so keep the code separate from the device and from where your backups are stored. If you lose both the passphrase and the recovery code, the developer cannot recover the backup.
+
 Keep your passphrase somewhere secure and separate from the device containing your SupportFlow records.
 
 
