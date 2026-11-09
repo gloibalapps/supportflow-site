@@ -3759,7 +3759,7 @@ function HomeDashboard({ data, m, go }) {
   const grossMonth = issued.reduce((n, i) => n + invTotal(i), 0);
   const monthPaid = issued.reduce((n, i) => n + invAmountPaid(i), 0);
   const fyIncome = m.income, fyExpenses = m.expenses; // same figures as the Money screen
-  const monthName = new Date().toLocaleDateString("en-AU", { month: "long" });
+  const monthShort = new Date().toLocaleDateString("en-AU", { month: "short" });
   const Tile = ({ label, value, sub, tone, onClick, neutral }) => (
     <button className={"hdtile" + (neutral ? " neutral" : "")} onClick={onClick}>
       <div className="eyebrow">{label}</div>
@@ -3769,17 +3769,15 @@ function HomeDashboard({ data, m, go }) {
   );
   return (
     <div style={{ marginBottom: 18 }}>
-      <button className="hdhero" onClick={() => go("summary", "invoices")}>
-        <div className="eyebrow">Gross income · {monthName}</div>
-        <div className="disp num" style={{ fontSize: 34, marginTop: 4, lineHeight: 1.05 }}>{money0(grossMonth)}</div>
-        <div style={{ fontSize: 13, marginTop: 6, color: "var(--tx-3)" }}>
-          {issued.length ? `${issued.length} invoice${issued.length === 1 ? "" : "s"} this month · ${money0(monthPaid)} paid ›` : "No invoices issued this month yet ›"}
-        </div>
+      <button className="hdhero" onClick={() => go("summary", "position")}>
+        <div className="eyebrow">Gross income · {fyLabel(fy)}</div>
+        <div className="disp num" style={{ fontSize: 34, marginTop: 4, lineHeight: 1.05 }}>{money0(fyIncome)}</div>
+        <div style={{ fontSize: 13, marginTop: 6, color: "var(--tx-3)" }}>Financial year to date ›</div>
       </button>
       <div className="hdgrid">
+        <Tile label={`Gross income \u00b7 ${monthShort}`} value={money0(grossMonth)} sub={issued.length ? `${issued.length} invoice${issued.length === 1 ? "" : "s"} \u00b7 ${money0(monthPaid)} paid` : "No invoices yet"} onClick={() => go("summary", "invoices")} />
         <Tile label="Next shift" value={nextShift ? nextDay : "None"} sub={nextShift ? `${nextShift.start || ""}${nextShift.end ? "\u2013" + nextShift.end : ""}${nextPt ? " \u00b7 " + nextPt.name : ""}` : "Nothing scheduled"} onClick={() => go("invoices", "shifts")} />
         <Tile neutral label="Uninvoiced work" value={money0(uninvoiced)} sub={uninvoiced > 0 ? `${unbilled.length} shift${unbilled.length === 1 ? "" : "s"}${unbilledTrips.length ? ` + ${unbilledTrips.length} trip${unbilledTrips.length === 1 ? "" : "s"}` : ""} \u00b7 ${uninvoicedHours.toFixed(1)}h` : "All caught up"} onClick={() => go("summary", "invoices")} />
-        <Tile label="Income this FY" value={money0(fyIncome)} sub={`Received · ${fyLabel(fy)}`} onClick={() => go("summary", "position")} />
         <Tile label="Expenses this FY" value={money0(fyExpenses)} sub={`Costs · ${fyLabel(fy)}`} onClick={() => go("summary", "expenses")} />
         <Tile neutral label="Outstanding" value={money0(owed)} sub={waiting.length ? `${waiting.length} invoice${waiting.length === 1 ? "" : "s"}${overdue ? ` \u00b7 ${overdue} overdue` : ""}` : "Nobody owes you"} tone={overdue ? "var(--warn)" : null} onClick={() => go("summary", "tracker")} />
         <Tile neutral label="Tax estimate" value={money0(m.setAside)} sub="Put aside this year" onClick={() => go("summary", "position")} />
