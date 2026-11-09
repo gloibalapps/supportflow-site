@@ -371,6 +371,9 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 .hdtile .eyebrow{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10.5px;letter-spacing:.12em}
 .hdtile{min-height:0;display:flex;flex-direction:column;text-align:left;cursor:pointer;font:inherit;color:inherit;border:1px solid var(--line);border-radius:14px;padding:10px 13px;background:var(--bg-2)}
 .hdtile:hover,.hdhero:hover{border-color:rgba(200,145,58,.6)}
+.hdtile.static,.hdhero.static{cursor:default}
+.hdtile.static:hover,.hdhero.static:hover{border-color:var(--line)}
+.hdhero.static:hover{border-color:rgba(200,145,58,.45)}
 .hdval{font-size:20px;margin-top:2px;line-height:1.1}
 .hdsub{font-size:12px;color:var(--tx-3);margin-top:3px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .shortgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
@@ -3766,11 +3769,11 @@ function HomeDashboard({ data, m, go }) {
   const fyIncome = m.income, fyExpenses = m.expenses; // same figures as the Money screen
   const monthShort = new Date().toLocaleDateString("en-AU", { month: "short" });
   const Tile = ({ label, value, sub, tone, onClick, neutral }) => (
-    <button className={"hdtile" + (neutral ? " neutral" : "")} onClick={onClick}>
-      <div className="eyebrow">{label}</div>
-      <div className="disp num hdval" style={tone ? { color: tone } : null}>{value}</div>
+    React.createElement(onClick ? "button" : "div", { className: "hdtile" + (neutral ? " neutral" : "") + (onClick ? "" : " static"), onClick: onClick || undefined },
+      <div className="eyebrow">{label}</div>,
+      <div className="disp num hdval" style={tone ? { color: tone } : null}>{value}</div>,
       <div className="hdsub">{sub}</div>
-    </button>
+    )
   );
   return (
     <div style={{ marginBottom: 18, position: "relative" }}>
@@ -3781,18 +3784,18 @@ function HomeDashboard({ data, m, go }) {
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2.5 12C3.5 10.5 7 6 12 6s8.5 4.5 9.5 6c-1 1.5-4.5 6-9.5 6s-8.5-4.5-9.5-6z" /><circle cx="12" cy="12" r="3" /></svg>
         )}
       </button>
-      <button className="hdhero" onClick={() => go("summary", "position")}>
+      <div className="hdhero static">
         <div className="eyebrow">Gross income · {fyLabel(fy)}</div>
         <div className="disp num" style={{ fontSize: 34, marginTop: 4, lineHeight: 1.05 }}>{mny(fyIncome)}</div>
-        <div style={{ fontSize: 13, marginTop: 6, color: "var(--tx-3)" }}>Financial year to date ›</div>
-      </button>
+        <div style={{ fontSize: 13, marginTop: 6, color: "var(--tx-3)" }}>Financial year to date</div>
+      </div>
       <div className="hdgrid">
-        <Tile label={`Gross income \u00b7 ${monthShort}`} value={mny(grossMonth)} sub={issued.length ? `${issued.length} invoice${issued.length === 1 ? "" : "s"} \u00b7 ${mny(monthPaid)} paid` : "No invoices yet"} onClick={() => go("summary", "invoices")} />
+        <Tile label={`Gross income \u00b7 ${monthShort}`} value={mny(grossMonth)} sub={issued.length ? `${issued.length} invoice${issued.length === 1 ? "" : "s"} \u00b7 ${mny(monthPaid)} paid` : "No invoices yet"} />
         <Tile label="Next shift" value={nextShift ? nextDay : "None"} sub={nextShift ? `${nextShift.start || ""}${nextShift.end ? "\u2013" + nextShift.end : ""}${nextPt ? " \u00b7 " + nextPt.name : ""}` : "Nothing scheduled"} onClick={() => go("invoices", "shifts")} />
-        <Tile neutral label="Uninvoiced work" value={mny(uninvoiced)} sub={uninvoiced > 0 ? `${unbilled.length} shift${unbilled.length === 1 ? "" : "s"}${unbilledTrips.length ? ` + ${unbilledTrips.length} trip${unbilledTrips.length === 1 ? "" : "s"}` : ""} \u00b7 ${uninvoicedHours.toFixed(1)}h` : "All caught up"} onClick={() => go("summary", "invoices")} />
-        <Tile label="Expenses this FY" value={mny(fyExpenses)} sub={`Costs · ${fyLabel(fy)}`} onClick={() => go("summary", "expenses")} />
+        <Tile neutral label="Uninvoiced work" value={mny(uninvoiced)} sub={uninvoiced > 0 ? `${unbilled.length} shift${unbilled.length === 1 ? "" : "s"}${unbilledTrips.length ? ` + ${unbilledTrips.length} trip${unbilledTrips.length === 1 ? "" : "s"}` : ""} \u00b7 ${uninvoicedHours.toFixed(1)}h` : "All caught up"} />
+        <Tile label="Expenses this FY" value={mny(fyExpenses)} sub={`Costs · ${fyLabel(fy)}`} />
         <Tile neutral label="Outstanding" value={mny(owed)} sub={waiting.length ? `${waiting.length} invoice${waiting.length === 1 ? "" : "s"}${overdue ? ` \u00b7 ${overdue} overdue` : ""}` : "Nobody owes you"} tone={overdue ? "var(--warn)" : null} onClick={() => go("summary", "tracker")} />
-        <Tile neutral label="Tax estimate" value={mny(m.setAside)} sub="Put aside this year" onClick={() => go("summary", "position")} />
+        <Tile neutral label="Tax estimate" value={mny(m.setAside)} sub="Put aside this year" />
       </div>
     </div>
   );
