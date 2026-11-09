@@ -9453,203 +9453,377 @@ const FAQ = [
 // pattern as the FAQ so there is one thing to learn, not two.
 const MANUAL = [
   {
-    t: "Getting started",
-    d: "Set up SupportFlow and get ready to record your work.",
-    q: [
-      ["What this app does, and doesn't",
-       "It handles the paperwork around support work: invoices with the right NDIS codes, a running figure for the tax you'll owe, your kilometres, and your service agreements. It is not a rostering system, it records shifts you have done, it does not arrange them. It provides a BAS worksheet with your quarterly GST figures, but it does not lodge anything with the ATO or replace an accountant."],
-      ["What SupportFlow costs",
-       "SupportFlow is a one-off Lifetime licence \u2014 no subscription. New accounts start with 5 free invoice credits for 30 days to try the app; one credit is used the first time you preview a new invoice. After the free credits, buy the lifetime licence from the pricing page or via the profile menu. Once you own it, the menu shows Lifetime and invoicing has no limit. Moving to a new phone or PC is covered under Backups and troubleshooting."],
-      ["The first thing you see",
-       "A welcome screen, once, explaining the app in three lines. You can start guided setup, or try the app with demo data first. Before normal use, onboarding requires a backup password and a recovery code; that backup-security step cannot be skipped. A row of numbered steps stays pinned to the top as you scroll, so you always see which step you are on."],
-      ["Finding your way around",
-       "Four fixed bottom navigation areas: Home, Work, Money and People. Work, Money and People open clean shortcut pages first; choose the feature you need, then use Back near the top to return to those shortcuts. Home shows your totals. The Light mode / Dark mode control sits in the fixed top header, immediately left of ?. Use ? for the manual, and the profile menu for Settings."],
-      ["Installing on Android",
-       "Open supportflow.work/app in Chrome, open Chrome's menu, then choose Install app or Add to Home screen and confirm. SupportFlow will open from its own Home screen icon. Installing it does not create a SupportFlow cloud account; your working records remain on that app/browser installation and your encrypted backup is stored in the Google Drive account you connect."],
-      ["Installing on iPhone or iPad",
-       "Open supportflow.work/app in Safari, tap Share, choose Add to Home Screen, then tap Add. Open SupportFlow from the new Home screen icon."],
-      ["Installing on a Windows PC",
-       "Open supportflow.work/app in Chrome or Microsoft Edge. Use the Install icon in the address bar, or the browser menu's install-app option, then confirm. SupportFlow opens in its own window and can be pinned to Start or the taskbar."],
-      ["Installing on a Mac",
-       "Open supportflow.work/app in a browser that offers web-app installation and use its Install or Add to Dock option. The wording depends on the browser and macOS version. You can also keep using SupportFlow in the browser without installing it."],
-      ["Step 1 – Your details",
-       "Your name and ABN are required, because they print on every invoice and an invoice without an ABN is not valid, whoever pays you may have to withhold 47%. Add your bank details so they appear for payment. No ABN yet? Apply free at abr.gov.au, and never pay a website that offers to do it for you."],
-      ["Step 2 – Plan managers",
-       "Add every plan management company you invoice: name, contact, accounts email, and payment terms in days. Emails and phone numbers are checked as you type; if one is not valid, a message appears under the field and Save stays off until it is fixed. The terms are what set the due date on every invoice automatically. Do this before participants so each one can be linked in a tap. If you deal with none, use \u201cI don't deal with any\u201d."],
-      ["Step 3 – Participants",
-       "For each person: name, NDIS number, and how their plan is managed. Plan managed means their manager is billed, so link them. Self managed and NDIA managed are billed directly, so they need their own payment terms. Set the item you usually bill them for, so new invoices open on the right code. Set their area, which decides your travel time cap."],
-      ["Home and section shortcuts",
-       "Home shows your totals at a glance: gross income for the year and month, next shift, uninvoiced work, expenses, outstanding and tax estimate. Only Next shift and Outstanding open anything when tapped; the other tiles are display only. The eye icon hides every dollar amount on Home until you tap it again. Work, Money and People each open a clean shortcut page first. Tap a shortcut to open the existing feature, then use Back near the top to return. The fixed top header and bottom navigation stay available while the middle content scrolls."],
-      ["Red means it still needs you",
-       "Anything outlined in red is required and not yet done. It turns green with a tick once complete. The Summary screen keeps a numbered checklist of whatever is outstanding until it is all finished."],
-    ],
+    "t": "Getting started",
+    "d": "Install SupportFlow, work through the five setup steps and find your way around.",
+    "q": [
+      [
+        "What this app does, and doesn't",
+        "It handles the paperwork around support work: invoices with the right NDIS codes, a running figure for the tax you'll owe, your kilometres, and your service agreements. It is not a rostering system, it records shifts you have done, it does not arrange them. It provides a BAS worksheet with your quarterly GST figures, but it does not lodge anything with the ATO or replace an accountant."
+      ],
+      [
+        "What SupportFlow costs",
+        "SupportFlow is a one-off Lifetime licence — no subscription. New accounts start with 5 free invoice credits for 30 days to try the app; one credit is used the first time you preview a new invoice. After the free credits, buy the lifetime licence from the pricing page or via the profile menu. Once you own it, the menu shows Lifetime and invoicing has no limit. Your licence, upgrades and moving to a new phone or PC are covered under Your data and security."
+      ],
+      [
+        "Installing on Android",
+        "Open supportflow.work/app in Chrome, open Chrome's menu, then choose Install app or Add to Home screen and confirm. SupportFlow will open from its own Home screen icon. Installing it does not create a SupportFlow cloud account; your working records remain on that app/browser installation and your encrypted backup is stored in the Google Drive account you connect."
+      ],
+      [
+        "Installing on iPhone or iPad",
+        "Open supportflow.work/app in Safari, tap Share, choose Add to Home Screen, then tap Add. Open SupportFlow from the new Home screen icon."
+      ],
+      [
+        "Installing on a Windows PC",
+        "Open supportflow.work/app in Chrome or Microsoft Edge. Use the Install icon in the address bar, or the browser menu's install-app option, then confirm. SupportFlow opens in its own window and can be pinned to Start or the taskbar."
+      ],
+      [
+        "Installing on a Mac",
+        "Open supportflow.work/app in a browser that offers web-app installation and use its Install or Add to Dock option. The wording depends on the browser and macOS version. You can also keep using SupportFlow in the browser without installing it."
+      ],
+      [
+        "The first thing you see",
+        "A welcome screen, once, explaining the app in three lines. You can start guided setup, or try the app with demo data first: a made-up business, nothing in it is real, and starting setup for real replaces it. Guided setup is five numbered steps: PIN, Backup, Details, Managers, Participants. The row of numbers stays pinned to the top as you scroll, so you always see which step you are on. All five must be finished before normal use."
+      ],
+      [
+        "Setup step 1 – PIN",
+        "First you set a PIN (4 or 6 digits) that locks the app, so participant details are protected from the very first record. The PIN step cannot be skipped in guided setup. Once it is set you can add fingerprint or face unlock as a shortcut. See App lock under Your data and security."
+      ],
+      [
+        "Setup step 2 – Backup",
+        "Create your backup password, save the recovery code you are given (you must tick that you have saved it), and connect Google Drive or OneDrive. Continue only unlocks when all three are done and the first encrypted backup has uploaded. Your records live on this device only, so this step is your safety net. See Backups under Your data and security."
+      ],
+      [
+        "Setup step 3 – Your details",
+        "Your name and ABN are required, because they print on every invoice and an invoice without an ABN is not valid, whoever pays you may have to withhold 47%. Add your bank details so they appear for payment. No ABN yet? Apply free at abr.gov.au, and never pay a website that offers to do it for you."
+      ],
+      [
+        "Setup step 4 – Plan managers",
+        "Add every plan management company you invoice: name, contact, accounts email, and payment terms in days. Emails and phone numbers are checked as you type; if one is not valid, a message appears under the field and Save stays off until it is fixed. The terms are what set the due date on every invoice automatically. Do this before participants so each one can be linked in a tap. If you deal with none, use “I don't deal with any”."
+      ],
+      [
+        "Setup step 5 – Participants",
+        "For each person: name, NDIS number, and how their plan is managed. Plan managed means their manager is billed, so link them. Self managed and NDIA managed are billed directly, so they need their own payment terms. Set the item you usually bill them for, so new invoices open on the right code. Set their area, which decides your travel time cap. Setting them up as a private client (not NDIS) is covered under Invoicing."
+      ],
+      [
+        "Red means it still needs you",
+        "Anything outlined in red is required and not yet done. It turns green with a tick once complete. The Summary screen keeps a numbered checklist of whatever is outstanding until it is all finished."
+      ],
+      [
+        "Finding your way around",
+        "Four fixed bottom navigation areas: Home, Work, Money and People. Work, Money and People open clean shortcut pages first; choose the feature you need, then use Back near the top to return to those shortcuts. Home shows your totals. The Light mode / Dark mode control sits in the fixed top header, immediately left of ?. Use ? for the manual, and the profile menu for Settings."
+      ],
+      [
+        "Home and section shortcuts",
+        "Home shows your totals at a glance: gross income for the year and month, next shift, uninvoiced work, expenses, outstanding and tax estimate. Only Next shift and Outstanding open anything when tapped; the other tiles are display only. The eye icon hides every dollar amount on Home until you tap it again. Work, Money and People each open a clean shortcut page first. Tap a shortcut to open the existing feature, then use Back near the top to return. The fixed top header and bottom navigation stay available while the middle content scrolls."
+      ]
+    ]
   },
   {
-    t: "Logging your work",
-    d: "Shifts, travel and expenses, entered once and used throughout SupportFlow.",
-    q: [
-      ["Adding a shift",
-       "Work \u2192 Shifts gives you a month calendar. Tap Add a shift and enter the participant, date, start and finish. That is all, the app works out which support item applies and shows you why before you save. Use it for work you have done and for work coming up."],
-      ["Your shifts, at a glance",
-       "Below the calendar, Work \u2192 Shifts groups everything by participant rather than listing every shift in a long scroll. Each person gets two totals: Completed, hours and an estimated dollar figure for work already done, and Scheduled, the same for what's still coming up. The estimate uses whatever rate that participant has set as their usual one, not the time-of-day classification an actual invoice works out, so treat it as a guide, not a figure to invoice from. Tap a calendar day instead to see that day's individual shifts."],
-      ["Scheduled, completed, cancelled",
-       "A shift set in the future starts as Scheduled; one dated today or earlier starts as Completed, so you rarely touch the field. Only completed shifts, once their finish time has actually passed, are ready to bill on Money \u2192 Invoices, so booking next Tuesday never prompts you to bill for it. If a past shift is still marked scheduled, the calendar asks whether it went ahead and a single tap confirms it."],
-      ["Cancelled shifts",
-       "Mark the shift cancelled and record the date they told you. The app immediately says whether it is claimable, under seven days notice it is, seven or more it is not. A claimable one is billable the same as completed work, on Money \u2192 Invoices, even though the participant summary on Work \u2192 Shifts leaves cancellations out of its totals."],
-      ["How the time-of-day rules work",
-       "Weekday daytime starts at or after 6am and finishes by 8pm. Evening starts at or after 8pm. Night starts before 6am or runs past midnight. Saturday, Sunday and public holiday go by the day the support was delivered. A sleepover crosses midnight, runs eight hours or more, and lets you sleep when not needed."],
-      ["Shifts that cross 8pm",
-       "The higher evening rate applies to the whole shift, not just the part after 8pm, as long as the same worker does all of it. The app does this for you and reminds you that the rules require discussing that arrangement with the participant, so it belongs in your service agreement."],
-      ["Logging travel",
-       "Work \u2192 Travel. Pick the participant and enter the distance, typed directly as kilometres or worked out from an odometer start and finish. Tick billable if it should go on their invoice. Those same kilometres do two jobs: billed to the participant, and counted as a tax deduction. You enter them once."],
-      ["Logging an expense",
-       "Money \u2192 Expenses. Date, what it was, category, amount. Not sure whether it counts? Type the description and tap Can I claim this?"],
-    ],
-  },
-
-  {
-    t: "Incidents",
-    d: "Record incidents, immediate safety actions, reporting prompts and follow-up.",
-    q: [
-      ["Recording an incident",
-       "People → Incidents → New incident. Record the affected person, incident date and time, when you became aware, location, what happened, any harm, immediate actions, people involved or witnesses, participant support, follow-up and corrective action. Keep it factual. Incident records stay with the rest of your local SupportFlow records and are included in your encrypted backup."],
-      ["Registered provider setting",
-       "Settings → Business & invoice details asks whether you are a registered NDIS provider. Turn this on only if you are registered. It changes the incident-reporting prompts; it does not decide whether you are required to register."],
-      ["Reportable incident prompts",
-       "For a registered provider, SupportFlow flags the common NDIS Commission reportable-incident categories. Most are shown as a 24-hour notification timeframe from when the provider became aware. An unauthorised restrictive practice is shown as five business days, with a stronger 24-hour warning when harm is recorded. These are prompts, not a legal determination — check the current Commission guidance and submit through the official portal."],
-      ["SupportFlow does not report for you",
-       "SupportFlow never automatically sends an incident to the NDIS Commission, police, emergency services, a participant, plan manager or anyone else. If anyone is in immediate danger call 000. If an incident may be reportable, use the Commission guidance link in the incident screen and make the required notification yourself."],
-      ["Incident register PDF",
-       "People → Incidents → Export register PDF creates a local PDF summary from the incident records on this device. It can help with review or audit preparation, but you should check the exported information before relying on it."],
-    ],
-  },
-  {
-    t: "Invoicing",
-    d: "Turn completed shifts and travel into accurate invoices.",
-    q: [
-      ["Creating an invoice",
-       "Invoices are built by ticking finished work, not typed up separately, and all of that happens on Money \u2192 Invoices, in a \u201cReady to bill\u201d panel. Work \u2192 Shifts is purely a record, dates, times, status, nothing about billing lives there. Tick the shifts you want on Money \u2192 Invoices, a running total appears for that participant, and Raise invoice creates it already filled in, one line per shift, each with its own date, time and support item code."],
-      ["Adding your shifts automatically",
-       "Ticking happens on Money \u2192 Invoices, in the \u201cReady to bill\u201d panel, not on Work \u2192 Shifts. Only finished shifts not yet billed can be ticked, and ticking someone else's shift while another participant's are already ticked swaps the selection, a running total only means something for one person at a time. Each ticked shift becomes its own line on the invoice, its date, start and finish time, and the correct support item code, nothing is merged or summarised."],
-      ["Adding your travel automatically",
-       "The same pattern on Work \u2192 Travel. Billable trips not yet on an invoice show a checkbox, ticking builds a running kilometre and dollar total for one participant, and Raise invoice creates it. Kilometres can be entered directly or from an odometer start and finish reading, whichever a trip was logged with is how it is shown."],
-      ["Why billed work locks",
-       "Anything attached to an invoice disappears from every other invoice's list, and its row turns green with the invoice number. You cannot edit or delete it until you remove it from that invoice. This is deliberate, it is what stops the same work being billed twice."],
-      ["Charging a cancelled shift",
-       "Mark the shift cancelled on Work \u2192 Shifts and record when it was booked and when they cancelled, the app tells you straight away whether it is claimable. If it is, it shows up on Money \u2192 Invoices with a checkbox alongside completed work, tick it and it goes on an invoice the same way, labelled clearly as a short notice cancellation rather than a delivered shift."],
-      ["Travel time versus kilometres",
-       "They are different claims, both logged on Work \u2192 Travel rather than the invoice. Kilometres are the non-labour travel item. Travel time is an optional field that appears once a trip is marked billable, claimed against the support item itself at the same hourly rate, capped at 30 minutes each way in metro and regional centres, 60 in regional areas, uncapped in remote, the cap depends on where the participant is, not where you live."],
-      ["Sending it",
-       "Preview PDF opens the real, finished document so you can check it before anyone else sees it. Share invoice sends the same PDF straight through Gmail, Outlook, Messages or whatever is installed on your device. Sending marks the invoice Sent, shown as a blue tag on the invoice list. If it passes its due date still unpaid, that tag turns red and reads Overdue instead, no extra step needed. When the money lands, open it and set the status to Paid, the tax figure only counts invoices marked paid."],
-    ],
+    "t": "Work",
+    "d": "Shifts, travel and shift notes. This is the Work tab.",
+    "q": [
+      [
+        "Adding a shift",
+        "Work → Shifts gives you a month calendar. Tap Add a shift and enter the participant, date, start and finish. That is all, the app works out which support item applies and shows you why before you save. Use it for work you have done and for work coming up."
+      ],
+      [
+        "Your shifts, at a glance",
+        "Below the calendar, Work → Shifts groups everything by participant rather than listing every shift in a long scroll. Each person gets two totals: Completed, hours and an estimated dollar figure for work already done, and Scheduled, the same for what's still coming up. The estimate uses whatever rate that participant has set as their usual one, not the time-of-day classification an actual invoice works out, so treat it as a guide, not a figure to invoice from. Tap a calendar day instead to see that day's individual shifts."
+      ],
+      [
+        "Scheduled, completed, cancelled",
+        "A shift set in the future starts as Scheduled; one dated today or earlier starts as Completed, so you rarely touch the field. Only completed shifts, once their finish time has actually passed, are ready to bill on Money → Invoices, so booking next Tuesday never prompts you to bill for it. If a past shift is still marked scheduled, the calendar asks whether it went ahead and a single tap confirms it."
+      ],
+      [
+        "Cancelled shifts",
+        "Mark the shift cancelled and record the date they told you. The app immediately says whether it is claimable, under seven days notice it is, seven or more it is not. A claimable one is billable the same as completed work, on Money → Invoices, even though the participant summary on Work → Shifts leaves cancellations out of its totals."
+      ],
+      [
+        "How the time-of-day rules work",
+        "Weekday daytime starts at or after 6am and finishes by 8pm. Evening starts at or after 8pm. Night starts before 6am or runs past midnight. Saturday, Sunday and public holiday go by the day the support was delivered. A sleepover crosses midnight, runs eight hours or more, and lets you sleep when not needed."
+      ],
+      [
+        "Shifts that cross 8pm",
+        "The higher evening rate applies to the whole shift, not just the part after 8pm, as long as the same worker does all of it. The app does this for you and reminds you that the rules require discussing that arrangement with the participant, so it belongs in your service agreement."
+      ],
+      [
+        "Logging travel",
+        "Work → Travel. Pick the participant and enter the distance, typed directly as kilometres or worked out from an odometer start and finish. Tick billable if it should go on their invoice. Those same kilometres do two jobs: billed to the participant, and counted as a tax deduction. You enter them once."
+      ],
+      [
+        "Shift notes",
+        "Work → Notes. Write a note against a participant and mark it private or shareable. That mark is about how you have written it, plain and factual for someone else to read, or your own private observations. Ticking it does not send anything."
+      ],
+      [
+        "Sending a note",
+        "A shareable note gets a Send button. On a phone you get your usual share sheet: WhatsApp, Telegram, Messages, email, whatever you have installed. You can also email it straight to the participant or their plan manager using the addresses on their records, or copy the text. On a computer the share sheet usually is not available, so email and copy are what you will see. Nothing goes until you press send in whichever app opens."
+      ],
+      [
+        "What gets sent, and to whom",
+        "There is a tick box for whether to include their full name and NDIS number. Leave it on when emailing a plan manager, who needs both to match the note to the right person. Turn it off when sending through a messaging app and the note goes out with a first name only. Either way this is personal information about someone else, so send it only to people entitled to see it, and check the participant is comfortable with how you are sending it, some plan managers require email or their own portal. Once sent, the note records the date, and who it went to when the app knows."
+      ]
+    ]
   },
   {
-    t: "Tax and money",
-    d: "Understand your tax estimate, deductions and vehicle kilometres.",
-    q: [
-      ["The set-aside figure",
-       "Money \u2192 Tax shows what to put aside. It uses the current tax rates and the Medicare levy, on your income less your expenses and vehicle deduction, counting only invoices marked Paid, you do not owe tax on money you have not received. The screen also shows what is left for you after expenses and tax, with your expenses taken off first. Open a second bank account and move it across as you are paid."],
-      ["Why it looks small in July",
-       "The first $18,200 you earn in a year is not taxed, and the figure is year-to-date. Early in the financial year there is genuinely little to set aside. It grows as the year goes on."],
-      ["Your vehicle",
-       "Every trip you log counts automatically at the ATO's cents-per-kilometre rate, up to 5,000 km a year. That rate already includes fuel, servicing, registration, insurance and the car losing value, so do not also claim those as separate expenses. Owning, leasing or hire-purchasing makes no difference under this method."],
-      ["Past 5,000 kilometres",
-       "The app tells you when this method stops counting. The logbook method has no cap and would probably be worth more, but it needs a twelve-week logbook and receipts for running costs. That is a conversation with an accountant, before year end."],
-      ["Starting point for this year",
-       "If you switched to SupportFlow partway through the financial year, Settings has a Starting point panel. Add a rough total for what you had already earned, spent and driven before you started, three numbers, not individual invoices. It joins your tax set-aside figure for the current year only, so the number covers the whole year rather than just the part tracked here. It never shows up as an invoice, an expense or a participant record, and it does not carry into next financial year on its own."],
-      ["Accountant pack",
-       "Money \u2192 Tax \u2192 Accountant pack. Choose the financial year (it opens on the current Australian year, 1 July to 30 June) and download a PDF, or print that same PDF. It lists your business name and ABN, income from invoices marked paid, expenses by category with the date and amount, vehicle kilometres and the cents-per-kilometre deduction, and the tax set-aside. GST and BAS figures are included when the app already calculates them. It excludes participant and client personal information: no names, NDIS numbers, notes, incident details, addresses, contact details, plan manager or payer names, or support descriptions. Expense descriptions are left out as well, because they can name a person. This is not the incident register. Printing uses the pack PDF only, not the rest of the app. Check the figures before you rely on them. It is a record of what you entered, not a tax return."],
-      ["The deduction checker",
-       "New checks are capped at 15 a day on each device. Anything you have asked before opens instantly and does not count. Money \u2192 Tax \u2192 Claim check: type anything, steel cap boots, phone bill, travel between clients, and it reads the ATO site and answers with a verdict, the reason in plain English, how to split work and private use, and what evidence to keep. It searches nowhere else: no blogs, no forums, no accounting firms. The links shown underneath are the ATO pages it actually opened, so a reference cannot be invented. If nothing on the ATO site answers your question it says so plainly, rather than guessing. Anything asked before opens instantly."],
-    ],
+    "t": "Invoicing",
+    "d": "Money → Invoices: turn finished shifts and travel into invoices, and bill private clients.",
+    "q": [
+      [
+        "Creating an invoice",
+        "Invoices are built by ticking finished work, not typed up separately, and all of that happens on Money → Invoices, in a “Ready to bill” panel. Work → Shifts is purely a record, dates, times, status, nothing about billing lives there. Tick the shifts you want on Money → Invoices, a running total appears for that participant, and Raise invoice creates it already filled in, one line per shift, each with its own date, time and support item code."
+      ],
+      [
+        "Adding your shifts automatically",
+        "Ticking happens on Money → Invoices, in the “Ready to bill” panel, not on Work → Shifts. Only finished shifts not yet billed can be ticked, and ticking someone else's shift while another participant's are already ticked swaps the selection, a running total only means something for one person at a time. Each ticked shift becomes its own line on the invoice, its date, start and finish time, and the correct support item code, nothing is merged or summarised."
+      ],
+      [
+        "Adding your travel automatically",
+        "The same pattern on Work → Travel. Billable trips not yet on an invoice show a checkbox, ticking builds a running kilometre and dollar total for one participant, and Raise invoice creates it. Kilometres can be entered directly or from an odometer start and finish reading, whichever a trip was logged with is how it is shown."
+      ],
+      [
+        "Why billed work locks",
+        "Anything attached to an invoice disappears from every other invoice's list, and its row turns green with the invoice number. You cannot edit or delete it until you remove it from that invoice. This is deliberate, it is what stops the same work being billed twice."
+      ],
+      [
+        "Charging a cancelled shift",
+        "Mark the shift cancelled on Work → Shifts and record when it was booked and when they cancelled, the app tells you straight away whether it is claimable. If it is, it shows up on Money → Invoices with a checkbox alongside completed work, tick it and it goes on an invoice the same way, labelled clearly as a short notice cancellation rather than a delivered shift."
+      ],
+      [
+        "Travel time versus kilometres",
+        "They are different claims, both logged on Work → Travel rather than the invoice. Kilometres are the non-labour travel item. Travel time is an optional field that appears once a trip is marked billable, claimed against the support item itself at the same hourly rate, capped at 30 minutes each way in metro and regional centres, 60 in regional areas, uncapped in remote, the cap depends on where the participant is, not where you live."
+      ],
+      [
+        "Sending it",
+        "Preview PDF opens the real, finished document so you can check it before anyone else sees it. Share invoice sends the same PDF straight through Gmail, Outlook, Messages or whatever is installed on your device. Sending marks the invoice Sent, shown as a blue tag on the invoice list. If it passes its due date still unpaid, that tag turns red and reads Overdue instead, no extra step needed. When the money lands, open it and set the status to Paid, the tax figure only counts invoices marked paid."
+      ],
+      [
+        "Private clients (not NDIS)",
+        "Not everyone you support is NDIS funded. On their record in People → Participants, tick “Not an NDIS participant, private client”. Their NDIS number becomes optional, and in place of an NDIS support item you enter a description (for example “Support work, hourly”) and your own hourly rate. Shifts then bill at that description and rate, not an NDIS item code, and a short-notice cancellation is worded the same way. Travel kilometres bill at the rate in Settings → Vehicle, without NDIS travel wording. Provider travel time is an NDIS-only claim, so it is not added for a private client; add that line yourself if your arrangement includes it. Notes, agreements, tax and income totals work as normal. You can tick or untick the box later; invoices already sent do not change, only new ones. If an invoice shows an NDIS code instead of their description, check the box is actually ticked on their record."
+      ]
+    ]
   },
   {
-    t: "GST",
-    d: "Understand the GST threshold, registration and BAS.",
-    q: [
-      ["The trap",
-       "Most NDIS supports are GST-free, so you do not add 10%. But GST-free income still counts toward the $75,000 registration threshold. Being GST-free does not keep you under it. The app tracks your turnover over a rolling twelve months and warns you at 80%, then tells you once you are over, registration is required within 21 days."],
-      ["Registering does not mean charging GST",
-       "Qualifying NDIS supports stay GST-free and your invoice shows GST as $0.00. What changes is that you lodge a BAS each quarter, and you can claim back the GST you paid on fuel, phone and equipment, which often means money coming back to you."],
-      ["Setting your status",
-       "Settings \u2192 GST. Invoices change to match: headed \u201cTax invoice\u201d with a GST-free statement when you are registered, plain \u201cInvoice\u201d when you are not."],
-      ["Lodging your BAS",
-       "Once registered, the Money shortcut page adds BAS: a quarterly summary of what you have invoiced and spent, built from records already entered, nothing typed twice. Income is counted in the quarter an invoice was paid, not the quarter it was issued. It opens on whichever quarter actually has activity in it rather than always the current one. It is a worksheet to lodge from, not a lodgement itself, the app does not submit anything to the ATO."],
-    ],
+    "t": "Payment tracker and notifications",
+    "d": "Money → Payment tracker: the optional add-on that chases unpaid invoices.",
+    "q": [
+      [
+        "What the Payment tracker costs",
+        "The Payment tracker (Money → Payment tracker) is optional. Without it, the Payment tracker page shows a short card with an Add Payment tracker button. With it, the page opens on the invoices that need action and shows whether reminders are On or Off. It is A$29 once, on top of Basic. A second device is a separate A$29 add-on, not a tracker price. Premium is A$129 once and includes everything in Basic, a two-device licence and the Payment tracker."
+      ],
+      [
+        "How you are alerted",
+        "When a reminder goes out, you are told in two free ways. Push notifications go to every device where you turned them on. If you leave Also email me ticked in Payment tracker → Settings, you also get a short email at the address you entered there. The payer is never emailed this alert. SupportFlow does not send text messages."
+      ],
+      [
+        "Turn on push notifications",
+        "Turn them on on each device separately: Payment tracker → Settings → Turn on phone notifications, then Allow. Android: install from Chrome's menu (Install app), open from the icon, sign in, then turn on. Windows or Mac: install from the Chrome or Edge address bar install icon, open the app, sign in, then turn on. iPhone/iPad (iOS 16.4 or later): in Safari tap Share → Add to Home Screen, open SupportFlow from the Home Screen icon, sign in again, then turn on and Allow."
+      ],
+      [
+        "Notifications not arriving",
+        "Check the system settings: Android Settings → Apps → Notifications; Windows Settings → System → Notifications plus the browser's site settings; Mac System Settings → Notifications; iPhone Settings → Notifications → SupportFlow. Check Do Not Disturb or Focus, then tap Turn on phone notifications again. Delivery isn't guaranteed. Notifications don't work in a normal iPhone Safari tab, only in the Home Screen app."
+      ]
+    ]
   },
   {
-    t: "Agreements and notes",
-    d: "Create service agreements and keep clear support notes.",
-    q: [
-      ["Why service agreements matter",
-       "A written agreement is one of four conditions that keep your supports GST-free. Miss one and a support may become taxable, meaning you could owe 10% you never charged. It is the condition sole traders most often skip."],
-      ["Letting the app write one",
-       "People \u2192 Agreements lists everyone with their agreement status, and Generate one writes the PDF. The PDF is built from what you have already entered, both parties, ABN, NDIS number, plan management, rates, travel and payment terms, plus clauses on cancellations, responsibilities, ending the agreement, GST and complaints, with signature blocks. It is a starting point, not legal advice, so have it looked over before the first one is signed."],
-      ["Recording and reviewing",
-       "Tick the agreement box, then record the date signed, a review date, and where the signed copy is kept. A participant whose review falls within 30 days shows amber and appears by name on the Summary checklist."],
-      ["Shift notes",
-       "Work \u2192 Notes. Write a note against a participant and mark it private or shareable. That mark is about how you have written it, plain and factual for someone else to read, or your own private observations. Ticking it does not send anything."],
-      ["Sending a note",
-       "A shareable note gets a Send button. On a phone you get your usual share sheet: WhatsApp, Telegram, Messages, email, whatever you have installed. You can also email it straight to the participant or their plan manager using the addresses on their records, or copy the text. On a computer the share sheet usually is not available, so email and copy are what you will see. Nothing goes until you press send in whichever app opens."],
-      ["What gets sent, and to whom",
-       "There is a tick box for whether to include their full name and NDIS number. Leave it on when emailing a plan manager, who needs both to match the note to the right person. Turn it off when sending through a messaging app and the note goes out with a first name only. Either way this is personal information about someone else, so send it only to people entitled to see it, and check the participant is comfortable with how you are sending it, some plan managers require email or their own portal. Once sent, the note records the date, and who it went to when the app knows."],
-    ],
+    "t": "Expenses, tax and GST",
+    "d": "Money → Expenses, Tax and BAS: what you spend, what to put aside and what to lodge.",
+    "q": [
+      [
+        "Logging an expense",
+        "Money → Expenses → Add an expense. Enter the date, category, what it was and the amount. If you are registered for GST, two more fields appear: the GST shown on the receipt, and the business-use percentage (100 unless part of it was private, such as a phone bill). The app shows the potential GST credit as an estimate; not every business purchase is creditable. Not sure whether something counts as a deduction? Type what it was and tap Can I claim this? (see The deduction checker)."
+      ],
+      [
+        "The set-aside figure",
+        "Money → Tax shows what to put aside. It uses the current tax rates and the Medicare levy, on your income less your expenses and vehicle deduction, counting only invoices marked Paid, you do not owe tax on money you have not received. The screen also shows what is left for you after expenses and tax, with your expenses taken off first. Open a second bank account and move it across as you are paid."
+      ],
+      [
+        "Why it looks small in July",
+        "The first $18,200 you earn in a year is not taxed, and the figure is year-to-date. Early in the financial year there is genuinely little to set aside. It grows as the year goes on."
+      ],
+      [
+        "Your vehicle",
+        "Every trip you log counts automatically at the ATO's cents-per-kilometre rate, up to 5,000 km a year. That rate already includes fuel, servicing, registration, insurance and the car losing value, so do not also claim those as separate expenses. Owning, leasing or hire-purchasing makes no difference under this method."
+      ],
+      [
+        "Past 5,000 kilometres",
+        "The app tells you when this method stops counting. The logbook method has no cap and would probably be worth more, but it needs a twelve-week logbook and receipts for running costs. That is a conversation with an accountant, before year end."
+      ],
+      [
+        "Starting point for this year",
+        "If you switched to SupportFlow partway through the financial year, Settings has a Starting point panel. Add a rough total for what you had already earned, spent and driven before you started, three numbers, not individual invoices. It joins your tax set-aside figure for the current year only, so the number covers the whole year rather than just the part tracked here. It never shows up as an invoice, an expense or a participant record, and it does not carry into next financial year on its own."
+      ],
+      [
+        "Accountant pack",
+        "Money → Tax → Accountant pack. Choose the financial year (it opens on the current Australian year, 1 July to 30 June) and download a PDF, or print that same PDF. It lists your business name and ABN, income from invoices marked paid, expenses by category with the date and amount, vehicle kilometres and the cents-per-kilometre deduction, and the tax set-aside. GST and BAS figures are included when the app already calculates them. It excludes participant and client personal information: no names, NDIS numbers, notes, incident details, addresses, contact details, plan manager or payer names, or support descriptions. Expense descriptions are left out as well, because they can name a person. This is not the incident register. Printing uses the pack PDF only, not the rest of the app. Check the figures before you rely on them. It is a record of what you entered, not a tax return."
+      ],
+      [
+        "The deduction checker",
+        "New checks are capped at 15 a day on each device. Anything you have asked before opens instantly and does not count. Money → Tax → Claim check: type anything, steel cap boots, phone bill, travel between clients, and it reads the ATO site and answers with a verdict, the reason in plain English, how to split work and private use, and what evidence to keep. It searches nowhere else: no blogs, no forums, no accounting firms. The links shown underneath are the ATO pages it actually opened, so a reference cannot be invented. If nothing on the ATO site answers your question it says so plainly, rather than guessing. Anything asked before opens instantly."
+      ],
+      [
+        "The trap",
+        "Most NDIS supports are GST-free, so you do not add 10%. But GST-free income still counts toward the $75,000 registration threshold. Being GST-free does not keep you under it. The app tracks your turnover over a rolling twelve months and warns you at 80%, then tells you once you are over, registration is required within 21 days."
+      ],
+      [
+        "Registering does not mean charging GST",
+        "Qualifying NDIS supports stay GST-free and your invoice shows GST as $0.00. What changes is that you lodge a BAS each quarter, and you can claim back the GST you paid on fuel, phone and equipment, which often means money coming back to you."
+      ],
+      [
+        "Setting your status",
+        "Settings → GST. Invoices change to match: headed “Tax invoice” with a GST-free statement when you are registered, plain “Invoice” when you are not."
+      ],
+      [
+        "Lodging your BAS",
+        "Once registered, the Money shortcut page adds BAS: a quarterly summary of what you have invoiced and spent, built from records already entered, nothing typed twice. Income is counted in the quarter an invoice was paid, not the quarter it was issued. It opens on whichever quarter actually has activity in it rather than always the current one. It is a worksheet to lodge from, not a lodgement itself, the app does not submit anything to the ATO."
+      ]
+    ]
   },
   {
-    t: "Backups and troubleshooting",
-    d: "Keep your data protected and know what to do when something goes wrong.",
-    q: [
-      ["Your records live on this device only",
-       "There is no account and no cloud sync. Clear your browser data, lose the phone or delete the app, and the records go with it. Settings \u2192 Backup handles this."],
-      ["Every backup is encrypted",
-       "During required onboarding, you create one backup password. New backups use that password until you change it in Settings → Backup. The file is locked with it before it leaves the app, so wherever it ends up (your Drive, an email, a chat) it is unreadable without that password. Nobody at SupportFlow ever sees it or stores it, so nobody can reset it. Write it down somewhere separate from the device, or keep it in a password manager, and do not reuse a password from somewhere else."],
-      ["Your recovery code",
-       "When you set the backup password you are also given a recovery code that looks like ABCD-EFGH-JKLM-NPQR-STUV. It opens your backups instead of the password, so if you forget the password you are not locked out. It is shown once and SupportFlow does not keep a copy, so use Copy or Save as file and store it in a password manager or write it down, away from this device and away from where your backups are kept. Anyone with the code and a backup file can open that backup. You must tick that you have saved it before setup continues. It works on backups made after the code was created; an older backup still needs the password that made it. If you set your password before recovery codes existed, Settings \u2192 Backup shows Recovery code: Not set up with a Create recovery code button. New recovery code replaces it. Changing your backup password gives you a new recovery code too. If you lose both the password and the recovery code, nobody can recover those backups."],
-      ["Restoring a backup",
-       "Choose Restore, pick the file, and enter the backup password it was made with, or the recovery code you saved when you set the password up (the recovery code works on backups made after it was created). Get it right and it shows you exactly what is in the file, how many participants, invoices and so on, and how many of your current records would be overwritten, before anything changes. Nothing is replaced until you confirm."],
-      ["Moving to a new phone or PC",
-       "Before switching devices, open Settings \u2192 Backup \u2192 Back up now and wait until the upload confirms. That backup must complete successfully \u2014 it is the only copy of your records. On the new device, open supportflow.work/app in Chrome, install it, and complete onboarding. When asked to restore, choose the file from your Google Drive and enter your backup password (or your recovery code). Your participants, shifts, invoices, incidents, expenses and settings will appear exactly as they were. Once you have confirmed the new device has everything, stop using the old installation \u2014 do not keep working on it, or the two copies will diverge."],
-      ["What transfers and what does not",
-       "Everything in your encrypted backup transfers: participants, shifts, invoices, service agreements, plan managers, incidents, expenses, trips and settings. Your lifetime licence is linked to your purchase email. After restoring your backup on the new device, if the Lifetime badge doesn't appear, open the profile menu (top right), tap Restore licence, and enter the email you used at checkout. What does not transfer automatically: your backup passphrase (you must know it \u2014 nobody can recover it), your Google Drive connection (reconnect it during onboarding on the new device), and any unsaved draft open at the time of the last backup."],
-      ["Automatic Google Drive backups",
-       "Google Drive is connected during required onboarding and the first encrypted backup must succeed before setup continues. After meaningful changes, SupportFlow waits about five minutes and uploads one encrypted backup while the app is active. If you are offline, the backup remains pending and retries when SupportFlow is next opened online. A PWA cannot reliably run while completely closed."],
-      ["Back up now, change account or disconnect",
-       "Settings \u2192 Backup shows the connected Google Drive, last successful backup and status. Back up now starts an immediate encrypted backup; while it is running the button changes to Backing up and additional manual or automatic backup attempts are blocked. Change Google account connects a different Drive account. Disconnect Google Drive stops automatic backups on this device but does not delete backups already stored in Drive."],
-      ["A figure looks wrong",
-       "Check the invoice is marked Paid, because unpaid invoices do not count toward tax. Then check the date falls inside the current financial year, 1 July to 30 June."],
-      ["A shift or trip will not delete",
-       "It is attached to an invoice. Remove it from that invoice first. This is deliberate, so you cannot delete work you have already billed."],
-      ["The due date is blank",
-       "The payer has no payment terms recorded. Open Participants, then the participant or plan manager, and add the number of days."],
-      ["An invoice says no billing email",
-       "The plan manager or participant has no email on file. Add it to their record and it will flow through to every future invoice."],
-      ["Getting support",
-       "Manual & help has a Support tab. Describe what happened, then Email support opens your mail app addressed to us with the subject already set to \u201cSupport NDIS\u201d and your message filled in. Nothing sends until you press send there. A few harmless details, app version, device, and how many records you have, are included automatically so we can help faster. Nothing about a participant is ever included."],
-      ["Privacy and security",
-       "Settings \u2192 Privacy & security explains where your records are stored, how encrypted Google Drive backups work, and what limited information is shared when you deliberately use services such as Claimable or SupportFlow Assistant. The Legal documents section links to the full public Privacy Policy and Terms of Use."],
-      ["Daily limit on checks",
-       "The checker allows 15 questions a day, and the note tidier 30. That is far more than a normal day of work and exists to stop the cost running away, each check reads live pages from the ATO, which is not free. Anything you have already asked opens instantly and does not count against the limit, and it resets the next day."],
-      ["Checking things yourself",
-       "Manual & help has an Official sources tab: the NDIS pricing updates page, the NDIA newsletters you can subscribe to, the NDIS Commission for worker screening and complaints, the ATO occupation guide for support workers, and the Australian Business Register. This app is a convenience, not an authority, when something matters, check the source."],
-      ["When the rates go out of date",
-       "Prices change every 1 July, and sometimes mid-year. The app records when its figures were last checked against the published schedule, and once that is more than a year old it says so on the Summary screen and in Settings rather than quietly looking current. Subscribing to the NDIA provider newsletter is the simplest way to hear about a change when it happens."],
-      ["Where the numbers come from",
-       "Support item codes and prices come from the NDIS Pricing Schedule 2026-27, National column, effective 1 July 2026. The billing rules, time of day, cancellations, travel, come from the Pricing Arrangements and Price Limits 2025-26, the most recent published rules. Prices change every 1 July, so check ndis.gov.au if the year has turned over."],
-    ],
-  },  {
-    t: "Payment tracker and notifications",
-    d: "The optional Payment tracker add-on: prices, reminders and notifications.",
-    q: [
-      ["What the Payment tracker costs",
-       "The Payment tracker (Money \u2192 Payment tracker) is optional. Without it, the Payment tracker page shows a short card with an Add Payment tracker button. With it, the page opens on the invoices that need action and shows whether reminders are On or Off. It is A$29 once, on top of Basic. A second device is a separate A$29 add-on, not a tracker price. Premium is A$129 once and includes everything in Basic, a two-device licence and the Payment tracker."],
-      ["How you are alerted",
-       "When a reminder goes out, you are told in two free ways. Push notifications go to every device where you turned them on. If you leave Also email me ticked in Payment tracker \u2192 Settings, you also get a short email at the address you entered there. The payer is never emailed this alert. SupportFlow does not send text messages."],
-      ["Turn on push notifications",
-       "Turn them on on each device separately: Payment tracker \u2192 Settings \u2192 Turn on phone notifications, then Allow. Android: install from Chrome's menu (Install app), open from the icon, sign in, then turn on. Windows or Mac: install from the Chrome or Edge address bar install icon, open the app, sign in, then turn on. iPhone/iPad (iOS 16.4 or later): in Safari tap Share \u2192 Add to Home Screen, open SupportFlow from the Home Screen icon, sign in again, then turn on and Allow."],
-      ["Notifications not arriving",
-       "Check the system settings: Android Settings \u2192 Apps \u2192 Notifications; Windows Settings \u2192 System \u2192 Notifications plus the browser's site settings; Mac System Settings \u2192 Notifications; iPhone Settings \u2192 Notifications \u2192 SupportFlow. Check Do Not Disturb or Focus, then tap Turn on phone notifications again. Delivery isn't guaranteed. Notifications don't work in a normal iPhone Safari tab, only in the Home Screen app."],
-    ],
+    "t": "People",
+    "d": "Participants, plan managers, service agreements and incidents. This is the People tab.",
+    "q": [
+      [
+        "Participants and plan managers",
+        "People → Participants lists everyone you support; Add participant opens the same form used in setup, and tapping a person opens their record to edit. People → Plan managers is the same for plan management companies, including their payment terms, which set the due date on every invoice. Emails and phone numbers are checked as you type."
+      ],
+      [
+        "The due date is blank",
+        "The payer has no payment terms recorded. Open Participants, then the participant or plan manager, and add the number of days."
+      ],
+      [
+        "An invoice says no billing email",
+        "The plan manager or participant has no email on file. Add it to their record and it will flow through to every future invoice."
+      ],
+      [
+        "Why service agreements matter",
+        "A written agreement is one of four conditions that keep your supports GST-free. Miss one and a support may become taxable, meaning you could owe 10% you never charged. It is the condition sole traders most often skip."
+      ],
+      [
+        "Letting the app write one",
+        "People → Agreements lists everyone with their agreement status, and Generate one writes the PDF. The PDF is built from what you have already entered, both parties, ABN, NDIS number, plan management, rates, travel and payment terms, plus clauses on cancellations, responsibilities, ending the agreement, GST and complaints, with signature blocks. It is a starting point, not legal advice, so have it looked over before the first one is signed."
+      ],
+      [
+        "Recording and reviewing",
+        "Tick the agreement box, then record the date signed, a review date, and where the signed copy is kept. A participant whose review falls within 30 days shows amber and appears by name on the Summary checklist."
+      ],
+      [
+        "Recording an incident",
+        "People → Incidents → New incident. Record the affected person, incident date and time, when you became aware, location, what happened, any harm, immediate actions, people involved or witnesses, participant support, follow-up and corrective action. Keep it factual. Incident records stay with the rest of your local SupportFlow records and are included in your encrypted backup."
+      ],
+      [
+        "Registered provider setting",
+        "Settings → Business & invoice details asks whether you are a registered NDIS provider. Turn this on only if you are registered. It changes the incident-reporting prompts; it does not decide whether you are required to register."
+      ],
+      [
+        "Reportable incident prompts",
+        "For a registered provider, SupportFlow flags the common NDIS Commission reportable-incident categories. Most are shown as a 24-hour notification timeframe from when the provider became aware. An unauthorised restrictive practice is shown as five business days, with a stronger 24-hour warning when harm is recorded. These are prompts, not a legal determination — check the current Commission guidance and submit through the official portal."
+      ],
+      [
+        "SupportFlow does not report for you",
+        "SupportFlow never automatically sends an incident to the NDIS Commission, police, emergency services, a participant, plan manager or anyone else. If anyone is in immediate danger call 000. If an incident may be reportable, use the Commission guidance link in the incident screen and make the required notification yourself."
+      ],
+      [
+        "Incident register PDF",
+        "People → Incidents → Export register PDF creates a local PDF summary from the incident records on this device. It can help with review or audit preparation, but you should check the exported information before relying on it."
+      ]
+    ]
   },
+  {
+    "t": "Your data and security",
+    "d": "Backups, the app lock, your licence and privacy.",
+    "q": [
+      [
+        "Your records live on this device only",
+        "There is no account and no cloud sync. Clear your browser data, lose the phone or delete the app, and the records go with it. Settings → Backup handles this."
+      ],
+      [
+        "Every backup is encrypted",
+        "During required onboarding, you create one backup password. New backups use that password until you change it in Settings → Backup. The file is locked with it before it leaves the app, so wherever it ends up (your Drive, an email, a chat) it is unreadable without that password. Nobody at SupportFlow ever sees it or stores it, so nobody can reset it. Write it down somewhere separate from the device, or keep it in a password manager, and do not reuse a password from somewhere else."
+      ],
+      [
+        "Your recovery code",
+        "When you set the backup password you are also given a recovery code that looks like ABCD-EFGH-JKLM-NPQR-STUV. It opens your backups instead of the password, so if you forget the password you are not locked out. It is shown once and SupportFlow does not keep a copy, so use Copy or Save as file and store it in a password manager or write it down, away from this device and away from where your backups are kept. Anyone with the code and a backup file can open that backup. You must tick that you have saved it before setup continues. It works on backups made after the code was created; an older backup still needs the password that made it. If you set your password before recovery codes existed, Settings → Backup shows Recovery code: Not set up with a Create recovery code button. New recovery code replaces it. Changing your backup password gives you a new recovery code too. If you lose both the password and the recovery code, nobody can recover those backups."
+      ],
+      [
+        "Restoring a backup",
+        "Choose Restore, pick the file, and enter the backup password it was made with, or the recovery code you saved when you set the password up (the recovery code works on backups made after it was created). Get it right and it shows you exactly what is in the file, how many participants, invoices and so on, and how many of your current records would be overwritten, before anything changes. Nothing is replaced until you confirm."
+      ],
+      [
+        "Moving to a new phone or PC",
+        "Before switching devices, open Settings → Backup → Back up now and wait until the upload confirms. That backup must complete successfully — it is the only copy of your records. On the new device, open supportflow.work/app in Chrome, install it, and complete onboarding. When asked to restore, choose the file from your Google Drive and enter your backup password (or your recovery code). Your participants, shifts, invoices, incidents, expenses and settings will appear exactly as they were. Once you have confirmed the new device has everything, stop using the old installation — do not keep working on it, or the two copies will diverge."
+      ],
+      [
+        "What transfers and what does not",
+        "Everything in your encrypted backup transfers: participants, shifts, invoices, service agreements, plan managers, incidents, expenses, trips and settings. Your lifetime licence is linked to your purchase email. After restoring your backup on the new device, if the Lifetime badge doesn't appear, open the profile menu (top right), tap Restore licence, and enter the email you used at checkout. What does not transfer automatically: your backup passphrase (you must know it — nobody can recover it), your Google Drive connection (reconnect it during onboarding on the new device), and any unsaved draft open at the time of the last backup."
+      ],
+      [
+        "Automatic Google Drive backups",
+        "A Google Drive or OneDrive account is connected during required onboarding and the first encrypted backup must succeed before setup continues. After meaningful changes, SupportFlow waits about five minutes and uploads one encrypted backup while the app is active. If you are offline, the backup remains pending and retries when SupportFlow is next opened online. A PWA cannot reliably run while completely closed."
+      ],
+      [
+        "Back up now, change account or disconnect",
+        "Settings → Backup shows the connected Google Drive or OneDrive, last successful backup and status. Back up now starts an immediate encrypted backup; while it is running the button changes to Backing up and additional manual or automatic backup attempts are blocked. Change Google account connects a different Drive account. Disconnect Google Drive stops automatic backups on this device but does not delete backups already stored in Drive."
+      ],
+      [
+        "Setting a PIN and fingerprint unlock",
+        "Settings → Lock the app (you also set it during guided setup). Choose 4 or 6 digits and enter the PIN twice. It is scrambled before it is stored; the app never keeps a plain copy. If your phone and browser support it, Add fingerprint or face appears once a PIN is set, as a shortcut with the PIN as the fallback. This is a screen lock, not encryption: your phone’s own screen lock is still your first line of defence, and your encrypted backup is what actually protects the data."
+      ],
+      [
+        "When the app locks again",
+        "It asks for the PIN again once SupportFlow has been in the background for more than 10 minutes. Switching to your mail app and straight back will not trigger it. It does not lock while the app stays open on screen. To lock it yourself, tap your avatar (top right) and choose Lock now; that option appears once a PIN is set."
+      ],
+      [
+        "If you forget your PIN",
+        "There is no reset. Nothing was sent anywhere that could check who you are. The way back in is Forgotten your PIN? on the lock screen, which clears the app and lets you restore from your backup, so anything since your last backup is gone. That is why a backup comes before everything else in setup."
+      ],
+      [
+        "Your licence: plans, upgrades and restoring",
+        "Basic (A$79) covers one device. A second device is a separate A$29 add-on and the Payment tracker is a separate A$29 add-on; Premium (A$129) includes both for people buying for the first time. There is no subscription. Settings → Licence & devices shows your plan. To add a second device or the tracker, use the Upgrade button on your plan (sign in with the Google account you bought with); you pay through Stripe and it applies automatically. On a new device, tap Already have a licence on another device? and enter your checkout email, so you are never asked to pay twice. Your records are never part of the licence: they stay on your device."
+      ],
+      [
+        "Where things are in Settings",
+        "Tap the avatar (top right) and choose Settings. Each panel is collapsed to its heading and only one stays open at a time: Lock the app, Business & invoice details (name, ABN, GST status, registered-provider setting), Bank details, Starting point, Backup, Vehicle, Support item rates, Records (run setup again, clear all records) and Manual & help. Privacy & security is also reachable from Settings."
+      ],
+      [
+        "Privacy and security",
+        "Settings → Privacy & security explains where your records are stored, how encrypted Google Drive backups work, and what limited information is shared when you deliberately use services such as Claimable or SupportFlow Assistant. The Legal documents section links to the full public Privacy Policy and Terms of Use."
+      ]
+    ]
+  },
+  {
+    "t": "Help and troubleshooting",
+    "d": "When something looks wrong, and where the numbers come from.",
+    "q": [
+      [
+        "A figure looks wrong",
+        "Check the invoice is marked Paid, because unpaid invoices do not count toward tax. Then check the date falls inside the current financial year, 1 July to 30 June."
+      ],
+      [
+        "A shift or trip will not delete",
+        "It is attached to an invoice. Remove it from that invoice first. This is deliberate, so you cannot delete work you have already billed."
+      ],
+      [
+        "Getting support",
+        "Manual & help has a Support tab. Describe what happened, then Email support opens your mail app addressed to us with the subject already set to “Support NDIS” and your message filled in. Nothing sends until you press send there. A few harmless details, app version, device, and how many records you have, are included automatically so we can help faster. Nothing about a participant is ever included."
+      ],
+      [
+        "Daily limit on checks",
+        "The checker allows 15 questions a day, and the note tidier 30. That is far more than a normal day of work and exists to stop the cost running away, each check reads live pages from the ATO, which is not free. Anything you have already asked opens instantly and does not count against the limit, and it resets the next day."
+      ],
+      [
+        "Checking things yourself",
+        "Manual & help has an Official sources tab: the NDIS pricing updates page, the NDIA newsletters you can subscribe to, the NDIS Commission for worker screening and complaints, the ATO occupation guide for support workers, and the Australian Business Register. This app is a convenience, not an authority, when something matters, check the source."
+      ],
+      [
+        "When the rates go out of date",
+        "Prices change every 1 July, and sometimes mid-year. The app records when its figures were last checked against the published schedule, and once that is more than a year old it says so on the Summary screen and in Settings rather than quietly looking current. Subscribing to the NDIA provider newsletter is the simplest way to hear about a change when it happens."
+      ],
+      [
+        "Where the numbers come from",
+        "Support item codes and prices come from the NDIS Pricing Schedule 2026-27, National column, effective 1 July 2026. The billing rules, time of day, cancellations, travel, come from the Pricing Arrangements and Price Limits 2025-26, the most recent published rules. Prices change every 1 July, so check ndis.gov.au if the year has turned over."
+      ]
+    ]
+  }
 ];
 
 
