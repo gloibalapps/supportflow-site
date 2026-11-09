@@ -365,6 +365,8 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 .hdhero{display:block;width:100%;text-align:left;cursor:pointer;font:inherit;color:inherit;border:1px solid rgba(200,145,58,.45);border-radius:16px;padding:13px 16px;margin-bottom:9px;background:linear-gradient(145deg,var(--bg-3),var(--bg-2))}
 .hdtile.neutral{background:var(--bg-1,var(--bg-2));border-color:var(--line)}
 .hdtile.neutral .hdval{color:var(--tx-2)}
+.hdeye{position:absolute;top:12px;right:12px;z-index:2;width:32px;height:32px;border-radius:50%;border:none;background:transparent;color:var(--tx-3);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.hdeye:hover{color:var(--brass-lift)}
 .hdgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
 .hdtile .eyebrow{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10.5px;letter-spacing:.12em}
 .hdtile{min-height:0;display:flex;flex-direction:column;text-align:left;cursor:pointer;font:inherit;color:inherit;border:1px solid var(--line);border-radius:14px;padding:10px 13px;background:var(--bg-2)}
@@ -3729,6 +3731,9 @@ function ThemeMoonIcon() {
 }
 
 function HomeDashboard({ data, m, go }) {
+  const [hide, setHide] = useState(() => { try { return localStorage.getItem("sf_hide_nums") === "1"; } catch (_) { return false; } });
+  const toggleHide = () => { const v = !hide; setHide(v); try { localStorage.setItem("sf_hide_nums", v ? "1" : "0"); } catch (_) {} };
+  const mny = (n) => hide ? "$\u2022\u2022\u2022\u2022" : money0(n);
   const t = today();
   const month = t.slice(0, 7);
   const ptOf = (id) => data.participants.find((p) => p.id === id);
@@ -3768,19 +3773,26 @@ function HomeDashboard({ data, m, go }) {
     </button>
   );
   return (
-    <div style={{ marginBottom: 18 }}>
+    <div style={{ marginBottom: 18, position: "relative" }}>
+      <button className="hdeye" onClick={toggleHide} aria-label={hide ? "Show amounts" : "Hide amounts"} title={hide ? "Show amounts" : "Hide amounts"}>
+        {hide ? (
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 3l18 18" /><path d="M10.6 6.2A9.8 9.8 0 0 1 12 6c5 0 8.5 4.5 9.5 6a15 15 0 0 1-3.2 3.7M6.3 7.8C4.4 9.2 3 11 2.5 12c1 1.5 4.5 6 9.5 6 1.5 0 2.8-.4 4-1" /><path d="M9.9 10A3 3 0 0 0 14 14.1" /></svg>
+        ) : (
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2.5 12C3.5 10.5 7 6 12 6s8.5 4.5 9.5 6c-1 1.5-4.5 6-9.5 6s-8.5-4.5-9.5-6z" /><circle cx="12" cy="12" r="3" /></svg>
+        )}
+      </button>
       <button className="hdhero" onClick={() => go("summary", "position")}>
         <div className="eyebrow">Gross income · {fyLabel(fy)}</div>
-        <div className="disp num" style={{ fontSize: 34, marginTop: 4, lineHeight: 1.05 }}>{money0(fyIncome)}</div>
+        <div className="disp num" style={{ fontSize: 34, marginTop: 4, lineHeight: 1.05 }}>{mny(fyIncome)}</div>
         <div style={{ fontSize: 13, marginTop: 6, color: "var(--tx-3)" }}>Financial year to date ›</div>
       </button>
       <div className="hdgrid">
-        <Tile label={`Gross income \u00b7 ${monthShort}`} value={money0(grossMonth)} sub={issued.length ? `${issued.length} invoice${issued.length === 1 ? "" : "s"} \u00b7 ${money0(monthPaid)} paid` : "No invoices yet"} onClick={() => go("summary", "invoices")} />
+        <Tile label={`Gross income \u00b7 ${monthShort}`} value={mny(grossMonth)} sub={issued.length ? `${issued.length} invoice${issued.length === 1 ? "" : "s"} \u00b7 ${mny(monthPaid)} paid` : "No invoices yet"} onClick={() => go("summary", "invoices")} />
         <Tile label="Next shift" value={nextShift ? nextDay : "None"} sub={nextShift ? `${nextShift.start || ""}${nextShift.end ? "\u2013" + nextShift.end : ""}${nextPt ? " \u00b7 " + nextPt.name : ""}` : "Nothing scheduled"} onClick={() => go("invoices", "shifts")} />
-        <Tile neutral label="Uninvoiced work" value={money0(uninvoiced)} sub={uninvoiced > 0 ? `${unbilled.length} shift${unbilled.length === 1 ? "" : "s"}${unbilledTrips.length ? ` + ${unbilledTrips.length} trip${unbilledTrips.length === 1 ? "" : "s"}` : ""} \u00b7 ${uninvoicedHours.toFixed(1)}h` : "All caught up"} onClick={() => go("summary", "invoices")} />
-        <Tile label="Expenses this FY" value={money0(fyExpenses)} sub={`Costs · ${fyLabel(fy)}`} onClick={() => go("summary", "expenses")} />
-        <Tile neutral label="Outstanding" value={money0(owed)} sub={waiting.length ? `${waiting.length} invoice${waiting.length === 1 ? "" : "s"}${overdue ? ` \u00b7 ${overdue} overdue` : ""}` : "Nobody owes you"} tone={overdue ? "var(--warn)" : null} onClick={() => go("summary", "tracker")} />
-        <Tile neutral label="Tax estimate" value={money0(m.setAside)} sub="Put aside this year" onClick={() => go("summary", "position")} />
+        <Tile neutral label="Uninvoiced work" value={mny(uninvoiced)} sub={uninvoiced > 0 ? `${unbilled.length} shift${unbilled.length === 1 ? "" : "s"}${unbilledTrips.length ? ` + ${unbilledTrips.length} trip${unbilledTrips.length === 1 ? "" : "s"}` : ""} \u00b7 ${uninvoicedHours.toFixed(1)}h` : "All caught up"} onClick={() => go("summary", "invoices")} />
+        <Tile label="Expenses this FY" value={mny(fyExpenses)} sub={`Costs · ${fyLabel(fy)}`} onClick={() => go("summary", "expenses")} />
+        <Tile neutral label="Outstanding" value={mny(owed)} sub={waiting.length ? `${waiting.length} invoice${waiting.length === 1 ? "" : "s"}${overdue ? ` \u00b7 ${overdue} overdue` : ""}` : "Nobody owes you"} tone={overdue ? "var(--warn)" : null} onClick={() => go("summary", "tracker")} />
+        <Tile neutral label="Tax estimate" value={mny(m.setAside)} sub="Put aside this year" onClick={() => go("summary", "position")} />
       </div>
     </div>
   );
