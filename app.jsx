@@ -82,7 +82,8 @@ html,body{overscroll-behavior-y:none;background:#14150F;height:100%;overflow-x:h
 .dots{display:flex;gap:6px;margin-bottom:20px}
 .dots i{height:3px;flex:1;border-radius:2px;background:var(--line);transition:background .3s}
 .dots i[data-on="1"]{background:var(--brass)}
-.setup-progress{display:flex;align-items:center;gap:0;margin-bottom:24px;padding:0}
+.setup-progress{display:flex;align-items:center;gap:0;margin:0 -22px 20px;padding:12px 22px 10px;position:sticky;top:60px;z-index:20;background:var(--bg);border-bottom:1px solid var(--line)}
+.sl[data-demo] .setup-progress{top:100px}
 .setup-step{display:flex;flex-direction:column;align-items:center;flex:1;position:relative;z-index:1}
 .setup-step .circle{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;font-family:'Instrument Sans',sans-serif;border:2.5px solid var(--line);background:var(--bg-2);color:var(--tx-3);transition:all .3s}
 .setup-step[data-state="done"] .circle{background:var(--good);border-color:var(--good);color:#fff}
@@ -6762,7 +6763,7 @@ function Onboarding({ data, save, close, help, openPrivacy, startStep }) {
           <BackupPasswordSetup data={data} save={save} onReady={() => setBackupRefresh((n) => n + 1)} />
         </div>
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 }}>
-          <button className="btn" disabled={!hasBackupMasterKey() || !cloudBackupConnected()} onClick={async () => { try { await performGoogleAutoBackup(data); setBackupDecided(true); } catch (e) { alert("The first encrypted " + cloudBackupLabel() + " backup could not be completed. Check your connection and try again."); } }}>
+          <button className="btn" disabled={!hasBackupMasterKey() || backupRecoveryState() !== "ok" || !cloudBackupConnected()} onClick={async () => { try { await performGoogleAutoBackup(data); setBackupDecided(true); } catch (e) { alert("The first encrypted " + cloudBackupLabel() + " backup could not be completed. Check your connection and try again."); } }}>
             Continue
           </button>
         </div>
@@ -9661,7 +9662,7 @@ const MANUAL = [
       ["Every backup is encrypted",
        "During required onboarding, you create one backup password. New backups use that password until you change it in Settings → Backup. The file is locked with it before it leaves the app, so wherever it ends up (your Drive, an email, a chat) it is unreadable without that passphrase. Nobody at SupportFlow ever sees it or stores it. That also means nobody can reset it. If you lose the passphrase, that backup cannot be recovered by anyone. Write it down somewhere separate from the device, or keep it in a password manager, and do not reuse a password from somewhere else."],
       ["Restoring a backup",
-       "Choose Restore, pick the file, and enter the passphrase it was made with. Get the passphrase right and it shows you exactly what is in the file, how many participants, invoices and so on, and how many of your current records would be overwritten, before anything changes. Nothing is replaced until you confirm."],
+       "Choose Restore, pick the file, and enter the backup password it was made with, or the recovery code you saved when you set the password up (the recovery code works on backups made after it was created). Get it right and it shows you exactly what is in the file, how many participants, invoices and so on, and how many of your current records would be overwritten, before anything changes. Nothing is replaced until you confirm."],
       ["Moving to a new phone or PC",
        "Before switching devices, open Settings \u2192 Backup \u2192 Back up now and wait until the upload confirms. That backup must complete successfully \u2014 it is the only copy of your records. On the new device, open supportflow.work/app in Chrome, install it, and complete onboarding. When asked to restore, choose the file from your Google Drive and enter your backup passphrase. Your participants, shifts, invoices, incidents, expenses and settings will appear exactly as they were. Once you have confirmed the new device has everything, stop using the old installation \u2014 do not keep working on it, or the two copies will diverge."],
       ["What transfers and what does not",
@@ -10359,6 +10360,35 @@ async function encryptBackup(text, passphrase) {
   });
 }
 
+// ---- recovery code ----
+// A random code the person keeps somewhere safe. It wraps the backup key, and the wrapped key
+// travels inside every backup file made after the code exists, so a forgotten password no longer
+// strands the backup. The code itself is never stored by SupportFlow.
+const REC_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+function makeRecoveryCode() {
+  const r = crypto.getRandomValues(new Uint8Array(20));
+  let s = ""; for (const b of r) s += REC_ALPHABET[b % 32];
+  return s.match(/.{4}/g).join("-");
+}
+const normRecovery = (c) => String(c || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+async function recoveryWrapKey(code, salt, usage) {
+  const m = await crypto.subtle.importKey("raw", new TextEncoder().encode(normRecovery(code)), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey({ name: "PBKDF2", salt, iterations: PBKDF2_ITERATIONS, hash: "SHA-256" }, m, { name: "AES-GCM", length: 256 }, false, [usage]);
+}
+async function wrapMasterWithRecovery(keyB64, code) {
+  const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+  const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+  const k = await recoveryWrapKey(code, salt, "encrypt");
+  const raw = Uint8Array.from(atob(keyB64), (c) => c.charCodeAt(0));
+  const wrapped = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, k, raw);
+  return { v: 1, salt: b64(salt), iv: b64(iv), data: b64(wrapped) };
+}
+async function unwrapMasterWithRecovery(rec, code) {
+  const b64d = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+  const k = await recoveryWrapKey(code, b64d(rec.salt), "decrypt");
+  return new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64d(rec.iv) }, k, b64d(rec.data)));
+}
+
 async function decryptBackup(json, passphrase) {
   const env = JSON.parse(json);
   if (!env.encrypted) return json;   // an older, unencrypted export
@@ -10373,7 +10403,16 @@ async function decryptBackup(json, passphrase) {
     const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64d(env.iv) }, key, b64d(env.data));
     return dec.decode(plain);
   } catch (e) {
-    throw new Error("wrong-passphrase");
+    // Not the password. If this file carries a recovery block, the same box also accepts the recovery code.
+    if (env.recovery) {
+      try {
+        const raw = await unwrapMasterWithRecovery(env.recovery, passphrase);
+        const mk = await crypto.subtle.importKey("raw", raw, { name: "AES-GCM" }, false, ["decrypt"]);
+        const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64d(env.iv) }, mk, b64d(env.data));
+        return dec.decode(plain);
+      } catch (_) { /* fall through */ }
+    }
+    throw new Error(env.recovery ? "wrong-passphrase" : "wrong-passphrase-norec");
   }
 }
 
@@ -10954,7 +10993,44 @@ async function setBackupMaster(passphrase) {
   const material = await crypto.subtle.importKey("raw", enc.encode(passphrase), "PBKDF2", false, ["deriveBits"]);
   const bits = await crypto.subtle.deriveBits({ name:"PBKDF2", salt, iterations:PBKDF2_ITERATIONS, hash:"SHA-256" }, material, 256);
   const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
-  localStorage.setItem(BACKUP_KEY_STORAGE, JSON.stringify({ salt:b64(salt), key:b64(bits), iterations:PBKDF2_ITERATIONS }));
+  const code = makeRecoveryCode();
+  const recovery = await wrapMasterWithRecovery(b64(bits), code);
+  localStorage.setItem(BACKUP_KEY_STORAGE, JSON.stringify({ salt:b64(salt), key:b64(bits), iterations:PBKDF2_ITERATIONS, recovery, recoveryAck:false }));
+  return code;   // shown once; never stored
+}
+// For a password that was set before recovery codes existed: wrap the stored key now.
+async function createRecoveryForExistingMaster() {
+  const m = getBackupMaster(); if (!m) throw new Error("backup-password-not-set");
+  const code = makeRecoveryCode();
+  m.recovery = await wrapMasterWithRecovery(m.key, code); m.recoveryAck = false;
+  localStorage.setItem(BACKUP_KEY_STORAGE, JSON.stringify(m));
+  return code;
+}
+function backupRecoveryState() { const m = getBackupMaster(); return !m ? "none" : !m.recovery ? "missing" : m.recoveryAck ? "ok" : "unconfirmed"; }
+function ackBackupRecovery() { const m = getBackupMaster(); if (!m) return; m.recoveryAck = true; try { localStorage.setItem(BACKUP_KEY_STORAGE, JSON.stringify(m)); } catch (_) {} }
+function RecoveryCodeCard({ code, onDone }) {
+  const [saved, setSaved] = useState(false); const [copied, setCopied] = useState(false);
+  const copy = async () => { try { await navigator.clipboard.writeText(code); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch (_) {} };
+  const download = () => {
+    const blob = new Blob(["SupportFlow backup recovery code\n\n" + code + "\n\nKeep this somewhere safe, away from the device and away from where your backups are stored. It opens backups made after this code was created if you forget your backup password. SupportFlow cannot recreate it.\n"], { type: "text/plain" });
+    const url = URL.createObjectURL(blob); const a = document.createElement("a");
+    a.href = url; a.download = "supportflow-recovery-code.txt"; document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  return <div style={{ background: "var(--bg)", border: "1px solid var(--line)", borderRadius: 10, padding: "15px 16px" }}>
+    <div className="eyebrow" style={{ marginBottom: 10 }}>Your recovery code</div>
+    <div style={{ fontSize: 12.5, color: "var(--tx-2)", lineHeight: 1.65, marginBottom: 12 }}>If you ever forget your backup password, this code opens your backups instead. It is shown once and SupportFlow does not keep a copy.</div>
+    <div className="num" style={{ fontFamily: "ui-monospace,Menlo,Consolas,monospace", fontSize: 17, letterSpacing: ".04em", textAlign: "center", padding: "14px 10px", border: "1px dashed var(--brass)", borderRadius: 9, marginBottom: 12, wordBreak: "break-all", userSelect: "all" }}>{code}</div>
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+      <button className="btn ghost" type="button" onClick={copy}>{copied ? "Copied ✓" : "Copy"}</button>
+      <button className="btn ghost" type="button" onClick={download}>Save as file</button>
+    </div>
+    <div style={{ border: "1px solid var(--req)", background: "var(--req-soft)", borderRadius: 9, padding: "11px 13px", marginBottom: 14, fontSize: 12, lineHeight: 1.6 }}>Keep it in a password manager or written down, <b>away from this device and away from where your backups are stored</b>. Anyone with the code and a backup file can open it.</div>
+    <label style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: 13, lineHeight: 1.5, marginBottom: 14 }}>
+      <input type="checkbox" checked={saved} onChange={(e) => setSaved(e.target.checked)} style={{ width: "auto", flex: "0 0 auto", margin: "3px 0 0" }} />
+      <span>I've saved my recovery code somewhere safe</span>
+    </label>
+    <button className="btn" disabled={!saved} onClick={() => { ackBackupRecovery(); onDone && onDone(); }}>Continue</button>
+  </div>;
 }
 async function encryptBackupWithMaster(text) {
   const master = getBackupMaster();
@@ -10964,13 +11040,16 @@ async function encryptBackupWithMaster(text) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const key = await crypto.subtle.importKey("raw", b64d(master.key), {name:"AES-GCM"}, false, ["encrypt"]);
   const cipher = await crypto.subtle.encrypt({name:"AES-GCM", iv}, key, new TextEncoder().encode(text));
-  return JSON.stringify({ encrypted:true, format:BACKUP_FORMAT, kdf:"PBKDF2-SHA256", iterations:master.iterations, salt:master.salt, iv:b64(iv), data:b64(cipher) });
+  return JSON.stringify({ encrypted:true, format:BACKUP_FORMAT, kdf:"PBKDF2-SHA256", iterations:master.iterations, salt:master.salt, iv:b64(iv), data:b64(cipher), ...(master.recovery ? { recovery: master.recovery } : {}) });
 }
 function BackupPasswordSetup({ data, save, onReady }) {
   const [pass,setPass]=useState(""); const [pass2,setPass2]=useState(""); const [show,setShow]=useState(false); const [busy,setBusy]=useState(false); const [err,setErr]=useState("");
+  const [recCode,setRecCode]=useState(""); const [, bump]=useState(0);
   const weak=weakPassphrase(pass);
+  if (recCode) return <RecoveryCodeCard code={recCode} onDone={()=>{setRecCode(""); onReady&&onReady(); bump(n=>n+1);}} />;
+  if (hasBackupMasterKey() && backupRecoveryState()!=="ok") return <div className="callout"><b>{backupRecoveryState()==="missing"?"One more step: recovery code":"Save your recovery code"}</b><div style={{marginTop:6,fontSize:12.5,lineHeight:1.6}}>A recovery code lets you open your backups if you ever forget your backup password.</div><button className="btn" style={{marginTop:10}} onClick={async()=>{try{setRecCode(await createRecoveryForExistingMaster());}catch(e){setErr("Couldn't create a recovery code.");}}}>{backupRecoveryState()==="missing"?"Create recovery code":"Show a new recovery code"}</button>{err&&<div style={{fontSize:12,color:"var(--warn)",marginTop:8}}>{err}</div>}</div>;
   if (hasBackupMasterKey()) return <div className="callout"><b>Backup password set ✓</b><div style={{marginTop:6,fontSize:12.5}}>This password will protect all new backups until you change it in Settings → Backup.</div></div>;
-  const create=async()=>{ if(weak||!pass||pass!==pass2)return; setBusy(true);setErr(""); try{await setBackupMaster(pass); save({...data,profile:{...data.profile,backupPasswordSet:true,backupEvery:"daily"}}); setPass("");setPass2("");onReady&&onReady();}catch(e){setErr("Couldn't set the backup password on this device.");}finally{setBusy(false);} };
+  const create=async()=>{ if(weak||!pass||pass!==pass2)return; setBusy(true);setErr(""); try{const code=await setBackupMaster(pass); save({...data,profile:{...data.profile,backupPasswordSet:true,backupEvery:"daily"}}); setPass("");setPass2("");setRecCode(code);}catch(e){setErr("Couldn't set the backup password on this device.");}finally{setBusy(false);} };
   return <div style={{background:"var(--bg)",border:"1px solid var(--line)",borderRadius:10,padding:"15px 16px"}}>
     <div className="eyebrow" style={{marginBottom:10}}>Create your backup password</div>
     <label className="f"><span>Backup password</span><input type={show?"text":"password"} value={pass} onChange={e=>setPass(e.target.value)} placeholder="A few random words work well" /></label>
@@ -10997,6 +11076,8 @@ function BackupPanel({ data, save, open, onToggle }) {
   const [pass2, setPass2] = useState("");
   const [unlockPass, setUnlockPass] = useState("");
   const [unlockFile, setUnlockFile] = useState(null);
+  const [recCode, setRecCode] = useState("");
+  const [, bumpRec] = useState(0);
   const [showPass, setShowPass] = useState(false);
   const [driveConnected, setDriveConnected] = useState(() => cloudBackupConnected());
   const [backupFailed, setBackupFailed] = useState(false);
@@ -11046,7 +11127,8 @@ function BackupPanel({ data, save, open, onToggle }) {
     if (pass !== pass2) { setErr("Those two don't match."); return; }
     setBusy(true); setErr("");
     try {
-      await setBackupMaster(pass);
+      const newCode = await setBackupMaster(pass);
+      setRecCode(newCode);
       const encrypted = await encryptBackupWithMaster(backupPayload(data));
       const how = via === "share" ? await shareBackup(encrypted, true) : (downloadBackup(encrypted, true), "downloaded");
       if (how !== "cancelled") {
@@ -11078,7 +11160,9 @@ function BackupPanel({ data, save, open, onToggle }) {
       setMode(null); setUnlockFile(null); setUnlockPass("");
     } catch (e) {
       setErr(e.message === "wrong-passphrase"
-        ? "That passphrase doesn't open this file. Check it and try again."
+        ? "That doesn't open this file. Check your backup password or recovery code and try again."
+        : e.message === "wrong-passphrase-norec"
+        ? "That passphrase doesn't open this file. This backup was made before recovery codes existed, so only its original backup password will open it."
         : (e.message || "Couldn't read that file."));
     } finally { setBusy(false); }
   };
@@ -11134,7 +11218,9 @@ function BackupPanel({ data, save, open, onToggle }) {
         )}
       </div>
 
-      {pending ? (
+      {recCode ? (
+        <RecoveryCodeCard code={recCode} onDone={() => { setRecCode(""); bumpRec((n) => n + 1); }} />
+      ) : pending ? (
         <div className="callout" style={{ borderColor: "var(--req)", marginBottom: 0 }}>
           <b>Ready to restore this backup?</b>
           <div style={{ marginTop: 9, fontSize: 12.5, lineHeight: 1.8 }}>
@@ -11177,7 +11263,7 @@ function BackupPanel({ data, save, open, onToggle }) {
           <div style={{ border: "1px solid var(--req)", background: "var(--req-soft)", borderRadius: 9,
                         padding: "12px 13px", marginBottom: 16 }}>
             <div style={{ color: "var(--req)", fontWeight: 700, fontSize: 12.5, lineHeight: 1.6 }}>
-              If you lose this passphrase, this backup cannot be recovered, not by us, not by anyone.
+              If you lose this passphrase and the recovery code you're about to get, your backups cannot be opened, not by us, not by anyone.
             </div>
             <div style={{ color: "var(--req)", fontSize: 11.5, lineHeight: 1.6, marginTop: 6, fontWeight: 600 }}>
               Don't reuse a password from somewhere else, and don't save it in a note on this phone.
@@ -11201,8 +11287,8 @@ function BackupPanel({ data, save, open, onToggle }) {
 
       ) : mode === "unlock" ? (
         <div style={{ background: "var(--bg)", border: "1px solid var(--line)", borderRadius: 10, padding: "15px 16px" }}>
-          <div className="eyebrow" style={{ marginBottom: 10 }}>Enter the passphrase for this backup</div>
-          <label className="f" style={{ marginBottom: 14 }}><span>Passphrase</span>
+          <div className="eyebrow" style={{ marginBottom: 10 }}>Unlock this backup</div>
+          <label className="f" style={{ marginBottom: 14 }}><span>Backup password or recovery code</span>
             <input type={showPass ? "text" : "password"} value={unlockPass} autoFocus
               onChange={(e) => setUnlockPass(e.target.value)} onKeyDown={(e) => e.key === "Enter" && unlock()} />
           </label>
@@ -11240,6 +11326,9 @@ function BackupPanel({ data, save, open, onToggle }) {
           )}
           <input ref={fileRef} type="file" accept="application/json,.json" onChange={pick} style={{ display: "none" }} />
           <div style={{marginTop:10,fontSize:11.5,color:"var(--tx-3)"}}>Backup password: {hasBackupMasterKey() ? "Set ✓" : "Not set — required for new encrypted backups"}</div>
+          {hasBackupMasterKey() && <div style={{marginTop:4,fontSize:11.5,color:backupRecoveryState()==="ok"?"var(--tx-3)":"var(--warn)"}}>Recovery code: {backupRecoveryState()==="ok" ? "Saved ✓ — opens backups if you forget the password" : "Not set up — backups can't be opened if the password is forgotten"}</div>}
+          {hasBackupMasterKey() && backupRecoveryState()!=="ok" && <button className="btn tiny" style={{marginTop:8}} onClick={async()=>{try{setRecCode(await createRecoveryForExistingMaster());}catch(_){setErr("Couldn't create a recovery code.");}}}>Create recovery code</button>}
+          {hasBackupMasterKey() && backupRecoveryState()==="ok" && <button className="btn ghost tiny" style={{marginTop:8,marginRight:8}} onClick={()=>{if(confirm("Make a new recovery code? The old one stops working for backups made from now on."))createRecoveryForExistingMaster().then(setRecCode).catch(()=>setErr("Couldn't create a recovery code."));}}>New recovery code</button>}
           {hasBackupMasterKey() && <button className="btn ghost tiny" style={{marginTop:8}} onClick={() => { if (confirm("Change the backup password? Existing backup files will still need the password that created them.")) { clearBackupMaster(); setMode("setpass"); } }}>Change backup password</button>}
 
           <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--line)" }}>
