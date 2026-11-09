@@ -3339,7 +3339,7 @@ function wantsBuyChooser() { try { return new URLSearchParams(location.search).g
 function wantsUpgradeChooser() { try { return new URLSearchParams(location.search).get("buy") === "upgrade"; } catch (e) { return false; } }
 // /app?buy=upgrade (Basic card "Upgrade" button, opens in a new tab): after
 // Google sign-in / licence restore, pick an upgrade and go to Stripe Checkout.
-function UpgradeChooser({ licence }) {
+function UpgradeChooser({ licence, theme }) {
   const [open, setOpen] = useState(() => wantsUpgradeChooser() || wantsBuyChooser());
   const [busy, setBusy] = useState(null);
   const [err, setErr] = useState("");
@@ -3367,20 +3367,23 @@ function UpgradeChooser({ licence }) {
     const r = await licence.checkout("upgrade");
     if (r?.error) { setErr(r.error); setBusy(null); }
   };
-  const buyPremium = async () => {
-    setBusy("premium"); setErr("");
+  const buyTrackerProduct = async (product, busyKey) => {
+    setBusy(busyKey); setErr("");
     try {
       const session = await licGet("session");
       const deviceId = await licenceDeviceId();
-      const r = await fetch(TRACKER_API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "checkout", product: "tracker_full", session: session?.token, deviceId }) });
+      const r = await fetch(TRACKER_API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "checkout", product, session: session?.token, deviceId }) });
       const d = await r.json().catch(() => ({}));
       if (d.url) { location.href = d.url; return; }
       setErr(d.error || "Couldn't start checkout.");
     } catch (e) { setErr("You're offline. Connect and try again."); }
     setBusy(null);
   };
+  const buyPremium = () => buyTrackerProduct("tracker_full", "premium");
+  const buyTracker = () => buyTrackerProduct("tracker", "tracker");
   return <div role="dialog" aria-modal="true" aria-label="Upgrade" style={{ position: "fixed", inset: 0, zIndex: 90, background: "rgba(10,11,8,.72)", display: "grid", placeItems: "center", padding: 16 }}>
-    <div className="panel" style={{ maxWidth: 440, width: "100%", maxHeight: "90vh", overflow: "auto" }}>
+    <div className="sl" data-theme={theme || "dark"} style={{ maxWidth: 440, width: "100%", maxHeight: "90vh", overflow: "auto", background: "transparent", borderRadius: 14, minHeight: 0, alignSelf: "center" }}>
+    <div className="panel">
       <div className="disp" style={{ fontSize: 20, marginBottom: 6 }}>{isBuy ? "Buy SupportFlow" : "Upgrade SupportFlow"}</div>
       <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.6, marginBottom: 14 }}>Choose the option you want. You'll pay securely on Stripe Checkout.</div>
       {!signedIn ? <>
@@ -3398,15 +3401,16 @@ function UpgradeChooser({ licence }) {
           {busy === "upgrade" ? "Opening checkout\u2026" : "Add a second device \u2014 A$29"}
         </button>
         {plan === 2 && <div style={{ fontSize: 12, color: "var(--tx-3)", marginBottom: 10 }}>Your licence already covers two devices.</div>}
-        <button className="btn" style={{ width: "100%", minHeight: 48, marginBottom: 10 }} disabled={!!busy || licence.offline} onClick={buyPremium}>
-          {busy === "premium" ? "Opening checkout\u2026" : `Upgrade to Premium \u2014 A$${premiumQuote.priceAud}`}
+        <button className="btn" style={{ width: "100%", minHeight: 48, marginBottom: 10 }} disabled={!!busy || licence.offline} onClick={buyTracker}>
+          {busy === "tracker" ? "Opening checkout\u2026" : "Add Payment tracker \u2014 A$29"}
         </button>
         <div style={{ fontSize: 12, color: "var(--tx-3)", lineHeight: 1.6, marginBottom: 10 }}>
-          <div>Premium is A${premiumQuote.priceAud}, paid once. Premium adds the Payment tracker and a two-device licence. SMS is A$4.99 a month for 50 texts and is not included.</div>
+          Each add-on is a one-off payment. Optional SMS alerts are offered inside the tracker after you add it.
         </div>
       </>}
       {err && <div style={{ fontSize: 12.5, color: "var(--warn)", marginBottom: 10 }}>{err}</div>}
       <button className="btn ghost tiny" onClick={close}>Not now</button>
+    </div>
     </div>
   </div>;
 }
@@ -4482,7 +4486,7 @@ function App() {
 
   return (
     <LicenceContext.Provider value={licence}>
-    <UpgradeChooser licence={licence} />
+    <UpgradeChooser licence={licence} theme={theme} />
     {licence.notice && (
       <div className="checkout-toast" data-type={licence.notice.type === "cancelled" ? "cancelled" : "success"} role="status" aria-live="polite">
         <span className="ti">{licence.notice.type === "cancelled" ? "\u2715" : "\u2713"}</span>
