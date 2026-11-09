@@ -5594,49 +5594,41 @@ function useTrackerAccess() {
 }
 
 function TrackerUpsell({ access, owed, count, go }) {
-  // Not paid: Payment tracker A$29 once (on top of Basic), or Premium.
-  // A second device is a separate A$29 add-on.
-  // SMS is offered only after the tracker is unlocked.
-  const offer = (access.cfg?.offer || []).filter((o) => !o.retired && o.id !== "tracker_sms" && (o.available || access.preview));
-  const smsOffer = (access.cfg?.offer || []).find((o) => o.id === "tracker_sms");
-  const premiumOffer = offer.find((o) => o.id === "tracker_full");
-  const tracker = offer.find((o) => o.id === "tracker");
-  const canBuy = access.phase === "locked" && !access.paid && !access.deviceLimit;
-  const smsPrice = smsOffer ? smsOffer.priceAud : "4.99";
+  // One short card. The tracker is A$29 on top of Basic. Premium, second
+  // device and SMS are not pitched here: Premium is not an upgrade path for
+  // someone who already owns Basic, and SMS is offered inside tracker Settings
+  // once it is unlocked.
+  const tracker = (access.cfg?.offer || []).find((o) => o.id === "tracker" && !o.retired && (o.available || access.preview));
+  const canBuy = access.phase === "locked" && !access.deviceLimit;
+  const needsBasic = canBuy && !access.paid;
   return (
     <div className="panel" style={{ borderColor: "var(--brass)" }}>
-      <div className="eyebrow" style={{ color: "var(--brass)" }}>Payment tracker · paid add-on</div>
+      <div className="eyebrow" style={{ color: "var(--brass)" }}>Payment tracker</div>
       <div className="disp" style={{ fontSize: 24, margin: "6px 0 8px" }}>Get paid on time without chasing</div>
       {count > 0 && <div style={{ fontSize: 14, marginBottom: 10 }}>You're owed <b>{money(owed)}</b> across {count} invoice{count === 1 ? "" : "s"}.</div>}
       <div style={{ fontSize: 13.5, lineHeight: 1.6, color: "var(--tx-2)" }}>
         ✓ Counts business days on every invoice you send<br />
-        ✓ Sends a polite reminder at day 7 and a firmer one at day 12, automatically (you can read and change them first)<br />
-        ✓ At day 20, emails you a ready-to-file NDIA complaint draft. Nothing is filed for you<br />
-        ✓ Shows plan managers who are late again and again, and exports a payment history
-      </div>
-      <div style={{ fontSize: 13, color: "var(--tx-2)", marginTop: 10, lineHeight: 1.55 }}>
-        The Payment tracker is <b>A$29 once</b>, on top of Basic. A second device is a separate <b>A$29</b> add-on, not part of the tracker price.
-        <br />Free: push notifications. Optional SMS alerts are A${smsPrice} a month for 50 texts, offered after the tracker is unlocked. Not included in any package, including Premium.
+        ✓ Reminder at day 7, firmer one at day 12. You can edit both<br />
+        ✓ Day 20: a complaint draft for you to file. Nothing is filed for you
       </div>
       {access.phase === "signedout" && (
         <div style={{ marginTop: 14 }}>
-          <div style={{ fontSize: 13, marginBottom: 8 }}>Sign in with Google so the unlock stays with you on every device.</div>
-          <a className="btn" style={{ display: "inline-flex", minHeight: 44, alignItems: "center" }} href={BUY_URL}>Sign in to unlock</a>
+          <div style={{ fontSize: 13, marginBottom: 8 }}>Sign in with Google so your licence follows you.</div>
+          <a className="btn" style={{ display: "inline-flex", minHeight: 44, alignItems: "center" }} href={BUY_URL}>Sign in</a>
         </div>
       )}
-      {access.phase === "locked" && access.deviceLimit && <div style={{ fontSize: 13, marginTop: 12 }}>Your Payment tracker is already in use on your other device. A second device is a separate A$29 add-on, from Settings → Licence &amp; devices.</div>}
-      {canBuy && (offer.length ? <>
-        {tracker && <button className="btn" style={{ width: "100%", marginTop: 10, minHeight: 48 }} disabled={!!access.busy} onClick={() => access.buy(tracker.id)}>
-          {access.busy === tracker.id ? "One moment..." : `Payment tracker · A$${tracker.priceAud} once`}
-        </button>}
-        {premiumOffer && <>
-          <div style={{ fontSize: 13, lineHeight: 1.55, color: "var(--tx-2)", marginTop: 12 }}>Premium is A${premiumOffer.priceAud}, paid once.</div>
-          <button className="btn" style={{ width: "100%", marginTop: 10, minHeight: 48 }} disabled={!!access.busy} onClick={() => access.buy(premiumOffer.id)}>
-            {access.busy === premiumOffer.id ? "One moment..." : `Premium · A$${premiumOffer.priceAud} once`}
-          </button>
-          {premiumOffer.items && <ul style={{ margin: "8px 0 0", paddingLeft: 18, fontSize: 13, lineHeight: 1.6, color: "var(--tx-2)" }}>{premiumOffer.items.map((t) => <li key={t}>{t}</li>)}</ul>}
-        </>}
-      </> : <div style={{ fontSize: 12.5, color: "var(--tx-3)", marginTop: 12 }}>The Payment tracker isn't available to buy yet.</div>)}
+      {access.phase === "locked" && access.deviceLimit && <div style={{ fontSize: 13, marginTop: 12 }}>The Payment tracker is already in use on your other device.</div>}
+      {canBuy && tracker && !needsBasic && (
+        <button className="btn" style={{ width: "100%", marginTop: 12, minHeight: 48 }} disabled={!!access.busy} onClick={() => access.buy(tracker.id)}>
+          {access.busy === tracker.id ? "One moment..." : `Add Payment tracker · A$${tracker.priceAud} once`}
+        </button>
+      )}
+      {needsBasic && (
+        <a className="btn" style={{ width: "100%", marginTop: 12, minHeight: 48, display: "flex", alignItems: "center", justifyContent: "center" }} href={BUY_URL}>
+          The tracker is an add-on to Basic. See plans
+        </a>
+      )}
+      {canBuy && !tracker && !needsBasic && <div style={{ fontSize: 12.5, color: "var(--tx-3)", marginTop: 12 }}>The Payment tracker isn't available to buy yet.</div>}
       {access.phase === "offline" && <div style={{ fontSize: 12.5, color: "var(--warn)", marginTop: 12 }}>Connect to the internet to unlock the Payment tracker.</div>}
       {access.phase === "loading" && <div style={{ fontSize: 12.5, color: "var(--tx-3)", marginTop: 12 }}>Checking…</div>}
       {access.error && <div style={{ fontSize: 12.5, color: "var(--warn)", marginTop: 10 }}>{access.error}</div>}
@@ -5654,7 +5646,7 @@ function PaymentTracker({ data, save, go, access }) {
   const [view, setView] = useState("list");
   const [sel, setSel] = useState(null);       // invoice id
   const [stageSel, setStageSel] = useState(1);
-  const [filter, setFilter] = useState("action");
+  const [filter, setFilter] = useState(() => (data.invoices.some((i) => i.status === "sent" && invoiceChase(i, data, localToday())?.stage >= 1) ? "action" : "all"));
   const [paying, setPaying] = useState(null);
   const [logForm, setLogForm] = useState(null);
   const [server, setServer] = useState({ status: {}, log: null, msg: "" });
@@ -5893,17 +5885,40 @@ function PaymentTracker({ data, save, go, access }) {
     );
   }
 
+  const needCount = rows.filter(needs).length;
+  const hasSent = rows.some((x) => x.i.status === "sent");
+  const emailOk = /^\S+@\S+\.\S+$/.test(s.replyTo || "");
   return (
     <div className="band">
       <div className="panel">
         <div className="eyebrow">Money owed to you</div>
         <div className="disp num" style={{ fontSize: 30, marginTop: 6 }}>{money(owed)}</div>
-        <div style={{ fontSize: 13.5, color: "var(--tx-2)", marginTop: 4 }}>{open.length} invoice{open.length === 1 ? "" : "s"} waiting · {rows.filter(needs).length} need action{s.autoSend ? " · automatic emails on" : ""}</div>
+        <div style={{ fontSize: 13.5, color: "var(--tx-2)", marginTop: 4 }}>{open.length} invoice{open.length === 1 ? "" : "s"} waiting · {needCount} need action</div>
+      </div>
+      <div className="panel" style={{ padding: 12, marginBottom: 12, borderColor: s.autoSend ? "var(--good)" : "var(--brass)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <div style={{ fontSize: 13.5, lineHeight: 1.5 }}>
+            <b>Automatic reminders: {s.autoSend ? "On" : "Off"}</b>
+            <div style={{ color: "var(--tx-2)", fontSize: 12.5 }}>
+              {s.autoSend
+                ? `Day 7 and day 12 emails go out for you. Replies come to ${s.replyTo || "your email"}.`
+                : emailOk ? "Switch on to send day 7 and day 12 reminders for you. Until then you review and send each one." : "Add your email in Settings to turn on day 7 and day 12 reminders. Until then you review and send each one."}
+            </div>
+          </div>
+          {!s.autoSend && <button className="btn tiny" style={{ minHeight: 40 }} onClick={() => setView("settings")}>Set up</button>}
+        </div>
       </div>
       <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
-        {chip("action", "Needs action", rows.filter(needs).length)}{chip("all", "Waiting", open.length)}{chip("paid", "Paid", null)}
+        {chip("action", "Needs action", needCount)}{chip("all", "Waiting", open.length)}{chip("paid", "Paid", null)}
       </div>
-      {shown.length === 0 && <div className="empty">{filter === "action" ? "Nothing needs chasing today." : "Nothing here yet."}</div>}
+      {shown.length === 0 && (
+        <div className="empty">
+          {!hasSent && filter !== "paid"
+            ? <>Nothing to track yet. Mark an invoice as <b>Sent</b> and it appears here, and the day count starts.</>
+            : filter === "action" ? <>Nothing needs chasing today.{open.length > 0 ? <> <button className="btn ghost tiny" style={{ marginLeft: 6 }} onClick={() => setFilter("all")}>See waiting invoices</button></> : null}</>
+            : "Nothing here yet."}
+        </div>
+      )}
       {shown.map(({ i, c, r }) => (
         <div className="panel" key={i.id} style={{ padding: 12 }}>
           <button style={{ all: "unset", cursor: "pointer", display: "block", width: "100%" }} onClick={() => { setSel(i.id); setView("detail"); }} aria-label={`Open invoice ${i.number}`}>
@@ -5924,9 +5939,11 @@ function PaymentTracker({ data, save, go, access }) {
         </div>
       ))}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-        <button className="btn ghost" style={{ minHeight: 48 }} onClick={() => setView("patterns")}>Patterns</button>
-        <button className="btn ghost" style={{ minHeight: 48 }} onClick={() => setView("report")}>Report</button>
-        <button className="btn ghost" style={{ minHeight: 48 }} onClick={() => setView("settings")}>Settings</button>
+        {[["patterns", "Patterns", "Who pays late"], ["report", "Report", "Export history"], ["settings", "Settings", "Reminders"]].map(([v, l, sub]) => (
+          <button key={v} className="btn ghost" style={{ minHeight: 56, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2, lineHeight: 1.2, minWidth: 0, padding: "6px 4px", textAlign: "center" }} onClick={() => setView(v)}>
+            {l}<span style={{ fontSize: 10.5, fontWeight: 400, color: "var(--tx-3)" }}>{sub}</span>
+          </button>
+        ))}
       </div>
     </div>
   );
