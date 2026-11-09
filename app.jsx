@@ -360,6 +360,8 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 .shortcuttitle{font-size:13px;font-weight:700;margin-bottom:4px}
 .shortcuthelp{font-size:12px;color:var(--tx-3);line-height:1.5}
 .hdhero{display:block;width:100%;text-align:left;cursor:pointer;font:inherit;color:inherit;border:1px solid rgba(200,145,58,.45);border-radius:16px;padding:18px 19px;margin-bottom:11px;background:linear-gradient(145deg,var(--bg-3),var(--bg-2))}
+.hdtile.neutral{background:var(--bg-1,var(--bg-2));border-color:var(--line);opacity:.92}
+.hdtile.neutral .hdval{font-size:19px;color:var(--tx-2)}
 .hdgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
 .hdtile{text-align:left;cursor:pointer;font:inherit;color:inherit;border:1px solid var(--line);border-radius:14px;padding:13px 14px;background:var(--bg-2)}
 .hdtile:hover,.hdhero:hover{border-color:rgba(200,145,58,.6)}
@@ -3738,16 +3740,24 @@ function HomeDashboard({ data, m, go }) {
   const unbilledTrips = data.trips.filter((x) => x.billable && x.participantId && !tripInvoice(x, data.invoices));
   const uninvoiced = unbilled.reduce((n, x) => n + shiftValue(x), 0) + unbilledTrips.reduce((n, x) => n + tripValue(x, data.participants, m.kmRate), 0);
   const uninvoicedHours = unbilled.reduce((n, x) => n + shiftHours(x), 0);
-  const todayShifts = data.shifts.filter((x) => x.date === t && statusOf(x) !== "cancelled");
-  const todayHours = todayShifts.reduce((n, x) => n + shiftHours(x), 0);
-  const monthHours = data.shifts.filter((x) => (x.date || "").slice(0, 7) === month && statusOf(x) === "done").reduce((n, x) => n + shiftHours(x), 0);
+  const nowHM = (() => { const d = new Date(); return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); })();
+  const nextShift = data.shifts
+    .filter((x) => x.date && statusOf(x) !== "cancelled" && (x.date > t || (x.date === t && (x.end || x.start || "23:59") >= nowHM)))
+    .sort((a, b) => (a.date + (a.start || "")).localeCompare(b.date + (b.start || "")))[0] || null;
+  const nextPt = nextShift ? ptOf(nextShift.participantId) : null;
+  const nextDay = nextShift ? (nextShift.date === t ? "Today" : new Date(nextShift.date + "T00:00:00").toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" })) : "";
   const waiting = data.invoices.filter((i) => i.status === "sent");
   const owed = waiting.reduce((n, i) => n + invTotal(i), 0);
   const overdue = waiting.filter(isOverdue).length;
-  const monthIncome = data.invoices.filter((i) => i.status === "paid" && (i.paidAt || "").slice(0, 7) === month).reduce((n, i) => n + invAmountPaid(i), 0);
-  const monthExpenses = data.expenses.filter((e) => (e.date || "").slice(0, 7) === month).reduce((n, e) => n + Number(e.amount || 0), 0);
-  const Tile = ({ label, value, sub, tone, onClick }) => (
-    <button className="hdtile" onClick={onClick}>
+  const fy = fyOf(t);
+  const issued = data.invoices.filter((i) => (i.status === "sent" || i.status === "paid") && ((i.sentAt || i.date || "").slice(0, 7) === month));
+  const grossMonth = issued.reduce((n, i) => n + invTotal(i), 0);
+  const monthPaid = data.invoices.filter((i) => i.status === "paid" && (i.paidAt || "").slice(0, 7) === month).reduce((n, i) => n + invAmountPaid(i), 0);
+  const fyIncome = data.invoices.filter((i) => i.status === "paid" && i.paidAt && fyOf(i.paidAt.slice(0, 10)) === fy).reduce((n, i) => n + invAmountPaid(i), 0);
+  const fyExpenses = data.expenses.filter((e) => e.date && fyOf(e.date.slice(0, 10)) === fy).reduce((n, e) => n + Number(e.amount || 0), 0);
+  const monthName = new Date().toLocaleDateString("en-AU", { month: "long" });
+  const Tile = ({ label, value, sub, tone, onClick, neutral }) => (
+    <button className={"hdtile" + (neutral ? " neutral" : "")} onClick={onClick}>
       <div className="eyebrow">{label}</div>
       <div className="disp num hdval" style={tone ? { color: tone } : null}>{value}</div>
       <div className="hdsub">{sub}</div>
@@ -3756,21 +3766,19 @@ function HomeDashboard({ data, m, go }) {
   return (
     <div style={{ marginBottom: 18 }}>
       <button className="hdhero" onClick={() => go("summary", "invoices")}>
-        <div className="eyebrow">Uninvoiced work</div>
-        <div className="disp num" style={{ fontSize: 34, marginTop: 4, lineHeight: 1.05 }}>{money0(uninvoiced)}</div>
-        <div style={{ fontSize: 13, marginTop: 6, color: uninvoiced > 0 ? "var(--brass-lift)" : "var(--tx-3)" }}>
-          {uninvoiced > 0
-            ? `Earned, not yet invoiced · ${unbilled.length} shift${unbilled.length === 1 ? "" : "s"}${unbilledTrips.length ? ` + ${unbilledTrips.length} trip${unbilledTrips.length === 1 ? "" : "s"}` : ""} · ${uninvoicedHours.toFixed(1)}h ›`
-            : "Nothing waiting to be invoiced. You're all caught up."}
+        <div className="eyebrow">Gross income · {monthName}</div>
+        <div className="disp num" style={{ fontSize: 34, marginTop: 4, lineHeight: 1.05 }}>{money0(grossMonth)}</div>
+        <div style={{ fontSize: 13, marginTop: 6, color: "var(--tx-3)" }}>
+          {issued.length ? `${issued.length} invoice${issued.length === 1 ? "" : "s"} this month · ${money0(monthPaid)} paid ›` : "No invoices issued this month yet ›"}
         </div>
       </button>
       <div className="hdgrid">
-        <Tile label="Today's shifts" value={todayShifts.length} sub={todayShifts.length ? `${todayHours.toFixed(1)}h scheduled` : "Nothing scheduled"} onClick={() => go("invoices", "shifts")} />
-        <Tile label="Hours this month" value={`${monthHours.toFixed(1)}h`} sub="Completed shifts" onClick={() => go("invoices", "shifts")} />
-        <Tile label="Outstanding" value={money0(owed)} sub={waiting.length ? `${waiting.length} invoice${waiting.length === 1 ? "" : "s"}${overdue ? ` · ${overdue} overdue` : ""}` : "Nobody owes you"} tone={overdue ? "var(--warn)" : null} onClick={() => go("summary", "tracker")} />
-        <Tile label="Income this month" value={money0(monthIncome)} sub="Paid invoices" onClick={() => go("summary", "invoices")} />
-        <Tile label="Expenses this month" value={money0(monthExpenses)} sub="Business costs" onClick={() => go("summary", "expenses")} />
-        <Tile label="Tax estimate" value={money0(m.setAside)} sub="Put aside this year" onClick={() => go("summary", "position")} />
+        <Tile label="Next shift" value={nextShift ? nextDay : "None"} sub={nextShift ? `${nextShift.start || ""}${nextShift.end ? "\u2013" + nextShift.end : ""}${nextPt ? " \u00b7 " + nextPt.name : ""}` : "Nothing scheduled"} onClick={() => go("invoices", "shifts")} />
+        <Tile neutral label="Uninvoiced work" value={money0(uninvoiced)} sub={uninvoiced > 0 ? `${unbilled.length} shift${unbilled.length === 1 ? "" : "s"}${unbilledTrips.length ? ` + ${unbilledTrips.length} trip${unbilledTrips.length === 1 ? "" : "s"}` : ""} \u00b7 ${uninvoicedHours.toFixed(1)}h` : "All caught up"} onClick={() => go("summary", "invoices")} />
+        <Tile label={`Income · FY ${fyLabel(fy)}`} value={money0(fyIncome)} sub="Paid invoices this financial year" onClick={() => go("summary", "position")} />
+        <Tile label={`Expenses · FY ${fyLabel(fy)}`} value={money0(fyExpenses)} sub="Business costs this financial year" onClick={() => go("summary", "expenses")} />
+        <Tile neutral label="Outstanding" value={money0(owed)} sub={waiting.length ? `${waiting.length} invoice${waiting.length === 1 ? "" : "s"}${overdue ? ` \u00b7 ${overdue} overdue` : ""}` : "Nobody owes you"} tone={overdue ? "var(--warn)" : null} onClick={() => go("summary", "tracker")} />
+        <Tile neutral label="Tax estimate" value={money0(m.setAside)} sub="Put aside this year" onClick={() => go("summary", "position")} />
       </div>
     </div>
   );
