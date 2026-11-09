@@ -164,7 +164,7 @@ export function localNow(state = "SA") {
 export async function resendSend({ to, subject, text, replyTo, fromName, headers = {}, idempotencyKey }) {
   const key = process.env.RESEND_API_KEY;
   if (!key) throw new Error("RESEND_API_KEY missing");
-  const fromAddr = process.env.TRACKER_EMAIL_FROM || "invoices@send.supportflow.work";
+  const fromAddr = process.env.TRACKER_EMAIL_FROM || "invoices@supportflow.work";
   const safeName = String(fromName || "SupportFlow").replace(/["<>\r\n]/g, "").slice(0, 60);
   const r = await fetch("https://api.resend.com/emails", {
     method: "POST",
