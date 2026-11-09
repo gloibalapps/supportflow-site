@@ -136,6 +136,18 @@ async function runWorker(prefs) {
         smsDone = sms.status === "sent" || sms.status === "dry_run";
         if (sms.status === "no_credits") await creditsGoneNotice(sub, dry);
       }
+      // Free email alert to the worker's own address (the payer never sees this). Skipped for the
+      // NDIA draft stage, which already emails the worker.
+      if (prefs.notify_email !== false && !toWorkerOnly && worker.replyTo && !dry) {
+        try {
+          await resendSend({
+            to: worker.replyTo, subject: `Unpaid invoice${p.invoiceNo ? " #" + p.invoiceNo : ""}: ${label}`,
+            text: `${what}\n\nOpen SupportFlow > Money > Payment tracker to see it.\n\n--\nSupportFlow Payment tracker. Turn these emails off in Payment tracker > Settings.`,
+            fromName: "SupportFlow", idempotencyKey: `${r.id}-w${stage}`,
+          });
+          await log({ ...base, channel: "email_worker", recipient_masked: maskEmail(worker.replyTo), subject: label, status: "sent" });
+        } catch (e) { console.error("tracker-sender: worker email failed", String(e.message).slice(0, 120)); }
+      }
       if (prefs.notify_push && !smsDone) {
         const n = dry ? 0 : await pushTo(sub, `Unpaid invoice: ${label}`, what);
         if (n) await log({ ...base, channel: "push", recipient_masked: `${n} device(s)`, subject: label, status: "sent" });

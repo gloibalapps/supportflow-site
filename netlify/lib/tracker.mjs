@@ -22,14 +22,13 @@ const PREMIUM_ITEMS = [
   "Everything in Basic (invoices, shifts, notes, kilometres, expenses and tax)",
   "Two-device license",
   "Payment tracker",
-  "SMS notification \u2014 optional (A$4.99 a month for 50 texts, not included in any package, including Premium)",
 ];
 
 export const TRACKER_PRODUCTS = Object.freeze({
   // Sold.
   tracker: { env: "STRIPE_PRICE_TRACKER", label: "Payment tracker", aud: 29, devices: 1 },
   tracker_full: { env: "STRIPE_PRICE_TRACKER_FULL", label: "Premium", aud: PREMIUM_AUD, devices: 2, items: PREMIUM_ITEMS },
-  tracker_sms: { env: "STRIPE_PRICE_TRACKER_SMS", label: "SMS alerts, 50 texts a month", aud: 4.99, recurring: "month", requires: "tracker" },
+  tracker_sms: { env: "STRIPE_PRICE_TRACKER_SMS", label: "SMS alerts, 50 texts a month", aud: 4.99, recurring: "month", requires: "tracker", retired: true }, // shelved: not sold
   // Retired. Kept so a paid row still unlocks. Checkout refuses them.
   tracker_base: { env: "STRIPE_PRICE_TRACKER_BASE", label: "Payment tracker, one computer", devices: 1, retired: true },
   tracker_two: { env: "STRIPE_PRICE_TRACKER_TWO", label: "Payment tracker, two computers", devices: 2, retired: true },

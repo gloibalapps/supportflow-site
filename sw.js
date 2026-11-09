@@ -1,6 +1,6 @@
 /* SupportFlow™ — service worker
    Bump CACHE when you deploy, or testers will keep the old build. */
-const CACHE = 'supportflow-v65-manual-recovery';
+const CACHE = 'supportflow-v66-no-sms-email-alerts';
 
 // Everything needed to open the app with no network at all.
 const CORE = [

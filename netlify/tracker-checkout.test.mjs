@@ -42,7 +42,6 @@ assert.deepEqual(full.items, [
   "Everything in Basic (invoices, shifts, notes, kilometres, expenses and tax)",
   "Two-device license",
   "Payment tracker",
-  "SMS notification \u2014 optional (A$4.99 a month for 50 texts, not included in any package, including Premium)",
 ]);
 assert.doesNotMatch(JSON.stringify(T.trackerOffer()), /Founding|first 200|sale|registration|coupon|discount/i);
 const as = (...p) => { rows = p.map((product) => ({ product, created_at: "2026-11-05T00:00:00Z" })); };

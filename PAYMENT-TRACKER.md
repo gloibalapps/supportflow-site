@@ -1,5 +1,7 @@
 # Payment tracker add-on: build notes, setup and launch blockers
 
+> **SMS add-on shelved (9 Nov 2026).** Not sold or advertised: `tracker_sms` is marked retired in `netlify/lib/tracker.mjs`, and `TRACKER_SMS_ENABLED` stays unset. The SMS code and tables remain dormant. Workers are alerted by free push notifications and a free email to their own address (`notify_email`, sent by `tracker-sender.mjs`). The SMS sections below are kept for reference only.
+
 Tests: `node payment-tracker-rules.test.mjs`, `node netlify/tracker-sender.test.mjs`, `node netlify/tracker-checkout.test.mjs`, `node netlify/tracker-sms.test.mjs` (need `web-push` installed), `node netlify/tracker-migration.test.mjs` (needs `@electric-sql/pglite`).
 
 Status: built on the local branch `feature/payment-tracker` only. It has not been pushed or deployed. The five live Stripe Prices exist (IDs below and in `.env.example`), but no migration has been applied and no Netlify env vars have been changed.

@@ -1003,7 +1003,6 @@ function LicencePlans({ onBuy, onPremium, busy, premium }) {
       {tick("Everything in Basic")}
       {tick("Two-device license")}
       {tick("Payment tracker included")}
-      {tick("Optional SMS, A$4.99 a month for 50 texts, not included in Premium")}
       <button className="btn" style={{ marginTop: 14, width: "100%" }} disabled={!!busy} onClick={onPremium}>
         {busy === "premium" ? "One moment..." : `Get Premium \u2014 A$${q.priceAud}`}
       </button>
@@ -2125,7 +2124,7 @@ const TRACKER_API = "/.netlify/functions/tracker";
 
 const trackerSettingsOf = (data) => ({
   state: "SA", thresholds: TRACKER_DEFAULT_THRESHOLDS, autoSend: false, replyTo: data.profile.email || "",
-  includeNdis: false, notifyPush: true, ...(data.trackerSettings || {}),
+  includeNdis: false, notifyPush: true, notifyEmail: true, ...(data.trackerSettings || {}),
 });
 // Chase state of one invoice: business days since sent, stage 0-3, label.
 function invoiceChase(i, data, asOf) {
@@ -3450,7 +3449,7 @@ function UpgradeChooser({ licence, theme }) {
           {busy === "tracker" ? "Opening checkout\u2026" : "Add Payment tracker \u2014 A$29"}
         </button>
         <div style={{ fontSize: 12, color: "var(--tx-3)", lineHeight: 1.6, marginBottom: 10 }}>
-          Each add-on is a one-off payment. Optional SMS alerts are offered inside the tracker after you add it.
+          Each add-on is a one-off payment.
         </div>
       </>}
       {err && <div style={{ fontSize: 12.5, color: "var(--warn)", marginBottom: 10 }}>{err}</div>}
@@ -3483,7 +3482,7 @@ function OfferOrUpgradeBanner({ paid, freeOffer, known }) {
   if (!due) return null;
   return <div role="status" style={box}>
     <div style={{ flex: 1 }}><b style={{ color: "#E8C171" }}>Keep invoicing with SupportFlow</b><br />
-      Basic A$79 one-off, or Premium A${premiumQuoteFrom(null).priceAud}. Everything in Basic, a two-device licence and the Payment tracker. A second device or the tracker on Basic is A$29 each. SMS is optional, A$4.99 a month for 50 texts, and is not included.</div>
+      Basic A$79 one-off, or Premium A${premiumQuoteFrom(null).priceAud}. Everything in Basic, a two-device licence and the Payment tracker. A second device or the tracker on Basic is A$29 each.</div>
     <a className="btn" href={BUY_URL} style={{ whiteSpace: "nowrap" }}>See plans</a>
     <button style={btn} onClick={() => hide(true)}>Remind me later</button>
   </div>;
@@ -5642,8 +5641,8 @@ function useTrackerAccess() {
 
 function TrackerUpsell({ access, owed, count, go }) {
   // One short card. The tracker is A$29 on top of Basic. Premium, second
-  // device and SMS are not pitched here: Premium is not an upgrade path for
-  // someone who already owns Basic, and SMS is offered inside tracker Settings
+  // device is not pitched here: Premium is not an upgrade path for
+  // someone who already owns Basic, 
   // once it is unlocked.
   const tracker = (access.cfg?.offer || []).find((o) => o.id === "tracker" && !o.retired && (o.available || access.preview));
   const canBuy = access.phase === "locked" && !access.deviceLimit;
@@ -5723,7 +5722,7 @@ function PaymentTracker({ data, save, go, access }) {
         messages: { 1: msgs[1], 2: msgs[2], 3: { subject: msgs[3].subject, body: msgs[3].body } },
       };
     }).filter(Boolean);
-    const { status, data: d } = await access.post({ action: "sync", prefs: { enabled: !!prefs.autoSend, replyTo: prefs.replyTo, workerName: data.profile.name, state: prefs.state, notifyPush: prefs.notifyPush }, records });
+    const { status, data: d } = await access.post({ action: "sync", prefs: { enabled: !!prefs.autoSend, replyTo: prefs.replyTo, workerName: data.profile.name, state: prefs.state, notifyPush: prefs.notifyPush, notifyEmail: prefs.notifyEmail !== false }, records });
     if (status >= 400) { setServer((c) => ({ ...c, msg: d.error || "Couldn't sync." })); return false; }
     setServer((c) => ({ ...c, status: d.status || {}, msg: d.autosendServer ? "" : "Automatic sending is switched off on the server for now. Nothing will be sent until SupportFlow turns it on." }));
     return true;
@@ -5903,6 +5902,7 @@ function PaymentTracker({ data, save, go, access }) {
           <label className="f"><span>Your email (replies come here)</span><input type="email" value={s.replyTo} onChange={(e) => setS({ replyTo: e.target.value })} /></label>
           <label className="check" style={{ marginBottom: 10 }}><input type="checkbox" checked={!!s.autoSend} onChange={(e) => enableAuto(e.target.checked)} /><span>Send reminders automatically at day 7 and day 12, and email me the NDIA draft at day 20</span></label>
           <label className="check" style={{ marginBottom: 10 }}><input type="checkbox" checked={!!s.includeNdis} onChange={(e) => setS({ includeNdis: e.target.checked })} /><span>Include the participant's NDIS number (only with their consent)</span></label>
+          <label className="check" style={{ marginBottom: 10 }}><input type="checkbox" checked={s.notifyEmail !== false} onChange={(e) => setS({ notifyEmail: e.target.checked })} /><span>Also email me when a reminder goes out (to the address above)</span></label>
           {server.msg && <div style={{ fontSize: 12.5, color: "var(--warn)", marginBottom: 8 }}>{server.msg}</div>}
           <button className="btn ghost" style={{ minHeight: 44, marginRight: 8 }} onClick={enablePush}>Turn on phone notifications</button>
           <button className="btn ghost" style={{ minHeight: 44 }} onClick={loadLog}>What was sent</button>
@@ -5910,7 +5910,6 @@ function PaymentTracker({ data, save, go, access }) {
             {server.log.length === 0 ? "Nothing sent yet." : server.log.map((l, k) => <div key={k}>{fmtAu(l.created_at.slice(0, 10))} · #{l.invoice_no || "—"} · {l.channel} to {l.recipient_masked || "—"} · {l.status}{l.subject ? ` · ${l.subject}` : ""}</div>)}
           </div>}
         </div>
-        <SmsAlertsPanel access={access} />
         <div className="panel">
           <div className="eyebrow" style={{ marginBottom: 10 }}>Counting business days</div>
           <label className="f"><span>Your state (for public holidays)</span>
@@ -5987,68 +5986,6 @@ function PaymentTracker({ data, save, go, access }) {
           </button>
         ))}
       </div>
-    </div>
-  );
-}
-
-/* Optional paid SMS alerts (A$4.99/month, 50 texts) to the worker's OWN
-   mobile only. Free alternative: push notifications. */
-function SmsAlertsPanel({ access }) {
-  const sms = access.sms || {};
-  const offer = (access.cfg?.offer || []).find((o) => o.id === "tracker_sms");
-  const [phone, setPhone] = useState("");
-  const [agree, setAgree] = useState(false);
-  const [code, setCode] = useState("");
-  const [step, setStep] = useState("idle");
-  const [msg, setMsg] = useState("");
-  const active = ["active", "trialing", "past_due"].includes(sms.subscription);
-  const call = async (body, next) => {
-    setMsg("");
-    try {
-      const { status, data } = await access.post(body);
-      if (status >= 400) { setMsg(data.error || "Something went wrong."); return; }
-      if (next) setStep(next);
-      if (body.action === "sms-start") setMsg(data.sent ? `Code sent to ${data.phone}.` : "SMS sending is switched off on the server, so no code was sent.");
-      await access.refresh();
-    } catch (e) { setMsg("You're offline. Connect and try again."); }
-  };
-  return (
-    <div className="panel">
-      <div className="eyebrow" style={{ marginBottom: 6 }}>Alerts</div>
-      <div style={{ fontSize: 13.5, lineHeight: 1.6, marginBottom: 10 }}>
-        Free: push notifications. Optional: SMS alerts A${offer ? offer.priceAud : "4.99"}/month for 50 texts. Not included in any package, including Premium.<br />
-        <span style={{ color: "var(--tx-3)", fontSize: 12.5 }}>Offered after the Payment tracker is unlocked. Texts go only to your own mobile, at day 7, 12 and 20 and when a complaint draft is ready. They never go to the NDIA, a plan manager or anyone you invoice. Each text uses 1 credit (2 if it's long). Unused texts don't roll over. If you run out, alerts continue as notifications.</span>
-      </div>
-      {!active && offer && (offer.available || access.preview) && (
-        <button className="btn ghost" style={{ minHeight: 44, width: "100%" }} disabled={!!access.busy} onClick={() => access.buy("tracker_sms")}>
-          {access.busy === "tracker_sms" ? "One moment..." : `Add SMS alerts · A$${offer.priceAud}/month`}
-        </button>
-      )}
-      {active && (
-        <div style={{ fontSize: 13.5 }}>
-          <div>SMS pack: {sms.subscription}{sms.renews ? ` · renews ${fmtAu(sms.renews.slice(0, 10))}` : ""} · <b>{sms.balance}</b> text{sms.balance === 1 ? "" : "s"} left</div>
-          {sms.balance === 0 && <div style={{ color: "var(--warn)", marginTop: 4 }}>No texts left this month. Alerts come as notifications until the pack renews.</div>}
-          {sms.verified && sms.optedIn ? (
-            <div style={{ marginTop: 8 }}>Texts go to {sms.phone}. <button className="btn ghost tiny" style={{ minHeight: 36 }} onClick={() => call({ action: "sms-optout" })}>Stop texts</button></div>
-          ) : step !== "code" ? (
-            <div style={{ marginTop: 10 }}>
-              {sms.phone && !sms.optedIn && <div style={{ fontSize: 12.5, color: "var(--tx-3)", marginBottom: 6 }}>Texts are off for {sms.phone}. Verify again to turn them back on.</div>}
-              <label className="f"><span>Your mobile number</span><input type="tel" inputMode="tel" placeholder="04xx xxx xxx" value={phone} onChange={(e) => setPhone(e.target.value)} /></label>
-              <label className="check" style={{ marginBottom: 10 }}><input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} /><span>Send payment alerts to this number. I can reply STOP or turn them off here at any time.</span></label>
-              <button className="btn" style={{ minHeight: 44 }} disabled={!agree || !phone} onClick={() => call({ action: "sms-start", phone, optIn: agree }, "code")}>Send me a code</button>
-            </div>
-          ) : (
-            <div style={{ marginTop: 10 }}>
-              <label className="f"><span>6-digit code</span><input inputMode="numeric" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} /></label>
-              <button className="btn" style={{ minHeight: 44, marginRight: 8 }} disabled={code.length !== 6} onClick={() => call({ action: "sms-verify", code }, "idle")}>Verify</button>
-              <button className="btn ghost" style={{ minHeight: 44 }} onClick={() => setStep("idle")}>Change number</button>
-            </div>
-          )}
-          <button className="btn ghost tiny" style={{ minHeight: 36, marginTop: 8 }} onClick={async () => { const { data } = await access.post({ action: "sms-manage" }); if (data.url) location.href = data.url; else setMsg(data.error || "Couldn't open billing."); }}>Manage or cancel the SMS pack</button>
-          <div style={{ fontSize: 12, color: "var(--tx-3)", marginTop: 6 }}>Remaining texts end when the pack is cancelled or refunded.</div>
-        </div>
-      )}
-      {msg && <div style={{ fontSize: 12.5, color: "var(--warn)", marginTop: 8 }}>{msg}</div>}
     </div>
   );
 }
@@ -9783,15 +9720,13 @@ const MANUAL = [
        "Support item codes and prices come from the NDIS Pricing Schedule 2026-27, National column, effective 1 July 2026. The billing rules, time of day, cancellations, travel, come from the Pricing Arrangements and Price Limits 2025-26, the most recent published rules. Prices change every 1 July, so check ndis.gov.au if the year has turned over."],
     ],
   },  {
-    t: "Payment tracker, SMS alerts and notifications",
-    d: "The optional Payment tracker add-on: prices, SMS pack and push notifications.",
+    t: "Payment tracker and notifications",
+    d: "The optional Payment tracker add-on: prices, reminders and notifications.",
     q: [
       ["What the Payment tracker costs",
-       "The Payment tracker (Money \u2192 Payment tracker) is optional. Without it, the Payment tracker page shows a short card with an Add Payment tracker button. With it, the page opens on the invoices that need action and shows whether reminders are On or Off. It is A$29 once, on top of Basic. A second device is a separate A$29 add-on, not a tracker price. Premium is A$129 once and includes everything in Basic, a two-device licence and the Payment tracker. The optional SMS pack (A$4.99 a month for 50 texts) is offered after the tracker is unlocked and is not included in any package, including Premium."],
-      ["SMS alerts pack",
-       "Optional, only for Payment tracker owners, and not included in the A$129 Premium package. Texts go only to your own mobile after you verify it with a code, never to the NDIA, a plan manager or a payer. They are used for the day 7, 12 and 20 overdue alerts and the complaint-draft-ready nudge. Credits reset to 50 each month and don't roll over. Reply STOP or use Stop texts in Payment tracker \u2192 Settings to stop texts."],
-      ["Out of SMS credits",
-       "When texts run out, alerts are sent as push notifications instead, to every device where you turned notifications on. You get one notification saying texts are used up. Push notifications are free."],
+       "The Payment tracker (Money \u2192 Payment tracker) is optional. Without it, the Payment tracker page shows a short card with an Add Payment tracker button. With it, the page opens on the invoices that need action and shows whether reminders are On or Off. It is A$29 once, on top of Basic. A second device is a separate A$29 add-on, not a tracker price. Premium is A$129 once and includes everything in Basic, a two-device licence and the Payment tracker."],
+      ["How you are alerted",
+       "When a reminder goes out, you are told in two free ways. Push notifications go to every device where you turned them on. If you leave Also email me ticked in Payment tracker \u2192 Settings, you also get a short email at the address you entered there. The payer is never emailed this alert. SupportFlow does not send text messages."],
       ["Turn on push notifications",
        "Turn them on on each device separately: Payment tracker \u2192 Settings \u2192 Turn on phone notifications, then Allow. Android: install from Chrome's menu (Install app), open from the icon, sign in, then turn on. Windows or Mac: install from the Chrome or Edge address bar install icon, open the app, sign in, then turn on. iPhone/iPad (iOS 16.4 or later): in Safari tap Share \u2192 Add to Home Screen, open SupportFlow from the Home Screen icon, sign in again, then turn on and Allow."],
       ["Notifications not arriving",

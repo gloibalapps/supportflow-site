@@ -11,7 +11,7 @@ New accounts receive **5 free invoices for 30 days**.
 | Payment tracker (add-on, on top of Basic) | A$29 once | The devices the licence already covers |
 | Premium | A$129 once. | 2, and the Payment tracker |
 
-Optional SMS is A$4.99 a month for 50 texts, only after the tracker is unlocked. It is not included in Basic, the tracker, or Premium.
+There is no subscription and no SMS add-on.
 
 Basic checkout is unchanged.
 

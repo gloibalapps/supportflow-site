@@ -161,8 +161,7 @@ SupportFlow is an independent software product and is not affiliated with, endor
 
 One-off Basic (A$79) and Premium (A$129) licences tied to a
 Google account, behind an owner switch. A second device is a separate A$29 add-on. The Payment
-tracker is A$29 once, on top of Basic. Optional SMS is A$4.99 a month for
-50 texts and is not included in any package. New accounts can try 5 free
+tracker is A$29 once, on top of Basic. There is no subscription. New accounts can try 5 free
 invoices for 30 days. Nothing changes for anyone until the
 switch is turned on. Setup, testing and the exact steps to turn it on are in
 [`LICENSING.md`](LICENSING.md).

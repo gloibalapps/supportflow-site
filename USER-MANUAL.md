@@ -827,7 +827,7 @@ show two one-off plans. There is no subscription on either plan.
 - **Second device, A$29:** a separate add-on if you want two devices. It is
   not included in Basic.
 - **Premium, A$129:** everything in Basic, a two-device
-  licence and the Payment tracker, paid once. Optional SMS (A$4.99 a month for 50 texts) is not included.
+  licence and the Payment tracker, paid once.
 
 Your current plan and how many devices it covers are shown in the app under
 **Settings → Licence & devices**.
@@ -884,19 +884,14 @@ The Payment tracker lives at **Money → Payment tracker**. It shows who owes yo
 - **A$29 once:** a second device. This is a separate add-on from the tracker. Buy it from the upgrade screen or Settings → Licence & devices.
 - **Premium, A$129 once:** everything in Basic (invoices, shifts, notes, kilometres, expenses and tax), a two-device licence and the Payment tracker. No subscription.
 
-The optional SMS pack below is separate. It is not included in Basic, the A$29 tracker, or Premium.
+### How you're alerted
 
-### SMS alerts (optional)
+When a reminder goes out, you're told in two free ways:
 
-- **A$4.99 a month for 50 texts.** It's optional, and only Payment tracker owners can buy it.
-- Texts go **only to your own mobile number**, after you verify it with a 6-digit code. They never go to the NDIA, a plan manager, or anyone you invoice.
-- They are used for the day 7, 12 and 20 overdue alerts and the "your complaint draft is ready" nudge.
-- A short text uses 1 credit. A long text, or one with emoji, may use 2. Credits reset to 50 each month when the pack renews. Unused texts don't roll over.
-- To stop texts, reply **STOP** or use **Stop texts** in Payment tracker → Settings. To cancel the pack, use **Manage or cancel the SMS pack**.
+- **Push notifications** to each device where you turned them on (see below).
+- **An email to you**, at the address you entered under **Payment tracker → Settings**, if **Also email me when a reminder goes out** is ticked. The payer never receives this one.
 
-### When you run out of texts
-
-Alerts aren't lost. They are sent as **push notifications** to each device where you turned notifications on. You get one notification saying your texts are used up, and Settings shows "No texts left this month". Push notifications are free, so set them up even if you buy the SMS pack.
+SupportFlow does not send text messages.
 
 ### Setting up push notifications
 
