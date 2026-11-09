@@ -506,7 +506,10 @@ async function askModel(prompt, opts) {
     body: JSON.stringify(body),
   });
   if (res.status === 503) throw new Error("not-configured");
-  if (res.status === 402) throw new Error("This device needs an active SupportFlow licence. Open Settings and check in.");
+  if (res.status === 402) {
+    if (TEST_MODE) testGateOnce("ai-licence", "AI assistant needs a licence", "In the live version this lookup is refused unless the device has an active licence.");
+    throw new Error("This device needs an active SupportFlow licence. Open Settings and check in.");
+  }
   if (res.status === 429) throw new Error("busy");
   if (!res.ok) {
     let why = "";
@@ -538,6 +541,56 @@ const APP_VERSION = "21";
    Nothing here does anything until the owner switch is on -- while it's off
    the config call says enabled:false and the app runs exactly as before.
    See LICENSING.md. */
+/* ---------------- TEST VERSION (supportflows.netlify.app only) ----------------
+   On the test site every paywall / gate is OPEN, but each time one WOULD have
+   stopped the user, a dialog says which gate it was and the user taps OK to
+   carry on. Locked to the test hostname: never active on supportflow.work. */
+const TEST_MODE = (() => { try { const h = location.hostname; return h === "supportflows.netlify.app" || h.endsWith("--supportflows.netlify.app") || h === "test-mode-open-gates--ndissupportflow.netlify.app"; } catch (e) { return false; } })();
+let testGateChain = Promise.resolve();
+const testGateSeen = new Set();
+function testGate(title, detail) {
+  const run = () => new Promise((resolve) => {
+    try {
+      const wrap = document.createElement("div");
+      wrap.setAttribute("role", "alertdialog"); wrap.setAttribute("aria-modal", "true");
+      wrap.style.cssText = "position:fixed;inset:0;z-index:2147483000;background:rgba(15,20,30,.62);display:flex;align-items:center;justify-content:center;padding:20px;font-family:system-ui,-apple-system,Segoe UI,sans-serif";
+      const box = document.createElement("div");
+      box.style.cssText = "max-width:420px;width:100%;background:#fff;color:#1b2430;border-radius:14px;padding:22px;box-shadow:0 12px 40px rgba(0,0,0,.35);border-top:6px solid #d9822b;line-height:1.5";
+      const tag = document.createElement("div");
+      tag.textContent = "TEST VERSION";
+      tag.style.cssText = "font-size:11px;font-weight:700;letter-spacing:.08em;color:#b4621a;margin-bottom:6px";
+      const h = document.createElement("div");
+      h.textContent = "A gate would appear here: " + title;
+      h.style.cssText = "font-size:17px;font-weight:700;margin-bottom:8px";
+      const d = document.createElement("div");
+      d.textContent = detail + " In this test version nothing is blocked. Tap OK to carry on.";
+      d.style.cssText = "font-size:14px;margin-bottom:18px";
+      const ok = document.createElement("button");
+      ok.textContent = "OK";
+      ok.style.cssText = "min-height:46px;width:100%;border:0;border-radius:10px;background:#1b2430;color:#fff;font-size:16px;font-weight:600;cursor:pointer";
+      ok.onclick = () => { wrap.remove(); resolve(); };
+      box.append(tag, h, d, ok); wrap.append(box); document.body.appendChild(wrap);
+      ok.focus();
+    } catch (e) { resolve(); }
+  });
+  testGateChain = testGateChain.then(run, run);
+  return testGateChain;
+}
+// For gates decided during render: show the dialog once per visit, not on every re-render.
+function testGateOnce(key, title, detail) {
+  if (testGateSeen.has(key)) return;
+  testGateSeen.add(key);
+  setTimeout(() => { testGate(title, detail); }, 0);
+}
+if (TEST_MODE) {
+  try {
+    const b = document.createElement("div");
+    b.textContent = "TEST VERSION — gates open";
+    b.style.cssText = "position:fixed;left:8px;bottom:8px;z-index:2147482000;background:#d9822b;color:#fff;font:700 10.5px system-ui,sans-serif;letter-spacing:.06em;padding:4px 8px;border-radius:6px;opacity:.9;pointer-events:none";
+    document.body.appendChild(b);
+  } catch (e) { }
+}
+
 const LICENCE_API = "/.netlify/functions/licence";
 const LICENCE_HEARTBEAT_MS = 30 * 60 * 1000;
 const LICENCE_ENFORCED_FLAG = "sf_licence_enforced_v1";   // last known: was licensing on?
@@ -1412,6 +1465,8 @@ const ABN_WEIGHTS = [10, 1, 3, 5, 7, 9, 11, 13, 15, 17, 19];
 function abnDigits(v) { return (v || "").replace(/\D/g, ""); }
 function isValidAbn(v) {
   const d = abnDigits(v);
+  // TEST VERSION: any figure is accepted so demos can use made-up numbers.
+  if (TEST_MODE) return d.length > 0;
   if (d.length !== 11) return false;
   const digits = d.split("").map(Number);
   digits[0] -= 1;
@@ -1437,7 +1492,7 @@ function AbnValidateButton({ value, onValid }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 7, flexWrap: "wrap" }}>
       <button type="button" className="btn ghost tiny" onClick={check}>Validate ABN</button>
-      {res === "ok" && <span style={{ fontSize: 12, color: "var(--good)" }}>{"\u2713"} Valid ABN (format and checksum)</span>}
+      {res === "ok" && <span style={{ fontSize: 12, color: "var(--good)" }}>{"\u2713"} {TEST_MODE ? "ABN confirmed" : "Valid ABN (format and checksum)"}</span>}
       {res === "bad" && <span style={{ fontSize: 12, color: "var(--warn)" }}>Not a valid ABN. Check the digits.</span>}
       {res === "empty" && <span style={{ fontSize: 12, color: "var(--warn)" }}>Enter an ABN first.</span>}
     </div>
@@ -4006,8 +4061,16 @@ function App() {
   const [showTrialNotice, setShowTrialNotice] = useState(false);
   const [trialNoticeRestore, setTrialNoticeRestore] = useState(false); // open straight into "Restore licence"
   const guardCreate = (fn) => (...args) => {
-    if (!canCreate) { setShowTrialNotice(true); return; }
+    if (!canCreate) {
+      if (TEST_MODE) { testGate("Trial ended / licence needed", "In the live version you could not add new records here.").then(() => fn(...args)); return; }
+      setShowTrialNotice(true); return;
+    }
     fn(...args);
+  };
+  // Same gate for the forms that check canCreate themselves. Resolves true = carry on.
+  const onBlockedCreate = async () => {
+    if (TEST_MODE) { await testGate("Trial ended / licence needed", "In the live version you could not add new records here."); return true; }
+    setShowTrialNotice(true); return false;
   };
   const [loaded, setLoaded] = useState(false);
   const fy = fyOf(today());
@@ -4435,7 +4498,10 @@ function App() {
   // never shown the sign-in gate; it appears only when they choose to buy or
   // restore (?buy=1, set by plan buttons, the upgrade reminder and paywall).
   if (licence.phase === "locked" && !(licence.info?.state === "signed_out" && !wantsLicenceFlow())
-      && !(isMemberDevice() && licence.info?.state === "offline")) return <LicenceGate licence={licence} theme={theme} />;
+      && !(isMemberDevice() && licence.info?.state === "offline")) {
+    if (TEST_MODE) testGateOnce("licence-screen", "Licence screen", "In the live version the whole app is locked behind the sign-in / buy screen.");
+    else return <LicenceGate licence={licence} theme={theme} />;
+  }
 
   const exitDemo = () => {
     const blank = { ...BLANK, profile: { ...BLANK.profile, welcomed: true, introTourVersion: 2 } };
@@ -4657,7 +4723,7 @@ function App() {
               {sumTab === "position" && <Summary data={data} save={save} m={m} go={go} newInvoice={newInvoice} resume={() => setTab("setup")}              snoozeBackup={() => save({ ...data, profile: { ...data.profile, remindedOn: today() } })}
                 dismissBackupNotice={() => save({ ...data, profile: { ...data.profile, backupNoticeSeen: true } })}
                 daysUntilTrialEnd={daysUntilTrialEnd} onSubscribe={() => setShowTrialNotice(true)} claimSeed={claimSeed} />}
-              {sumTab === "expenses" && <Expenses data={data} save={save} m={m} fy={fy} askClaim={askClaim} canCreate={canCreate} onBlocked={() => setShowTrialNotice(true)} />}
+              {sumTab === "expenses" && <Expenses data={data} save={save} m={m} fy={fy} askClaim={askClaim} canCreate={canCreate} onBlocked={onBlockedCreate} />}
             </>
           ))}
 
@@ -4671,10 +4737,10 @@ function App() {
               title={({ shifts: "Shifts", travel: "Travel", notes: "Notes", incidents: "Incidents" })[invTab] || "Work"}
               onBack={() => goHub("workhub")}
             />
-            {invTab === "shifts" && <Shifts data={data} save={save} fy={fy} newInvoice={newInvoice} canCreate={canCreate} onBlocked={() => setShowTrialNotice(true)}
+            {invTab === "shifts" && <Shifts data={data} save={save} fy={fy} newInvoice={newInvoice} canCreate={canCreate} onBlocked={onBlockedCreate}
               openNewRequest={openNewShiftRequest} onOpenNewConsumed={() => setOpenNewShiftRequest(false)}
               onShiftSaved={(ctx) => { if (!suppressVisitFollowUp) setVisitFollowUp(ctx); }} />}
-            {invTab === "travel" && <Trips data={data} save={save} m={m} fy={fy} canCreate={canCreate} onBlocked={() => setShowTrialNotice(true)}
+            {invTab === "travel" && <Trips data={data} save={save} m={m} fy={fy} canCreate={canCreate} onBlocked={onBlockedCreate}
               prefill={travelPrefill}
               onSaved={() => { setTravelFollowUp(travelPrefill); setTravelPrefill(null); }} />}
             {invTab === "notes" && <Notes data={data} save={save} prefill={notesPrefill} onPrefillConsumed={() => setNotesPrefill(null)} />}
@@ -4692,7 +4758,7 @@ function App() {
             />
             {pplTab === "agreements" && <Agreements data={data} save={save} open={(pt) => { setPplTab("participants"); setOpenPt(pt.id); }} />}
             {(pplTab === "participants" || pplTab === "managers") &&
-              <Directory data={data} save={save} view={pplTab} setView={setPplTab} openId={openPt} clearOpen={() => setOpenPt(null)} canCreate={canCreate} onBlocked={() => setShowTrialNotice(true)} />}
+              <Directory data={data} save={save} view={pplTab} setView={setPplTab} openId={openPt} clearOpen={() => setOpenPt(null)} canCreate={canCreate} onBlocked={onBlockedCreate} />}
           </>
         )}
 
@@ -5645,7 +5711,12 @@ function PaymentTracker({ data, save, go, access }) {
     return () => clearTimeout(t);
   }, [sig, access.phase]);
 
-  if (access.phase !== "unlocked") return <TrackerUpsell access={access} owed={owed} count={open.length} go={go} />;
+  if (access.phase !== "unlocked") {
+    if (TEST_MODE) {
+      testGateOnce("tracker", "Payment tracker (paid add-on)", "In the live version this tab shows the buy screen instead of the tracker.");
+      access = { ...access, phase: "unlocked", preview: true };
+    } else return <TrackerUpsell access={access} owed={owed} count={open.length} go={go} />;
+  }
 
   const chip = (k, label, n) => (
     <button key={k} className={"btn" + (filter === k ? "" : " ghost")} style={{ minHeight: 44, flex: 1 }} onClick={() => setFilter(k)} aria-pressed={filter === k}>{label}{n != null ? ` (${n})` : ""}</button>
@@ -6348,7 +6419,11 @@ async function chargeInvoiceCredit(invoiceNumber) {
   }
   // Billing not wired up on this deployment (dev / local): never block.
   if (resp.status === 503 || resp.status === 404) return "ok";
-  if (resp.status === 402) { announceCredits({ balance: 0 }); return "no_credits"; }
+  if (resp.status === 402) {
+    announceCredits({ balance: 0 });
+    if (TEST_MODE) { await testGate("Out of free invoices", "In the live version this invoice would be blocked until you buy Basic (A$79)."); return "ok"; }
+    return "no_credits";
+  }
   if (!resp.ok) return "error";
   const d = await resp.json().catch(() => ({}));
   if (d.charged === true) {
@@ -7408,8 +7483,8 @@ function Directory({ data, save, view, setView, openId, clearOpen, canCreate, on
           <div style={{ display: "flex", gap: 8 }}>
             <button className="btn ghost" onClick={() => setEdit(null)}>Cancel</button>
             <button className="btn"
-              onClick={() => {
-                if (!r.id && !canCreate) { onBlocked(); return; }
+              onClick={async () => {
+                if (!r.id && !canCreate && !(await onBlocked())) return;
                 put(edit._k, isP
                   ? { ...r, name: toProperName(r.name), ndisNumber: ndisDigits(r.ndisNumber) }
                   : { ...r, abn: formatAbn(r.abn) });
@@ -7735,9 +7810,9 @@ function Expenses({ data, save, m, fy, askClaim, canCreate, onBlocked }) {
   // drift out of sync with the two real inputs.
   const [f, setF] = useState({ date: today(), cat: EXPENSE_CATS[0], desc: "", amount: "", gstAmount: "", businessUsePct: 100 });
   const rows = data.expenses.filter((e) => inFY(e.date, fy));
-  const add = () => {
+  const add = async () => {
     if (!f.amount) return;
-    if (!canCreate) { onBlocked(); return; }
+    if (!canCreate && !(await onBlocked())) return;
     save({ ...data, expenses: [...data.expenses, { ...f, id: uid() }] });
     setF({ date: today(), cat: EXPENSE_CATS[0], desc: "", amount: "", gstAmount: "", businessUsePct: 100 });
   };
@@ -8179,8 +8254,8 @@ function Shifts({ data, save, fy, newInvoice, canCreate, onBlocked, onShiftSaved
     setMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); setPick(null);
   };
 
-  const put = () => {
-    if (!f.id && !canCreate) { onBlocked(); return; }
+  const put = async () => {
+    if (!f.id && !canCreate && !(await onBlocked())) return;
     if (shiftConflict(f)) return;
     const isNew = !f.id;
     const rec = f.id ? f : { ...f, id: uid() };
@@ -8610,10 +8685,10 @@ function Trips({ data, save, m, fy, canCreate, onBlocked, prefill, onSaved }) {
   // before this field existed have taxDeductible === undefined, treated as
   // deductible by default since that matches how the app already behaved,
   // rather than silently zeroing out real deductions people already had.
-  const put = () => {
+  const put = async () => {
     if (!finalKm || billed) return;
     if (currentTripProblem) return;
-    if (!f.id && !canCreate) { onBlocked(); return; }
+    if (!f.id && !canCreate && !(await onBlocked())) return;
     const isNew = !f.id;
     const wasPrefilled = isNew && prefill && prefill.participantId === f.participantId && prefill.date === f.date;
     const rec = { ...f, km: finalKm, id: f.id || uid() };
@@ -10145,7 +10220,7 @@ function Help({ data, initialView = "manual" }) {
       ) : (
       <>
       <div className="tabnav" style={{ marginTop: 6 }}>
-        {[["manual", "How it works"], ["faq", "Questions"], ["sources", "Sources"], ["support", "Support"]].map(([k, l]) => (
+        {[["manual", "How it works"], ["faq", "Questions"], ["sources", "Sources"], ["support", "Support"]].filter(([k]) => !(TEST_MODE && k === "support")).map(([k, l]) => (
           <button key={k} data-on={view === k ? 1 : 0} onClick={() => { setView(k); setOpen(null); }}>{l}</button>
         ))}
       </div>
