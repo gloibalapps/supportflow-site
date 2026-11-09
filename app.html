@@ -4810,7 +4810,6 @@ function App() {
       )}
 
       {askPin && licence.phase === "ok" && !readLock() && <PinSetupPrompt onDone={() => { try { localStorage.removeItem(ASK_PIN_FLAG); } catch (e) { } setAskPin(false); }} />}
-      <OfferOrUpgradeBanner paid={licence.phase === "ok" || isLifetime} freeOffer={freeOffer} known={statusKnown} />
 
       <RestoreLinkHandler />
       {showTrialNotice && <TrialEndedNotice startInRestore={trialNoticeRestore} onClose={() => { setShowTrialNotice(false); setTrialNoticeRestore(false); }} />}
