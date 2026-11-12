@@ -543,7 +543,7 @@
 </section>
 <script>
 (function(){
-  return; // Disabled: owner-only stats must not appear on the public homepage. Owner view: /admin/dashboard.
+  return; // Disabled: owner-only stats must not appear on the public homepage. Owner view: /admin.
   var sec=document.getElementById('live-stats'),row=document.getElementById('ls-row');
   var reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
   function card(lbl){var c=document.createElement('div');c.className='ls-card';c.innerHTML='<div class="ls-num">0</div><div class="ls-lbl"></div>';c.lastChild.textContent=lbl;row.appendChild(c);return c;}
