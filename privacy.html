@@ -60,12 +60,63 @@
     'allow_ad_personalization_signals': false
   });
 </script>
-<script src="/visit.js" defer></script></head>
+<script src="/visit.js" defer></script><!--sf-theme-head-->
+<meta name="theme-color" content="#12140E" />
+<script>(function(){var t=null;try{t=localStorage.getItem("sf-site-theme")}catch(e){}var l=t?t==="light":(window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches);if(l)document.documentElement.setAttribute("data-theme","light")})();</script>
+<style>
+  /* site theme: shared light/dark. Dark is the default look and is unchanged. */
+  .tb-btn{width:32px;height:32px;border-radius:50%;border:1px solid #30312B;background:#1C1E17;color:#C9C9C2;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;text-decoration:none;transition:all .18s ease;font-family:inherit;flex:0 0 auto}
+  .tb-btn:hover{border-color:#C8913A;color:#E0A83F}
+  .tb-theme .ic-sun{display:none}
+  .tb-auto{margin-left:auto}
+  .top .tb-btn{margin:-1px 0}
+  html[data-theme="light"]{
+    color-scheme:light;
+    --ink:#F4F2EC;--ink-2:#FAF9F6;--ink-3:#F0EEE7;--card:#FAF9F6;
+    --paper:#1A1B18;--muted:#4A4D45;--muted-2:#6B6E64;
+    --line:#DDDAD1;--brass:#8A5F22;--brass-lift:#8A5F22;--good:#3F7D57}
+  html[data-theme="light"] .tb-btn{background:#FAF9F6;border-color:#DDDAD1;color:#4A4D45}
+  html[data-theme="light"] .tb-btn:hover{border-color:#C8913A;color:#8A5F22}
+  html[data-theme="light"] .tb-theme .ic-moon{display:none}
+  html[data-theme="light"] .tb-theme .ic-sun{display:block}
+  html[data-theme="light"] body{background:#F4F2EC!important;color:#1A1B18!important}
+  html[data-theme="light"] .page-header{background:rgba(244,242,236,.92)}
+  html[data-theme="light"] .top{background:rgba(244,242,236,.96)}
+  html[data-theme="light"] .page-seal{background:#FAF9F6;box-shadow:0 0 0 1px rgba(200,145,58,.4);color:#8A5F22}
+  html[data-theme="light"] .page-seal[style],html[data-theme="light"] .page-seal{color:#8A5F22}
+  html[data-theme="light"] .page-navcta,html[data-theme="light"] .page-navcta:hover{background:#C8913A!important;color:#14150F!important}
+  html[data-theme="light"] .page-navcta:hover{background:#D49C45!important}
+  html[data-theme="light"] .btn:not(.quiet){background:#C8913A;border-color:#C8913A;color:#14150F}
+  html[data-theme="light"] .btn:not(.quiet):hover{background:#D49C45}
+  html[data-theme="light"] .cta{border-color:rgba(138,95,34,.45)}
+  html[data-theme="light"] .code{background:linear-gradient(96deg,#C8913A,#9C6F2B 60%,#7A5420);-webkit-background-clip:text;background-clip:text}
+  html[data-theme="light"] footer a{color:#8A5F22}
+  /* pricing page, which carries its own hard-coded colours */
+  html[data-theme="light"] h1{color:#1A1B18}
+  html[data-theme="light"] .lead,html[data-theme="light"] .once,html[data-theme="light"] .addons,html[data-theme="light"] .gst-end,html[data-theme="light"] .trial,html[data-theme="light"] .fine{color:#4A4D45}
+  html[data-theme="light"] .p,html[data-theme="light"] .fine,html[data-theme="light"] .promo input{background:#FAF9F6;border-color:#DDDAD1}
+  html[data-theme="light"] .pop{border-color:rgba(200,145,58,.7);background:linear-gradient(168deg,rgba(200,145,58,.12),#FAF9F6 46%)}
+  html[data-theme="light"] .tag,html[data-theme="light"] .promo label,html[data-theme="light"] .price.big,html[data-theme="light"] .trial a,html[data-theme="light"] .incl li:before{color:#8A5F22}
+  html[data-theme="light"] .price,html[data-theme="light"] .fine b,html[data-theme="light"] .promo input{color:#1A1B18}
+  html[data-theme="light"] .price.big{color:#8A5F22}
+  html[data-theme="light"] .price.big .inc,html[data-theme="light"] .gst{color:#4A4D45}
+  html[data-theme="light"] .promo input::placeholder{color:#8B8E82}
+  html[data-theme="light"] .incl li{border-top-color:#DDDAD1}
+  html[data-theme="light"] .trial a:hover{color:#6B4716}
+  html[data-theme="light"] #checkout-msg{color:#A5501F!important}
+  html[data-theme="light"] footer[style]{border-top-color:#DDDAD1!important}
+  html[data-theme="light"] footer [style*="#8B8E82"],html[data-theme="light"] footer [style*="#6B6E62"]{color:#4A4D45!important}
+  html[data-theme="light"] footer [style*="#2A2D23"]{border-top-color:#DDDAD1!important}
+  html[data-theme="light"] footer a[style*="#C8913A"]{color:#8A5F22!important}
+</style>
+<!--/sf-theme-head-->
+</head>
 <body>
   <div class="top">
     <img src="./icon-192.png" alt="" />
     <b>SupportFlow™</b>
     <a class="home" href="./index.html">&larr; Back to the site</a>
+    <button type="button" class="tb-btn tb-theme" id="tb-theme" aria-label="Dark mode. Switch to light mode" title="Switch to light mode"><svg class="ic-moon" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path fill="#8EA0B4" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="ic-sun" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="#C8913A" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2" fill="#E0A83F" stroke="none"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></svg></button>
   </div>
   <div class="wrap">
 <h1>Privacy Policy: SupportFlow™</h1>
@@ -325,5 +376,6 @@
   </div>
 <div class="supportflow-legal-mark" style="text-align:center;font-size:12px;line-height:1.55;opacity:.78;margin:22px auto;padding:0 16px;max-width:900px">
 <strong>SupportFlow™</strong> · © 2026 SupportFlow. All rights reserved.<br>SupportFlow is an independent software product and is not affiliated with, endorsed by, or operated by the NDIA or NDIS.
-</div></body>
+</div><!--sf-theme-body--><script>(function(){var b=document.getElementById("tb-theme"),r=document.documentElement,m=document.querySelector('meta[name="theme-color"]');function apply(l){if(l)r.setAttribute("data-theme","light");else r.removeAttribute("data-theme");if(b){b.setAttribute("aria-label",l?"Light mode. Switch to dark mode":"Dark mode. Switch to light mode");b.title=l?"Switch to dark mode":"Switch to light mode";}if(m)m.setAttribute("content",l?"#F4F2EC":"#12140E");}apply(r.getAttribute("data-theme")==="light");if(b)b.addEventListener("click",function(){var l=r.getAttribute("data-theme")!=="light";apply(l);try{localStorage.setItem("sf-site-theme",l?"light":"dark")}catch(e){}});if(window.matchMedia){var q=matchMedia("(prefers-color-scheme: light)"),f=function(e){var t=null;try{t=localStorage.getItem("sf-site-theme")}catch(x){}if(!t)apply(e.matches)};if(q.addEventListener)q.addEventListener("change",f);else if(q.addListener)q.addListener(f);}})();</script><!--/sf-theme-body-->
+</body>
 </html>
