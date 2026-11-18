@@ -91,7 +91,7 @@
           "name": "How do I get started?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Open SupportFlow and try 5 free invoices for 30 days, no card needed. Then complete the setup for your business, passcode and encrypted backup."
+            "text": "Open SupportFlow and try 5 free invoices for 30 days, no card needed. Then complete the setup for your business, PIN and encrypted backup."
           }
         }
       ]
@@ -431,37 +431,17 @@
   <main id="main-content" class="block">
     <div class="kicker rise">For independent support workers</div>
     <h1 id="title" class="rise" aria-label="From shift to invoice: the NDIS invoicing app for independent support workers"><span class="line">From shift</span><span class="line">to invoice</span><span class="h1-kicker">the NDIS invoicing app for independent support workers</span></h1>
-    <div class="hero-features rise">Shifts &bull; Kilometres &bull; Notes &bull; Invoices &bull; Tax &bull; Overdue invoice payment tracker &bull; Expenses</div>
+    <div class="hero-features rise">Shifts &bull; Kilometres &bull; Notes &bull; Invoices &bull; Tax &bull; Payment follow-ups &bull; Expenses</div>
     <div class="actions rise"><a class="btn" href="./app">Try 5 free invoices</a></div>
     <p class="try-free rise">Includes five invoices for 30 days, no payment required</p>
     <p class="rise"><a class="how-link" href="#follow-ups">See how follow-ups work</a></p>
   </main>
 </section>
 
-<section id="follow-ups" class="follow-ups" aria-labelledby="follow-ups-title">
+<section id="plans" class="plans" aria-labelledby="plans-title">
   <style>
     .tracker-sub{max-width:620px;margin:10px auto 0;color:var(--muted);font-size:16px;line-height:1.55}
     .how-link{color:var(--brass-lift);font-size:14.5px;text-decoration:underline;text-underline-offset:3px}
-    .follow-ups{max-width:980px;margin:0 auto;padding:36px 20px 8px;text-align:center}
-    .follow-ups h2{margin:0 0 18px}
-    .follow-ups .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;list-style:none;padding:0;margin:0}
-    .follow-ups .steps li{border:1px solid var(--line);border-radius:16px;padding:18px 16px;text-align:center}
-    .follow-ups .day{font-family:'Fraunces',Georgia,serif;font-size:26px;color:var(--brass-lift)}
-    .follow-ups .day-note{margin:6px 0 0;font-size:14.5px;opacity:.8}
-    .follow-ups .bullets{list-style:none;padding:0;margin:18px 0 0;color:var(--muted);font-size:14.5px;line-height:1.8}
-    @media (max-width:640px){.follow-ups .steps{grid-template-columns:1fr}}
-  </style>
-  <h2 id="follow-ups-title">How the automated overdue invoice payment tracker follows up</h2>
-  <p class="bullets" style="margin:0 0 18px">The overdue invoice payment tracker follows up on its own, with no action needed from you.</p>
-  <ol class="steps">
-    <li><div class="day">Day 7</div><p class="day-note">Polite reminder email</p></li>
-    <li><div class="day">Day 12</div><p class="day-note">Firmer follow-up email</p></li>
-    <li><div class="day">Day 20</div><p class="day-note">Complaint draft ready</p></li>
-  </ol>
-</section>
-
-<section id="plans" class="plans" aria-labelledby="plans-title">
-  <style>
     .try-free{margin:14px 0 0;font-size:14px;color:var(--muted)}
     .try-free b{color:var(--brass-lift);font-weight:650}
     .plans{display:block;max-width:1120px;margin:0 auto;padding:clamp(36px,5vw,64px) clamp(20px,3.6vw,40px) 0}
@@ -476,38 +456,11 @@
     .plan ul{margin:0;padding-left:18px;color:var(--muted);font-size:14.5px;line-height:1.7;flex:1}
     .plan .btn{text-align:center}
     .plans .fine{text-align:center;color:var(--muted);font-size:13px;margin-top:16px}
-    .cmp{max-width:820px;margin:0 auto clamp(22px,3vw,30px);display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:14px}
-    .cmp-col{border:1px solid var(--line);border-radius:14px;padding:18px 18px 14px;background:var(--ink-2,#1A1C15)}
-    .cmp-col.feat{border-color:rgba(224,168,63,.55)}
-    .cmp-col h3{margin:0 0 10px;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--brass);font-weight:600}
-    .cmp-row{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-top:1px solid var(--line);font-size:14px;color:var(--muted)}
-    .cmp-row:first-of-type{border-top:0}
-    .cmp-row b{color:var(--paper);font-weight:600;white-space:nowrap}
-    .cmp-row.total{color:var(--paper);font-weight:600}
-    .cmp-row.total b{color:var(--brass-lift);font-family:'Fraunces',Georgia,serif;font-size:20px;font-weight:400}
-    .cmp-save{grid-column:1/-1;margin:0;text-align:center;font-size:15px;color:var(--paper)}
+    .cmp-save{margin:clamp(16px,2.4vw,22px) 0 0;text-align:center;font-size:15px;color:var(--paper)}
     .cmp-save b{color:var(--brass-lift)}
   </style>
   <h2 id="plans-title">Simple, one-off pricing</h2>
   <p class="sub">Start with 5 free invoices for 30 days. Upgrade when you're ready. No subscription.</p>
-  <div class="cmp" id="price-comparison" aria-label="Price comparison">
-    <div class="cmp-col">
-      <h3>Basic + add-ons</h3>
-      <div class="cmp-row"><span>Basic, one device: invoices, shifts, notes, kilometres, expenses and tax</span><b>A$79</b></div>
-      <div class="cmp-row"><span>Add-on: extra device (second computer or phone)</span><b>+ A$29</b></div>
-      <div class="cmp-row"><span>Add-on: overdue invoice payment tracker</span><b>+ A$29</b></div>
-      <div class="cmp-row total"><span>Total, one-off</span><b>A$137</b></div>
-    </div>
-    <div class="cmp-col feat">
-      <h3>Premium</h3>
-      <div class="cmp-row"><span>Everything in Basic</span><b>&check;</b></div>
-      <div class="cmp-row"><span>Two-device licence</span><b>Included</b></div>
-      <div class="cmp-row"><span>Overdue invoice payment tracker</span><b>Included</b></div>
-      <div class="cmp-row"><span>No upgrades needed</span><b>&check;</b></div>
-      <div class="cmp-row total"><span>Premium price, one-off</span><b>A$129</b></div>
-    </div>
-    <p class="cmp-save">Basic plus both add-ons totals <b>A$137</b>. Premium is <b>A$129</b>, paid once, and includes the overdue invoice payment tracker and a two-device licence.</p>
-  </div>
   <div class="grid">
     <div class="plan">
       <div class="name">Basic</div>
@@ -523,6 +476,7 @@
       <a class="btn" data-premium-cta href="./app?buy=upgrade">Get Premium &mdash; A$129</a>
     </div>
   </div>
+  <p class="cmp-save">Basic plus both add-ons is <b>A$137</b>. Premium is <b>A$129</b> with everything included, so you save <b>A$8</b>.</p>
   <p class="fine">Prices in Australian dollars, GST inclusive where applicable. Your rights under the Australian Consumer Law are not affected.</p>
 </section>
 
@@ -602,7 +556,7 @@
 <!-- ============ THE PRODUCT ============ -->
 <section class="sec" id="how">
   <div class="sec-head">
-    <h2>Everything you need to run your support work</h2>
+    <h2>From shift to invoice to tax figure</h2>
     <p>Log the shift in Work, raise the invoice, and Money keeps a running tax figure the moment
       you mark it paid.</p>
   </div>
@@ -669,6 +623,26 @@
   </div>
 </section>
 
+<section id="follow-ups" class="follow-ups" aria-labelledby="follow-ups-title">
+  <style>
+    .follow-ups{max-width:980px;margin:0 auto;padding:36px 20px 8px;text-align:center}
+    .follow-ups h2{margin:0 0 18px}
+    .follow-ups .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;list-style:none;padding:0;margin:0}
+    .follow-ups .steps li{border:1px solid var(--line);border-radius:16px;padding:18px 16px;text-align:center}
+    .follow-ups .day{font-family:'Fraunces',Georgia,serif;font-size:26px;color:var(--brass-lift)}
+    .follow-ups .day-note{margin:6px 0 0;font-size:14.5px;opacity:.8}
+    .follow-ups .bullets{list-style:none;padding:0;margin:18px 0 0;color:var(--muted);font-size:14.5px;line-height:1.8}
+    @media (max-width:640px){.follow-ups .steps{grid-template-columns:1fr}}
+  </style>
+  <h2 id="follow-ups-title">How the automated overdue invoice payment tracker follows up</h2>
+  <p class="bullets" style="margin:0 0 18px">The overdue invoice payment tracker follows up on its own, with no action needed from you.</p>
+  <ol class="steps">
+    <li><div class="day">Day 7</div><p class="day-note">Polite reminder email</p></li>
+    <li><div class="day">Day 12</div><p class="day-note">Firmer follow-up email</p></li>
+    <li><div class="day">Day 20</div><p class="day-note">Complaint draft ready</p></li>
+  </ol>
+</section>
+
 <!-- ============ GET STARTED ============ -->
 <section class="big" id="get-started"><div class="big-in">
 <h2>Your support work, organised.</h2>
@@ -702,7 +676,7 @@
     </div>
     <div class="tcard">
       <b>How do I get started?</b>
-      <span>Open SupportFlow and try 5 free invoices for 30 days, no card needed. Then complete the setup for your business, passcode and encrypted backup.</span>
+      <span>Open SupportFlow and try 5 free invoices for 30 days, no card needed. Then complete the setup for your business, PIN and encrypted backup.</span>
     </div>
   </div>
 </section>
