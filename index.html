@@ -313,6 +313,13 @@
     font-size:clamp(23px,3vw,32px);line-height:1.15;letter-spacing:-.02em;margin-bottom:12px}
   .showcase p{color:var(--muted);font-size:clamp(14px,1.6vw,16px);line-height:1.7;max-width:38ch}
 
+  @media (max-width:820px){
+    .sample-invoice{margin-bottom:64px!important}
+    .sample-invoice .si-h{font-family:'Fraunces',Georgia,serif;font-weight:400;font-size:clamp(23px,3vw,32px);line-height:1.15;letter-spacing:-.02em;margin-bottom:12px!important}
+    .sample-invoice .si-a{display:block!important;margin:0 -12px}
+    .sample-invoice .si-img{max-width:none!important;width:100%!important;border-radius:8px!important}
+    .sample-invoice .si-link{margin-top:16px!important}
+  }
   /* screenshot frame — a phone-shaped slot the real capture drops into */
   .shot{position:relative;border-radius:26px;overflow:hidden;
     background:linear-gradient(168deg,var(--ink-3),var(--ink-2));
@@ -538,12 +545,12 @@
   </div>
 
   <div class="sample-invoice" style="max-width:760px;margin:clamp(8px,2vw,20px) auto clamp(28px,4vw,48px);text-align:center">
-    <h3 style="margin:0 0 6px">The finished PDF invoice</h3>
+    <h3 class="si-h" style="margin:0 0 6px">The finished PDF invoice</h3>
     <p style="margin:0 0 16px;opacity:.8">The invoice above, as the PDF your participant or plan manager receives. Sample details only.</p>
-    <a href="./sample-invoice.pdf" target="_blank" rel="noopener" style="display:inline-block">
-      <img src="./sample-invoice.png" alt="Sample SupportFlow PDF invoice INV-0002: two Self-Care shifts and provider travel, total due $753.62" loading="lazy" style="width:100%;max-width:520px;height:auto;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.35);background:#fff" />
+    <a class="si-a" href="./sample-invoice.pdf" target="_blank" rel="noopener" style="display:inline-block">
+      <picture><source media="(max-width:820px)" srcset="./sample-invoice-mobile.png"><img class="si-img" src="./sample-invoice.png" alt="Sample SupportFlow PDF invoice INV-0002: two Self-Care shifts and provider travel, total due $753.62" loading="lazy" style="width:100%;max-width:520px;height:auto;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.35);background:#fff" /></picture>
     </a>
-    <p style="margin:14px 0 0"><a href="./sample-invoice.pdf" target="_blank" rel="noopener">Open the sample invoice (PDF)</a></p>
+    <p class="si-link" style="margin:14px 0 0"><a href="./sample-invoice.pdf" target="_blank" rel="noopener">Open the sample invoice (PDF)</a></p>
   </div>
 
 
