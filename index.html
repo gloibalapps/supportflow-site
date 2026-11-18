@@ -54,7 +54,7 @@
         "audienceType": "Independent Australian NDIS support workers"
       },
       "isAccessibleForFree": false,
-        "offers": [{ "@type": "Offer", "name": "Basic", "price": "79.00", "priceCurrency": "AUD", "description": "Basic, one device, one-off payment" }, { "@type": "Offer", "name": "Premium", "price": "129.00", "priceCurrency": "AUD", "description": "Premium, two devices and payment tracker, one-off." }],
+        "offers": [{ "@type": "Offer", "name": "Basic", "price": "79.00", "priceCurrency": "AUD", "description": "Basic, one device, one-off payment" }, { "@type": "Offer", "name": "Premium", "price": "129.00", "priceCurrency": "AUD", "description": "Premium, two devices and late payment fees, one-off." }],
       "inLanguage": "en-AU"
     }
 ,
@@ -431,7 +431,7 @@
   <main id="main-content" class="block">
     <div class="kicker rise">For independent support workers</div>
     <h1 id="title" class="rise" aria-label="From shift to invoice: the NDIS invoicing app for independent support workers"><span class="line">From shift</span><span class="line">to invoice</span><span class="h1-kicker">the NDIS invoicing app for independent support workers</span></h1>
-    <div class="hero-features rise">Shifts &bull; Kilometres &bull; Notes &bull; Invoices &bull; Tax &bull; Overdue payment tracker &bull; Expenses</div>
+    <div class="hero-features rise">Shifts &bull; Kilometres &bull; Notes &bull; Invoices &bull; Tax &bull; Late payment fees &bull; Expenses</div>
     <div class="actions rise"><a class="btn" href="./app">Try 5 free invoices</a></div>
     <p class="try-free rise">Includes five invoices for 30 days, no payment required</p>
     <p class="rise"><a class="how-link" href="#follow-ups">See how follow-ups work</a></p>
@@ -451,8 +451,8 @@
     .follow-ups .bullets{list-style:none;padding:0;margin:18px 0 0;color:var(--muted);font-size:14.5px;line-height:1.8}
     @media (max-width:640px){.follow-ups .steps{grid-template-columns:1fr}}
   </style>
-  <h2 id="follow-ups-title">How the automated payment tracker follows up</h2>
-  <p class="bullets" style="margin:0 0 18px">The tracker follows up on its own, with no action needed from you.</p>
+  <h2 id="follow-ups-title">How late payment fees follow up automatically</h2>
+  <p class="bullets" style="margin:0 0 18px">Late payment follow-ups run on their own, with no action needed from you.</p>
   <ol class="steps">
     <li><div class="day">Day 7</div><p class="day-note">Polite reminder email</p></li>
     <li><div class="day">Day 12</div><p class="day-note">Firmer follow-up email</p></li>
@@ -494,32 +494,32 @@
     <div class="cmp-col">
       <h3>Basic + add-ons</h3>
       <div class="cmp-row"><span>Basic, one device: invoices, shifts, notes, kilometres, expenses and tax</span><b>A$79</b></div>
-      <div class="cmp-row"><span>Add-on: second computer/device</span><b>+ A$29</b></div>
-      <div class="cmp-row"><span>Add-on: overdue payment tracker</span><b>+ A$29</b></div>
+      <div class="cmp-row"><span>Add-on: extra device (second computer or phone)</span><b>+ A$29</b></div>
+      <div class="cmp-row"><span>Add-on: late payment fees</span><b>+ A$29</b></div>
       <div class="cmp-row total"><span>Total, one-off</span><b>A$137</b></div>
     </div>
     <div class="cmp-col feat">
       <h3>Premium</h3>
       <div class="cmp-row"><span>Everything in Basic</span><b>&check;</b></div>
-      <div class="cmp-row"><span>Two-device license</span><b>Included</b></div>
-      <div class="cmp-row"><span>Overdue payment tracker</span><b>Included</b></div>
+      <div class="cmp-row"><span>Two-device licence</span><b>Included</b></div>
+      <div class="cmp-row"><span>Late payment fees</span><b>Included</b></div>
       <div class="cmp-row"><span>No upgrades needed</span><b>&check;</b></div>
       <div class="cmp-row total"><span>Premium price, one-off</span><b>A$129</b></div>
     </div>
-    <p class="cmp-save">Basic plus both add-ons totals <b>A$137</b>. Premium is <b>A$129</b>, paid once, and packages the second device and payment tracker.</p>
+    <p class="cmp-save">Basic plus both add-ons totals <b>A$137</b>. Premium is <b>A$129</b>, paid once, and includes late payment fees and a two-device licence.</p>
   </div>
   <div class="grid">
     <div class="plan">
       <div class="name">Basic</div>
       <div class="price">A$79 <small>one-off</small></div>
-      <ul><li>SupportFlow on one device</li><li>Invoices, shifts, notes, kilometres, expenses and tax</li><li>Works offline, private by design</li><li>Add a second device later for A$29</li><li>Add the payment tracker later for A$29</li></ul>
+      <ul><li>SupportFlow on one device</li><li>Invoices, shifts, notes, kilometres, expenses and tax</li><li>Works offline, private by design</li><li>Extra device: add a second device later for A$29</li><li>Add late payment fees later for A$29</li></ul>
       <a class="btn" href="./app?buy=1">Get Basic &mdash; A$79</a>
     </div>
     <div class="plan feat">
       <div class="badge">Most popular</div>
       <div class="name">Premium</div>
       <div class="price">A$129 <small>one-off</small></div>
-      <ul><li>Everything in Basic (invoices, shifts, notes, kilometres, expenses and tax)</li><li>Two-device license</li><li>Payment tracker</li></ul>
+      <ul><li>Everything in Basic (invoices, shifts, notes, kilometres, expenses and tax)</li><li>Two-device licence</li><li>Late payment fees</li></ul>
       <a class="btn" data-premium-cta href="./app?buy=upgrade">Get Premium &mdash; A$129</a>
     </div>
   </div>

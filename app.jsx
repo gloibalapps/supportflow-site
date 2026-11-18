@@ -901,8 +901,8 @@ function LicencePlans({ onBuy, onPremium, busy, premium }) {
       <div className="disp" style={{ fontSize: 28, margin: "6px 0 2px" }}>A$79 <span style={{ fontSize: 13, color: "var(--tx-3)", fontFamily: "inherit" }}>once</span></div>
       <div style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 8 }}>One device. Pay once.</div>
       {tick("Invoices, shifts, notes, kilometres, expenses and tax")}
-      {tick("A second device is a separate A$29 add-on")}
-      {tick("The Payment tracker is A$29 once, on top of Basic")}
+      {tick("An extra (second) device is a separate A$29 add-on")}
+      {tick("Late payment fees are a separate A$29 add-on, paid once")}
       {tick("No subscription on Basic")}
       <button className="btn" style={{ marginTop: 14, width: "100%" }} disabled={!!busy} onClick={() => onBuy("one")}>
         {busy === "one" ? "One moment..." : "Get Basic \u2014 A$79"}
@@ -913,8 +913,8 @@ function LicencePlans({ onBuy, onPremium, busy, premium }) {
       <div className="disp" style={{ fontSize: 28, margin: "6px 0 2px" }}>A${q.priceAud} <span style={{ fontSize: 13, color: "var(--tx-3)", fontFamily: "inherit" }}>once</span></div>
       <div style={{ fontSize: 13.5, lineHeight: 1.55, marginBottom: 8 }}>Premium is A${q.priceAud}, paid once.</div>
       {tick("Everything in Basic")}
-      {tick("Two-device license")}
-      {tick("Payment tracker included")}
+      {tick("Two-device licence")}
+      {tick("Late payment fees included")}
       <button className="btn" style={{ marginTop: 14, width: "100%" }} disabled={!!busy} onClick={onPremium}>
         {busy === "premium" ? "One moment..." : `Get Premium \u2014 A$${q.priceAud}`}
       </button>
@@ -3358,7 +3358,7 @@ function UpgradeChooser({ licence, theme }) {
         </button>
         {plan === 2 && <div style={{ fontSize: 12, color: "var(--tx-3)", marginBottom: 10 }}>Your licence already covers two devices.</div>}
         <button className="btn" style={{ width: "100%", minHeight: 48, marginBottom: 10 }} disabled={!!busy || licence.offline} onClick={buyTracker}>
-          {busy === "tracker" ? "Opening checkout\u2026" : "Add Payment tracker \u2014 A$29"}
+          {busy === "tracker" ? "Opening checkout\u2026" : "Add late payment fees \u2014 A$29"}
         </button>
         <div style={{ fontSize: 12, color: "var(--tx-3)", lineHeight: 1.6, marginBottom: 10 }}>
           Each add-on is a one-off payment.
@@ -3394,7 +3394,7 @@ function OfferOrUpgradeBanner({ paid, freeOffer, known }) {
   if (!due) return null;
   return <div role="status" style={box}>
     <div style={{ flex: 1 }}><b style={{ color: "#E8C171" }}>Keep invoicing with SupportFlow</b><br />
-      Basic A$79 one-off, or Premium A${premiumQuoteFrom(null).priceAud}. Everything in Basic, a two-device licence and the Payment tracker. A second device or the tracker on Basic is A$29 each.</div>
+      Basic A$79 one-off, or Premium A${premiumQuoteFrom(null).priceAud}. Everything in Basic, a two-device licence and late payment fees. On Basic, an extra device or late payment fees is A$29 each.</div>
     <a className="btn" href={BUY_URL} style={{ whiteSpace: "nowrap" }}>See plans</a>
     <button style={btn} onClick={() => hide(true)}>Remind me later</button>
   </div>;
@@ -4623,7 +4623,7 @@ function App() {
               <div className="shortgrid">
                 <ShortcutCard icon="invoice" tone="blue" title="Invoices" sub="Raise, send and mark invoices paid." onClick={() => go("summary", "invoices")}
                   badge={(() => { const n = data.invoices.filter(isOverdue).length; return n ? `${n} overdue` : null; })()}/>
-                <ShortcutCard icon="document" tone="teal" title="Payment tracker" sub="See who owes you and chase it." onClick={() => go("summary", "tracker")}/>
+                <ShortcutCard icon="document" tone="teal" title="Late payment fees" sub="See who owes you and chase it." onClick={() => go("summary", "tracker")}/>
                 <ShortcutCard icon="expense" tone="pink" title="Expenses" sub="Log and review expenses." onClick={() => go("summary", "expenses")}/>
                 <ShortcutCard icon="tax" tone="yellow" title="Tax" sub="Set-aside, claim check and accountant pack." onClick={() => { setClaimSeed(""); go("summary", "position"); }}/>
                 <ShortcutCard icon="tax" tone="yellow" title="BAS" sub="GST and BAS worksheet." onClick={() => go("summary", "bas")} wide/>
@@ -4654,7 +4654,7 @@ function App() {
             <>
               <SectionReturnHeader
                 section="Money"
-                title={({ invoices: "Invoices", expenses: "Expenses", position: "Tax", bas: "BAS", tracker: "Payment tracker" })[sumTab] || "Money"}
+                title={({ invoices: "Invoices", expenses: "Expenses", position: "Tax", bas: "BAS", tracker: "Late payment fees" })[sumTab] || "Money"}
                 onBack={() => { setClaimSeed(""); goHub("moneyhub"); }}
               />
               {sumTab === "invoices" && <InvoiceList data={data} m={m} fy={fy} save={save} newInvoice={newInvoice} open={setEditing} go={go} billTick={billTick} setBillTick={setBillTick} />}
@@ -5566,7 +5566,7 @@ function TrackerUpsell({ access, owed, count, go }) {
   const needsBasic = canBuy && !access.paid;
   return (
     <div className="panel" style={{ borderColor: "var(--brass)" }}>
-      <div className="eyebrow" style={{ color: "var(--brass)" }}>Payment tracker</div>
+      <div className="eyebrow" style={{ color: "var(--brass)" }}>Late payment fees</div>
       <div className="disp" style={{ fontSize: 24, margin: "6px 0 8px" }}>Get paid on time without chasing</div>
       {count > 0 && <div style={{ fontSize: 14, marginBottom: 10 }}>You're owed <b>{money(owed)}</b> across {count} invoice{count === 1 ? "" : "s"}.</div>}
       <div style={{ fontSize: 13.5, lineHeight: 1.6, color: "var(--tx-2)" }}>
@@ -5580,19 +5580,19 @@ function TrackerUpsell({ access, owed, count, go }) {
           <a className="btn" style={{ display: "inline-flex", minHeight: 44, alignItems: "center" }} href={BUY_URL}>Sign in</a>
         </div>
       )}
-      {access.phase === "locked" && access.deviceLimit && <div style={{ fontSize: 13, marginTop: 12 }}>The Payment tracker is already in use on your other device.</div>}
+      {access.phase === "locked" && access.deviceLimit && <div style={{ fontSize: 13, marginTop: 12 }}>Late payment fees are already in use on your other device.</div>}
       {canBuy && tracker && !needsBasic && (
         <button className="btn" style={{ width: "100%", marginTop: 12, minHeight: 48 }} disabled={!!access.busy} onClick={() => access.buy(tracker.id)}>
-          {access.busy === tracker.id ? "One moment..." : `Add Payment tracker · A$${tracker.priceAud} once`}
+          {access.busy === tracker.id ? "One moment..." : `Add late payment fees · A$${tracker.priceAud} once`}
         </button>
       )}
       {needsBasic && (
         <a className="btn" style={{ width: "100%", marginTop: 12, minHeight: 48, display: "flex", alignItems: "center", justifyContent: "center" }} href={BUY_URL}>
-          The tracker is an add-on to Basic. See plans
+          Late payment fees are an add-on to Basic. See plans
         </a>
       )}
-      {canBuy && !tracker && !needsBasic && <div style={{ fontSize: 12.5, color: "var(--tx-3)", marginTop: 12 }}>The Payment tracker isn't available to buy yet.</div>}
-      {access.phase === "offline" && <div style={{ fontSize: 12.5, color: "var(--warn)", marginTop: 12 }}>Connect to the internet to unlock the Payment tracker.</div>}
+      {canBuy && !tracker && !needsBasic && <div style={{ fontSize: 12.5, color: "var(--tx-3)", marginTop: 12 }}>Late payment fees aren't available to buy yet.</div>}
+      {access.phase === "offline" && <div style={{ fontSize: 12.5, color: "var(--warn)", marginTop: 12 }}>Connect to the internet to unlock late payment fees.</div>}
       {access.phase === "loading" && <div style={{ fontSize: 12.5, color: "var(--tx-3)", marginTop: 12 }}>Checking…</div>}
       {access.error && <div style={{ fontSize: 12.5, color: "var(--warn)", marginTop: 10 }}>{access.error}</div>}
       <button className="btn ghost" style={{ width: "100%", marginTop: 10, minHeight: 44 }} onClick={() => go("summary", "invoices")}>See my invoices</button>
@@ -9603,20 +9603,20 @@ const MANUAL = [
     ]
   },
   {
-    "t": "Payment tracker and notifications",
-    "d": "Money → Payment tracker: the optional add-on that chases unpaid invoices.",
+    "t": "Late payment fees and notifications",
+    "d": "Money → Late payment fees: the optional add-on that chases unpaid invoices.",
     "q": [
       [
-        "What the Payment tracker costs",
-        "The Payment tracker (Money → Payment tracker) is optional. Without it, the Payment tracker page shows a short card with an Add Payment tracker button. With it, the page opens on the invoices that need action and shows whether reminders are On or Off. It is A$29 once, on top of Basic. A second device is a separate A$29 add-on, not a tracker price. Premium is A$129 once and includes everything in Basic, a two-device licence and the Payment tracker."
+        "What late payment fees cost",
+        "Late payment fees (Money → Late payment fees) are optional. Without them, the Late payment fees page shows a short card with an Add late payment fees button. With it, the page opens on the invoices that need action and shows whether reminders are On or Off. It is A$29 once, on top of Basic. An extra (second) device is a separate A$29 add-on, not part of the late payment fees price. Premium is A$129 once and includes everything in Basic, a two-device licence and late payment fees."
       ],
       [
         "How you are alerted",
-        "When a reminder goes out, you are told in two free ways. Push notifications go to every device where you turned them on. If you leave Also email me ticked in Payment tracker → Settings, you also get a short email at the address you entered there. The payer is never emailed this alert. SupportFlow does not send text messages."
+        "When a reminder goes out, you are told in two free ways. Push notifications go to every device where you turned them on. If you leave Also email me ticked in Late payment fees → Settings, you also get a short email at the address you entered there. The payer is never emailed this alert. SupportFlow does not send text messages."
       ],
       [
         "Turn on push notifications",
-        "Turn them on on each device separately: Payment tracker → Settings → Turn on phone notifications, then Allow. Android: install from Chrome's menu (Install app), open from the icon, sign in, then turn on. Windows or Mac: install from the Chrome or Edge address bar install icon, open the app, sign in, then turn on. iPhone/iPad (iOS 16.4 or later): in Safari tap Share → Add to Home Screen, open SupportFlow from the Home Screen icon, sign in again, then turn on and Allow."
+        "Turn them on on each device separately: Late payment fees → Settings → Turn on phone notifications, then Allow. Android: install from Chrome's menu (Install app), open from the icon, sign in, then turn on. Windows or Mac: install from the Chrome or Edge address bar install icon, open the app, sign in, then turn on. iPhone/iPad (iOS 16.4 or later): in Safari tap Share → Add to Home Screen, open SupportFlow from the Home Screen icon, sign in again, then turn on and Allow."
       ],
       [
         "Notifications not arriving",
@@ -9778,7 +9778,7 @@ const MANUAL = [
       ],
       [
         "Your licence: plans, upgrades and restoring",
-        "Basic (A$79) covers one device. A second device is a separate A$29 add-on and the Payment tracker is a separate A$29 add-on; Premium (A$129) includes both for people buying for the first time. There is no subscription. Settings → Licence & devices shows your plan. To add a second device or the tracker, use the Upgrade button on your plan (sign in with the Google account you bought with); you pay through Stripe and it applies automatically. On a new device, tap Already have a licence on another device? and enter your checkout email, so you are never asked to pay twice. Your records are never part of the licence: they stay on your device."
+        "Basic (A$79) covers one device. An extra (second) device is a separate A$29 add-on and late payment fees are a separate A$29 add-on; Premium (A$129) includes both for people buying for the first time. There is no subscription. Settings → Licence & devices shows your plan. To add a second device or late payment fees, use the Upgrade button on your plan (sign in with the Google account you bought with); you pay through Stripe and it applies automatically. On a new device, tap Already have a licence on another device? and enter your checkout email, so you are never asked to pay twice. Your records are never part of the licence: they stay on your device."
       ],
       [
         "Where things are in Settings",

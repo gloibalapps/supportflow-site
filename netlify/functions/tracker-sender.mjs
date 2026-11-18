@@ -105,7 +105,7 @@ async function runWorker(prefs) {
     } else {
       try {
         const isThirdParty = !toWorkerOnly;
-        const text = dyn(msg.body) + (isThirdParty ? footer(sub, r.recipient_hash, worker) : "\n\n--\nSupportFlow Payment tracker. Nothing has been filed for you. Turn automatic emails off in Settings > Payment tracker.");
+        const text = dyn(msg.body) + (isThirdParty ? footer(sub, r.recipient_hash, worker) : "\n\n--\nSupportFlow late payment fees. Nothing has been filed for you. Turn automatic emails off in Settings > Late payment fees.");
         const site = process.env.SITE_URL || "https://supportflow.work";
         const headers = isThirdParty ? {
           "List-Unsubscribe": `<${site}/.netlify/functions/tracker-unsubscribe?t=${unsubToken(sub, r.recipient_hash)}>`,
@@ -142,7 +142,7 @@ async function runWorker(prefs) {
         try {
           await resendSend({
             to: worker.replyTo, subject: `Unpaid invoice${p.invoiceNo ? " #" + p.invoiceNo : ""}: ${label}`,
-            text: `${what}\n\nOpen SupportFlow > Money > Payment tracker to see it.\n\n--\nSupportFlow Payment tracker. Turn these emails off in Payment tracker > Settings.`,
+            text: `${what}\n\nOpen SupportFlow > Money > Late payment fees to see it.\n\n--\nSupportFlow late payment fees. Turn these emails off in Late payment fees > Settings.`,
             fromName: "SupportFlow", idempotencyKey: `${r.id}-w${stage}`,
           });
           await log({ ...base, channel: "email_worker", recipient_masked: maskEmail(worker.replyTo), subject: label, status: "sent" });

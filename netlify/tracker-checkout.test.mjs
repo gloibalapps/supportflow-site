@@ -40,8 +40,8 @@ assert.equal(full.priceAud, 129);
 assert.deepEqual(Object.keys(full).filter((k) => /list|saving|window|coupon|timezone/i.test(k)), []);
 assert.deepEqual(full.items, [
   "Everything in Basic (invoices, shifts, notes, kilometres, expenses and tax)",
-  "Two-device license",
-  "Payment tracker",
+  "Two-device licence",
+  "Late payment fees",
 ]);
 assert.doesNotMatch(JSON.stringify(T.trackerOffer()), /Founding|first 200|sale|registration|coupon|discount/i);
 const as = (...p) => { rows = p.map((product) => ({ product, created_at: "2026-11-05T00:00:00Z" })); };

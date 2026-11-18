@@ -31,7 +31,7 @@ It follows the order you'll actually meet things in the app:
 |---|---|
 | **Getting started** | Installing · The first time you open it · First-time setup (five steps) · Finding your way around |
 | **Work** tab | Shifts · Travel · Shift notes |
-| **Money** tab | Invoices · Private clients · Payment tracker · Expenses · Tax · GST |
+| **Money** tab | Invoices · Private clients · Late payment fees · Expenses · Tax · GST |
 | **People** tab | Participants and plan managers · Service agreements · Incidents |
 | **Your data and security** | Backing up · App lock · Licence · Settings |
 | **Help** | If something looks wrong · Words you'll see · Sending feedback · Checking things yourself · Where the numbers come from |
@@ -168,7 +168,7 @@ SupportFlow has four fixed navigation areas at the bottom of every main screen:
 |---|---|
 | **Home** | Your start page: totals at a glance (gross income for the year and the month, next shift, uninvoiced work, expenses, outstanding, tax estimate). Only **Next shift** and **Outstanding** open anything when tapped |
 | **Work** | Opens the Work shortcut page: Shifts · Travel · Notes |
-| **Money** | Opens the Money shortcut page: Invoices · Payment tracker · Expenses · Tax · BAS (when GST registered). The Payment tracker is an add-on: A$29 once on top of Basic, or included in Premium (A$129). See [Payment tracker](#10-payment-tracker-optional-add-on) |
+| **Money** | Opens the Money shortcut page: Invoices · Late payment fees · Expenses · Tax · BAS (when GST registered). Late payment fees are an add-on: A$29 once on top of Basic, or included in Premium (A$129). See [Late payment fees](#10-late-payment-fees-optional-add-on) |
 | **People** | Opens the People shortcut page: Participants · Add participant · Plan managers · Service agreements · Incidents |
 
 The **top header is fixed** as well. The **Light mode / Dark mode** pill, immediately left of **?**, switches the app between light and dark. Use **?** for Manual & Help, and use your profile initial at the top right for Settings and other account/device options. Until you use that pill, the app follows your phone's light or dark setting.
@@ -177,7 +177,7 @@ The **top header is fixed** as well. The **Light mode / Dark mode** pill, immedi
 
 Home shows your numbers at a glance: gross income for the financial year (the large card) and for this month, your next shift, uninvoiced work, expenses this financial year, what's outstanding and your tax estimate.
 
-Only two tiles are tappable: **Next shift** opens your shifts, and **Outstanding** opens the Payment tracker's view of who owes you. Every other tile is display only, so you can't open something by accident while scrolling. To do anything else, use **Work**, **Money** or **People** in the bottom bar.
+Only two tiles are tappable: **Next shift** opens your shifts, and **Outstanding** opens the late payment fees view of who owes you. Every other tile is display only, so you can't open something by accident while scrolling. To do anything else, use **Work**, **Money** or **People** in the bottom bar.
 
 The **eye icon** on the income card hides every dollar amount on Home (they show as dots) for when someone is looking over your shoulder. Tap it again to show them. The choice is remembered on that device.
 
@@ -498,49 +498,49 @@ switches them between the two modes at any time, from **Participants → Partici
 
 ---
 
-## 10. Payment tracker (optional add-on)
+## 10. Late payment fees (optional add-on)
 
-The Payment tracker lives at **Money → Payment tracker**. It shows who owes you, flags overdue invoices, and, if you switch it on, sends polite reminder emails to the payer at business day 7 and 12. At day 20 (day 15 for NDIA-managed) it prepares a complaint draft for you to review. Nothing is ever filed for you.
+Late payment fees live at **Money → Late payment fees**. This screen shows who owes you, flags overdue invoices, and, if you switch it on, sends polite reminder emails to the payer at business day 7 and 12. At day 20 (day 15 for NDIA-managed) it prepares a complaint draft for you to review. Nothing is ever filed for you.
 
 **What you see depends on your licence.**
 
-- **Basic without the tracker:** a short card explaining what it does, with a single **Add Payment tracker · A$29 once** button. Signed out, it asks you to sign in first.
-- **Premium, or Basic with the tracker:** the tracker page itself. It opens on the invoices that need action (it opens on **All** if nothing does). A panel shows whether reminders are **On** or **Off**, with a **Set up** button to change that. If there are no unpaid invoices it says so rather than showing an empty page. The **Patterns**, **Report** and **Settings** tabs each start with a short line saying what they're for.
+- **Basic without late payment fees:** a short card explaining what it does, with a single **Add late payment fees · A$29 once** button. Signed out, it asks you to sign in first.
+- **Premium, or Basic with late payment fees:** the late payment fees page itself. It opens on the invoices that need action (it opens on **All** if nothing does). A panel shows whether reminders are **On** or **Off**, with a **Set up** button to change that. If there are no unpaid invoices it says so rather than showing an empty page. The **Patterns**, **Report** and **Settings** tabs each start with a short line saying what they're for.
 
 ### Pricing
 
-- **A$29 once:** the Payment tracker, on top of Basic. It does not add a second device.
-- **A$29 once:** a second device. This is a separate add-on from the tracker. Buy it from the upgrade screen or Settings → Licence & devices.
-- **Premium, A$129 once:** everything in Basic (invoices, shifts, notes, kilometres, expenses and tax), a two-device licence and the Payment tracker. No subscription.
+- **A$29 once:** late payment fees, on top of Basic. It does not add a second device.
+- **A$29 once:** an extra (second) device. This is a separate add-on from late payment fees. Buy it from the upgrade screen or Settings → Licence & devices.
+- **Premium, A$129 once:** everything in Basic (invoices, shifts, notes, kilometres, expenses and tax), a two-device licence and late payment fees. No subscription.
 
 ### How you're alerted
 
 When a reminder goes out, you're told in two free ways:
 
 - **Push notifications** to each device where you turned them on (see below).
-- **An email to you**, at the address you entered under **Payment tracker → Settings**, if **Also email me when a reminder goes out** is ticked. The payer never receives this one.
+- **An email to you**, at the address you entered under **Late payment fees → Settings**, if **Also email me when a reminder goes out** is ticked. The payer never receives this one.
 
 SupportFlow does not send text messages.
 
 ### Setting up push notifications
 
-Notifications are turned on **separately on each device**, from **Payment tracker → Settings → Turn on phone notifications**. Tap the button yourself, then choose **Allow** when asked.
+Notifications are turned on **separately on each device**, from **Late payment fees → Settings → Turn on phone notifications**. Tap the button yourself, then choose **Allow** when asked.
 
 **Android (Chrome):**
 1. Open supportflow.work/app in Chrome. Use Chrome's menu → **Install app** (or **Add to Home screen**).
-2. Open SupportFlow from its icon and sign in to the tracker.
-3. Go to Payment tracker → Settings → **Turn on phone notifications**, then choose **Allow**.
+2. Open SupportFlow from its icon and sign in to late payment fees.
+3. Go to Late payment fees → Settings → **Turn on phone notifications**, then choose **Allow**.
 
 **Windows or Mac (Chrome or Edge):**
 1. Open supportflow.work/app and click the **install** icon in the address bar (or menu → Install SupportFlow / Apps → Install).
-2. Open the installed app and sign in to the tracker.
-3. Go to Payment tracker → Settings → **Turn on phone notifications**, then choose **Allow**.
+2. Open the installed app and sign in to late payment fees.
+3. Go to Late payment fees → Settings → **Turn on phone notifications**, then choose **Allow**.
 
 **iPhone or iPad (iOS / iPadOS 16.4 or later):**
 1. Open supportflow.work/app in **Safari**. Tap **Share → Add to Home Screen**, then **Add**.
 2. Open SupportFlow **from the Home Screen icon**, not from Safari.
-3. **Sign in again.** The Home Screen app is kept separate from Safari, so you need to sign in to the tracker there too.
-4. Go to Payment tracker → Settings → **Turn on phone notifications**, then choose **Allow**.
+3. **Sign in again.** The Home Screen app is kept separate from Safari, so you need to sign in to late payment fees there too.
+4. Go to Late payment fees → Settings → **Turn on phone notifications**, then choose **Allow**.
 
 ### Checking or turning notifications back on
 
@@ -550,11 +550,11 @@ If you chose "Don't allow" or notifications stopped arriving:
 - **Mac:** System Settings → Notifications → Google Chrome / Microsoft Edge / SupportFlow → Allow notifications. Also check Focus.
 - **iPhone/iPad:** Settings → Notifications → SupportFlow → Allow Notifications. Also check Focus.
 
-Then open the tracker and tap **Turn on phone notifications** again.
+Then open late payment fees and tap **Turn on phone notifications** again.
 
 ### Limits
 
-- Push delivery **isn't guaranteed**. Battery saving, Do Not Disturb or Focus, being offline, or the phone or browser clearing old subscriptions can delay or drop a notification. Check the tracker regularly as well.
+- Push delivery **isn't guaranteed**. Battery saving, Do Not Disturb or Focus, being offline, or the phone or browser clearing old subscriptions can delay or drop a notification. Check late payment fees regularly as well.
 - On iPhone and iPad, notifications **don't work in a normal Safari tab**. They only work in the Home Screen app on iOS 16.4 or later.
 - Turning notifications on applies to one device only. Turn them on on every device you want alerts on.
 - If you remove the app or clear its data, turn notifications on again.
@@ -903,10 +903,10 @@ show two one-off plans. There is no subscription on either plan.
 
 - **Basic, A$79:** invoices, shifts, notes, kilometres, expenses and tax, on
   one device.
-- **Second device, A$29:** a separate add-on if you want two devices. It is
+- **Extra (second) device, A$29:** a separate add-on if you want two devices. It is
   not included in Basic.
 - **Premium, A$129:** everything in Basic, a two-device
-  licence and the Payment tracker, paid once.
+  licence and late payment fees, paid once.
 
 Your current plan and how many devices it covers are shown in the app under
 **Settings → Licence & devices**.
@@ -919,14 +919,14 @@ opens SupportFlow in a **new tab** (supportflow.work/app?buy=upgrade):
 1. If this device isn't signed in yet, sign in with the Google account you
    bought Basic with.
 2. An **Upgrade SupportFlow** box appears. Choose the option you want:
-   - **Add a second device, A$29:** your Basic licence then covers two
+   - **Add an extra (second) device, A$29:** your Basic licence then covers two
      devices. Only available on a one-device (Basic) licence. This is separate
-     from the Payment tracker.
-   - **Add Payment tracker, A$29:** adds the tracker to your Basic licence.
+     from late payment fees.
+   - **Add late payment fees, A$29:** adds late payment fees to your Basic licence.
      It does not add a second device.
 
    Premium (A$129) is offered to people buying for the first time, not here:
-   if you already own Basic you add the second device and the tracker
+   if you already own Basic you add the second device and late payment fees
    separately, A$29 each.
 3. You're taken to **Stripe Checkout** to pay. When payment finishes you come
    back to the app and the upgrade is applied automatically.

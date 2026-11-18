@@ -20,5 +20,5 @@
 - Audience: independent / sole-trader Australian NDIS support workers (not agency rostering).
 - Positioning: "From shift to invoice"; offline-friendly; records stay on the device by default.
 - Trial: 5 free invoices for 30 days; no card needed for the trial.
-- Pricing: Basic A$79 one-off; Premium A$129 one-off (two devices + payment tracker).
+- Pricing: Basic A$79 one-off; Premium A$129 one-off (two devices + late payment fees); Basic add-ons A$29 each: extra device, late payment fees.
 - Do not describe SupportFlow as NDIS-approved, NDIA-endorsed, or as tax advice.

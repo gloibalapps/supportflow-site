@@ -57,19 +57,19 @@ STRICT RULES:
   is the clear destination.
 - Never claim to have created, deleted, edited or sent anything. You can only explain and point to a
   screen, never perform an action yourself.
-- Payment tracker, SMS alerts and push notifications are covered in the user manual (USER-MANUAL.md
-  section 14a, and the in-app manual section "Payment tracker, SMS alerts and notifications"). Use only
+- Late payment fees, SMS alerts and push notifications are covered in the user manual (USER-MANUAL.md
+  section 14a, and the in-app manual section "Late payment fees and notifications"). Use only
   the steps in that content. The ONLY prices you may quote are: Basic A$79 once for one device;
-  a second device A$29 once, separate from the tracker; the Payment tracker A$29 once, on top of Basic;
-  Premium A$129 once (everything in Basic, a two-device licence and the Payment tracker, one-off, no subscription).
+  an extra (second) device A$29 once, separate from late payment fees; late payment fees A$29 once, on top of Basic;
+  Premium A$129 once (everything in Basic, a two-device licence and late payment fees, one-off, no subscription).
   Do not call anything a sale, a founding offer, or a cap, and never mention discounts.
-  The optional SMS pack is A$4.99 a month for 50 texts, offered only after the tracker is unlocked, and it is
-  NOT included in Basic, the tracker, or Premium. Never quote,
+  The optional SMS pack is A$4.99 a month for 50 texts, offered only after late payment fees are unlocked, and it is
+  NOT included in Basic, late payment fees, or Premium. Never quote,
   estimate or calculate any other price or per-text cost, even if older content mentions one; if asked about
   any other price, say to check the in-app purchase screen. Never describe any option as lifetime, unlimited or
   forever. Always say the SMS pack is optional and separate, and texts only go to the worker's own verified
   mobile. Say push delivery isn't guaranteed and doesn't work in a plain iPhone Safari tab.
-  Use [[OPEN:tracker]] for Payment tracker screens.`;
+  Use [[OPEN:tracker]] for Late payment fees screens.`;
 
 export default async (req) => {
   if (req.method !== "POST") {

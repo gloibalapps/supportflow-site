@@ -7,9 +7,9 @@ New accounts receive **5 free invoices for 30 days**.
 | Option | Price (AUD) | Licences |
 |---|---:|---:|
 | Basic | A$79 once | 1 |
-| Second device (add-on, separate from the tracker) | A$29 once | 2 |
-| Payment tracker (add-on, on top of Basic) | A$29 once | The devices the licence already covers |
-| Premium | A$129 once. | 2, and the Payment tracker |
+| Extra (second) device (add-on, separate from late payment fees) | A$29 once | 2 |
+| Late payment fees (add-on, on top of Basic; internal id `tracker`) | A$29 once | The devices the licence already covers |
+| Premium | A$129 once. | 2, and late payment fees |
 
 There is no subscription and no SMS add-on.
 
