@@ -154,7 +154,8 @@
   .brand{display:flex;align-items:center;gap:11px}
   .seal-img{width:32px;height:32px;border-radius:9px;display:block;box-shadow:0 0 0 1px rgba(224,168,63,.25),0 6px 22px rgba(200,145,58,.22)}
   .seal{width:32px;height:32px;border-radius:9px;background:linear-gradient(148deg,var(--brass-lift),var(--brass));display:grid;place-items:center;font-family:'Fraunces',serif;font-size:16px;color:#14150F;box-shadow:0 0 0 1px rgba(224,168,63,.25),0 6px 22px rgba(200,145,58,.22)}
-  .wordmark{font-size:12.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  .wordmark{font-family:'Fraunces',Georgia,serif;font-weight:400;font-size:19px;line-height:1.1;letter-spacing:-.02em;color:#F5F3EC;white-space:nowrap}
+  .wm-fy{font-size:10px;letter-spacing:.18em;text-transform:uppercase;font-weight:600;color:#A8A89F;margin-top:2px}
   .navlink{font-size:13.5px;color:var(--muted);text-decoration:none;transition:color .16s}
   .navlink:hover{color:var(--brass-lift)}
 
@@ -432,9 +433,10 @@
 <section class="hero">
   <div class="wash"></div>
   <header class="mast">
-    <div class="brand"><img class="seal-img" src="/logo-tile-512.png" width="32" height="32" alt="" aria-hidden="true"><div class="wordmark">SupportFlow</div></div>
+    <div class="brand"><img class="seal-img" src="/logo-tile-512.png" width="32" height="32" alt="" aria-hidden="true"><div class="wm"><div class="wordmark">SupportFlow</div><div class="wm-fy" id="wm-fy">2026–27</div></div></div>
     <nav class="mastnav"><a class="navlink" href="./ndis-support-worker-invoice-template">Invoice Guide</a><a class="navlink" href="./ndis-support-worker-progress-notes">Notes Guide</a><a class="navlink" href="./pricing.html">Pricing</a><a class="btn navcta" href="./app">Open App</a></nav>
   </header>
+  <script>(function(){var d=new Date(),y=d.getMonth()>=6?d.getFullYear():d.getFullYear()-1,e=document.getElementById("wm-fy");if(e)e.textContent=y+"\u2013"+String(y+1).slice(2);})();</script>
   <main id="main-content" class="block">
     <div class="kicker rise">For independent support workers</div>
     <h1 id="title" class="rise" aria-label="From shift to invoice: the NDIS invoicing app for independent support workers"><span class="line">From shift</span><span class="line">to invoice</span><span class="h1-kicker">the NDIS invoicing app for independent support workers</span></h1>
