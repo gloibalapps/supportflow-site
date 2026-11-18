@@ -31,7 +31,7 @@ New accounts received **5 free invoice credits**.
 | Most Popular | $19.99 | 30 |
 | Best Value | $39.99 | 100 |
 
-Credits never expire. Creating, editing and previewing drafts is free. One credit is consumed when an invoice is finalised. A 24-hour correction rule is reserved for accidental finalisation so a genuine correction does not unfairly consume another credit.
+Credits are valid for 30 days. Buying more credits while your window is open adds them to your balance and resets the 30-day window; once credits expire, a new purchase starts a fresh balance and a new 30-day window. Creating, editing and previewing drafts is free. One credit is consumed when an invoice is finalised. A 24-hour correction rule is reserved for accidental finalisation so a genuine correction does not unfairly consume another credit.
 
 SupportFlow Pro remains separate from invoice-volume credits and is reserved for advanced business dashboards, reporting, exports and analytics.
 
