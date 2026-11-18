@@ -41,7 +41,7 @@ assert.deepEqual(Object.keys(full).filter((k) => /list|saving|window|coupon|time
 assert.deepEqual(full.items, [
   "Everything in Basic (invoices, shifts, notes, kilometres, expenses and tax)",
   "Two-device licence",
-  "Late payment fees",
+  "Overdue invoice payment tracker",
 ]);
 assert.doesNotMatch(JSON.stringify(T.trackerOffer()), /Founding|first 200|sale|registration|coupon|discount/i);
 const as = (...p) => { rows = p.map((product) => ({ product, created_at: "2026-11-05T00:00:00Z" })); };

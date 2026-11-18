@@ -45,7 +45,7 @@ async function checkout(session, deviceId, body) {
   const product = String(body?.product || "");
   // The client may send a product name only. Amount and price id are chosen here.
   if (isRetiredTrackerProduct(product)) {
-    return json({ error: "That option is no longer sold. Late payment fees are A$29 once, on top of Basic. An extra (second) device is a separate A$29 add-on." }, 410);
+    return json({ error: "That option is no longer sold. The overdue invoice payment tracker is A$29 once, on top of Basic. An extra (second) device is a separate A$29 add-on." }, 410);
   }
   if (!isTrackerProduct(product)) return json({ error: "Choose an option." }, 400);
   const have = await trackerUnlock(session.sub);
@@ -57,12 +57,12 @@ async function checkout(session, deviceId, body) {
     price = sel.price;
   }
   if (!price) return json({ error: "That option isn't available yet.", comingSoon: true }, 503);
-  if (!isSub && have) return json({ error: have.full ? "This account already has Premium." : "This account already has late payment fees." }, 409);
+  if (!isSub && have) return json({ error: have.full ? "This account already has Premium." : "This account already has the overdue invoice payment tracker." }, 409);
   const meta = { kind: "tracker", product, google_sub: session.sub, device_id: deviceId };
   if (isSub) {
     // Optional SMS pack: tracker owners only, one active pack per account.
     // Not included in Basic, the A$29 tracker, or Premium.
-    if (!have) return json({ error: "SMS alerts are an option for late payment fees owners. Unlock late payment fees first." }, 409);
+    if (!have) return json({ error: "SMS alerts are an option for overdue invoice payment tracker owners. Unlock the tracker first." }, 409);
     const cur = await supa(`tracker_sms_subscriptions?google_sub=eq.${q(session.sub)}&status=in.(active,trialing,past_due)&select=stripe_subscription_id`);
     if (cur?.length) return json({ error: "SMS alerts are already active on this account." }, 409);
   }
@@ -222,7 +222,7 @@ export default async (req) => {
     }
     if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
     if (!sameOrigin(req)) return json({ error: "forbidden" }, 403);
-    if (!supaConfigured() || !process.env.LICENCE_SECRET) return json({ error: "Late payment fees aren't set up on this site yet." }, 503);
+    if (!supaConfigured() || !process.env.LICENCE_SECRET) return json({ error: "Overdue invoice payment tracker isn't set up on this site yet." }, 503);
     let body;
     try { body = await req.json(); } catch { return json({ error: "Malformed request." }, 400); }
     const action = String(body?.action || "");
@@ -246,7 +246,7 @@ export default async (req) => {
       const p = (await supa(`tracker_prefs?google_sub=eq.${q(session.sub)}&select=enabled,state,notify_push,notify_email`))?.[0] || null;
       return json({ sms: await smsStatus(session.sub), unlocked: !!unlock, paid: !!paid, devices: paid?.devices || 0, deviceLimit: !!paid && !seat, product: paid?.product || null, prefs: p, autosendServer: autosendEnabled() });
     }
-    if (!unlock) return json({ error: paid ? "Late payment fees are in use on another device. An extra (second) device is a separate A$29 add-on." : "Late payment fees aren't unlocked on this Google account.", locked: true, deviceLimit: !!paid }, 402);
+    if (!unlock) return json({ error: paid ? "Your overdue invoice payment tracker is in use on another device. An extra (second) device is a separate A$29 add-on." : "Overdue invoice payment tracker isn't unlocked on this Google account.", locked: true, deviceLimit: !!paid }, 402);
 
     if (action === "sync") return await sync(session, body);
     if (action === "sms-start") return await smsStart(session, body);
@@ -286,7 +286,7 @@ export default async (req) => {
     return json({ error: "Unknown action." }, 400);
   } catch (e) {
     console.error("tracker:", e.message);
-    if (/TRACKER_DATA_KEY/.test(e.message || "")) return json({ error: "Late payment fees are coming soon.", comingSoon: true }, 503);
+    if (/TRACKER_DATA_KEY/.test(e.message || "")) return json({ error: "The overdue invoice payment tracker is coming soon.", comingSoon: true }, 503);
     return json({ error: "Something went wrong. Try again." }, 500);
   }
 };

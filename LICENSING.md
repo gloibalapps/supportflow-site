@@ -6,7 +6,7 @@ SupportFlow can sell a one-off licence that belongs to a **Google account**:
 |---|---|---|
 | Basic (one device) | A$79 | 1 |
 | Second device add-on | A$29 | 2 |
-| Premium | A$129 | 2, and includes late payment fees |
+| Premium | A$129 | 2, and includes the overdue invoice payment tracker |
 
 Basic checkout still uses `STRIPE_PRICE_79` (the old name `STRIPE_PRICE_49` still works as a fallback).
 
@@ -27,7 +27,7 @@ the existing credit packs / Lifetime flow keep working.
    copy each Price ID (`price_...`):
    * "SupportFlow: Basic" A$79 → `STRIPE_PRICE_79` (formerly `STRIPE_PRICE_49`, still read)
    * "SupportFlow: Second device" A$29 → `STRIPE_PRICE_UPGRADE`
-   * Premium is not one of these licence Prices. It is the late payment fees (internal: tracker) Premium checkout in [`PAYMENT-TRACKER.md`](PAYMENT-TRACKER.md): A$129.
+   * Premium is not one of these licence Prices. It is the overdue invoice payment tracker Premium checkout in [`PAYMENT-TRACKER.md`](PAYMENT-TRACKER.md): A$129.
 3. **Stripe webhook**: on the existing endpoint
    `https://<your-site>/.netlify/functions/stripe-webhook`, make sure these
    events are selected (the first two are already there):

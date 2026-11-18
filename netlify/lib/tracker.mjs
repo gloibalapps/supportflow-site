@@ -21,17 +21,17 @@ import { PREMIUM_AUD, premiumCheckoutSelection, premiumPublic } from "./premium.
 const PREMIUM_ITEMS = [
   "Everything in Basic (invoices, shifts, notes, kilometres, expenses and tax)",
   "Two-device licence",
-  "Late payment fees",
+  "Overdue invoice payment tracker",
 ];
 
 export const TRACKER_PRODUCTS = Object.freeze({
   // Sold.
-  tracker: { env: "STRIPE_PRICE_TRACKER", label: "Late payment fees", aud: 29, devices: 1 },
+  tracker: { env: "STRIPE_PRICE_TRACKER", label: "Overdue invoice payment tracker", aud: 29, devices: 1 },
   tracker_full: { env: "STRIPE_PRICE_TRACKER_FULL", label: "Premium", aud: PREMIUM_AUD, devices: 2, items: PREMIUM_ITEMS },
   tracker_sms: { env: "STRIPE_PRICE_TRACKER_SMS", label: "SMS alerts, 50 texts a month", aud: 4.99, recurring: "month", requires: "tracker", retired: true }, // shelved: not sold
   // Retired. Kept so a paid row still unlocks. Checkout refuses them.
-  tracker_base: { env: "STRIPE_PRICE_TRACKER_BASE", label: "Late payment fees, one computer", devices: 1, retired: true },
-  tracker_two: { env: "STRIPE_PRICE_TRACKER_TWO", label: "Late payment fees, two computers", devices: 2, retired: true },
+  tracker_base: { env: "STRIPE_PRICE_TRACKER_BASE", label: "Overdue invoice payment tracker, one computer", devices: 1, retired: true },
+  tracker_two: { env: "STRIPE_PRICE_TRACKER_TWO", label: "Overdue invoice payment tracker, two computers", devices: 2, retired: true },
   tracker_addon: { env: "STRIPE_PRICE_TRACKER_ADDON", label: "Upgrade: add a second computer", devices: 2, requires: "tracker_base", retired: true },
 });
 export const RETIRED_TRACKER_PRODUCTS = Object.freeze(["tracker_base", "tracker_two", "tracker_addon"]);
