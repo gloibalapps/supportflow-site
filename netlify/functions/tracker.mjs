@@ -62,7 +62,7 @@ async function checkout(session, deviceId, body) {
   if (isSub) {
     // Optional SMS pack: tracker owners only, one active pack per account.
     // Not included in Basic, the A$29 tracker, or Premium.
-    if (!have) return json({ error: "SMS alerts are an option for overdue invoice payment tracker owners. Unlock the tracker first." }, 409);
+    if (!have) return json({ error: "SMS alerts are an option for overdue invoice payment tracker owners. Unlock the overdue invoice payment tracker first." }, 409);
     const cur = await supa(`tracker_sms_subscriptions?google_sub=eq.${q(session.sub)}&status=in.(active,trialing,past_due)&select=stripe_subscription_id`);
     if (cur?.length) return json({ error: "SMS alerts are already active on this account." }, 409);
   }

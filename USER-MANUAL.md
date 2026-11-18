@@ -504,13 +504,13 @@ The overdue invoice payment tracker lives at **Money → Overdue invoice payment
 
 **What you see depends on your licence.**
 
-- **Basic without the tracker:** a short card explaining what it does, with a single **Add overdue invoice payment tracker · A$29 once** button. Signed out, it asks you to sign in first.
-- **Premium, or Basic with the tracker:** the tracker page itself. It opens on the invoices that need action (it opens on **All** if nothing does). A panel shows whether reminders are **On** or **Off**, with a **Set up** button to change that. If there are no unpaid invoices it says so rather than showing an empty page. The **Patterns**, **Report** and **Settings** tabs each start with a short line saying what they're for.
+- **Basic without the overdue invoice payment tracker:** a short card explaining what it does, with a single **Add overdue invoice payment tracker · A$29 once** button. Signed out, it asks you to sign in first.
+- **Premium, or Basic with the overdue invoice payment tracker:** the overdue invoice payment tracker page itself. It opens on the invoices that need action (it opens on **All** if nothing does). A panel shows whether reminders are **On** or **Off**, with a **Set up** button to change that. If there are no unpaid invoices it says so rather than showing an empty page. The **Patterns**, **Report** and **Settings** tabs each start with a short line saying what they're for.
 
 ### Pricing
 
 - **A$29 once:** the overdue invoice payment tracker, on top of Basic. It does not add a second device.
-- **A$29 once:** an extra (second) device. This is a separate add-on from the tracker. Buy it from the upgrade screen or Settings → Licence & devices.
+- **A$29 once:** an extra (second) device. This is a separate add-on from the overdue invoice payment tracker. Buy it from the upgrade screen or Settings → Licence & devices.
 - **Premium, A$129 once:** everything in Basic (invoices, shifts, notes, kilometres, expenses and tax), a two-device licence and the overdue invoice payment tracker. No subscription.
 
 ### How you're alerted
@@ -528,18 +528,18 @@ Notifications are turned on **separately on each device**, from **Overdue invoic
 
 **Android (Chrome):**
 1. Open supportflow.work/app in Chrome. Use Chrome's menu → **Install app** (or **Add to Home screen**).
-2. Open SupportFlow from its icon and sign in to the tracker.
+2. Open SupportFlow from its icon and sign in to the overdue invoice payment tracker.
 3. Go to Overdue invoice payment tracker → Settings → **Turn on phone notifications**, then choose **Allow**.
 
 **Windows or Mac (Chrome or Edge):**
 1. Open supportflow.work/app and click the **install** icon in the address bar (or menu → Install SupportFlow / Apps → Install).
-2. Open the installed app and sign in to the tracker.
+2. Open the installed app and sign in to the overdue invoice payment tracker.
 3. Go to Overdue invoice payment tracker → Settings → **Turn on phone notifications**, then choose **Allow**.
 
 **iPhone or iPad (iOS / iPadOS 16.4 or later):**
 1. Open supportflow.work/app in **Safari**. Tap **Share → Add to Home Screen**, then **Add**.
 2. Open SupportFlow **from the Home Screen icon**, not from Safari.
-3. **Sign in again.** The Home Screen app is kept separate from Safari, so you need to sign in to the tracker there too.
+3. **Sign in again.** The Home Screen app is kept separate from Safari, so you need to sign in to the overdue invoice payment tracker there too.
 4. Go to Overdue invoice payment tracker → Settings → **Turn on phone notifications**, then choose **Allow**.
 
 ### Checking or turning notifications back on
@@ -550,11 +550,11 @@ If you chose "Don't allow" or notifications stopped arriving:
 - **Mac:** System Settings → Notifications → Google Chrome / Microsoft Edge / SupportFlow → Allow notifications. Also check Focus.
 - **iPhone/iPad:** Settings → Notifications → SupportFlow → Allow Notifications. Also check Focus.
 
-Then open the tracker and tap **Turn on phone notifications** again.
+Then open the overdue invoice payment tracker and tap **Turn on phone notifications** again.
 
 ### Limits
 
-- Push delivery **isn't guaranteed**. Battery saving, Do Not Disturb or Focus, being offline, or the phone or browser clearing old subscriptions can delay or drop a notification. Check the tracker regularly as well.
+- Push delivery **isn't guaranteed**. Battery saving, Do Not Disturb or Focus, being offline, or the phone or browser clearing old subscriptions can delay or drop a notification. Check the overdue invoice payment tracker regularly as well.
 - On iPhone and iPad, notifications **don't work in a normal Safari tab**. They only work in the Home Screen app on iOS 16.4 or later.
 - Turning notifications on applies to one device only. Turn them on on every device you want alerts on.
 - If you remove the app or clear its data, turn notifications on again.
@@ -922,11 +922,11 @@ opens SupportFlow in a **new tab** (supportflow.work/app?buy=upgrade):
    - **Add an extra (second) device, A$29:** your Basic licence then covers two
      devices. Only available on a one-device (Basic) licence. This is separate
      from the overdue invoice payment tracker.
-   - **Add overdue invoice payment tracker, A$29:** adds the tracker to your Basic licence.
+   - **Add overdue invoice payment tracker, A$29:** adds the overdue invoice payment tracker to your Basic licence.
      It does not add a second device.
 
    Premium (A$129) is offered to people buying for the first time, not here:
-   if you already own Basic you add the second device and the tracker
+   if you already own Basic you add the second device and the overdue invoice payment tracker
    separately, A$29 each.
 3. You're taken to **Stripe Checkout** to pay. When payment finishes you come
    back to the app and the upgrade is applied automatically.

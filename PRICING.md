@@ -7,7 +7,7 @@ New accounts receive **5 free invoices for 30 days**.
 | Option | Price (AUD) | Licences |
 |---|---:|---:|
 | Basic | A$79 once | 1 |
-| Extra (second) device (add-on, separate from the tracker) | A$29 once | 2 |
+| Extra (second) device (add-on, separate from the overdue invoice payment tracker) | A$29 once | 2 |
 | Overdue invoice payment tracker (add-on, on top of Basic) | A$29 once | The devices the licence already covers |
 | Premium | A$129 once. | 2, and the overdue invoice payment tracker |
 
