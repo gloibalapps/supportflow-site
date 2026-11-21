@@ -150,3 +150,18 @@ If a material change affects your use of SupportFlow, an appropriate notice may 
 Questions about these Terms can be sent to:
 
 **Email:** globalappsai@gmail.com
+
+---
+
+## DRAFT — Voice notes (for Evan's review, not in force)
+
+This section is a draft for review. It is not part of the terms above, and it is not in force, until Evan approves it. The public terms currently say there is no subscription. Voice notes, if this draft is adopted, would be the exception, and that sentence would need to say so.
+
+**Proposed addition**
+
+Voice notes is an optional add-on: **A$5 per month**. It is included in Premium (A$129, paid once) and is not included in Basic or in the Payment tracker on its own.
+
+- The monthly fair use allowance is 120 minutes. A one-off top-up of **A$5** adds 120 minutes, used after the monthly allowance, valid until the subscription renewal, and it does not lift the limit of 30 voice notes a day.
+- You must check the transcript before you save a note. SupportFlow does not keep the recording or the transcript on its servers.
+- You must not record another person unless they have agreed, and you remain responsible for the note you save.
+- The checkout prices for the monthly add-on and the top-up are not on sale until they are created. Nothing in this draft charges a card.
