@@ -20,6 +20,7 @@ import {
   voicePreviewOpen,
   consumeSeconds,
   paymentGrantsVoice,
+  refundSeconds,
 } from "../lib/voice-notes.mjs";
 export { paymentGrantsVoice };
 import { openUsageStore, updateUsage } from "../lib/voice-store.mjs";
@@ -191,10 +192,6 @@ export async function handleTranscribe(req, deps = {}) {
     console.error("transcribe usage");
     return json({ error: "usage-unavailable" }, 503);
   }
-  const gate = canStartClip(usage);
-  if (gate === "daily") return json({ error: "daily-cap", usage: publicUsage(usage) }, 402);
-  if (gate === "out") return json({ error: "out-of-minutes", usage: publicUsage(usage) }, 402);
-
   const parsed = containerDurationSeconds(bytes);
   const seconds = billableSeconds({
     bytes: bytes.length,
@@ -203,31 +200,60 @@ export async function handleTranscribe(req, deps = {}) {
   });
   if (!(seconds >= 0.4) || seconds > 120) return json({ error: "bad-audio", usage: publicUsage(usage) }, 400);
 
+  // Hold the minutes and the daily note before the transcription call. A second
+  // request for the same licence then sees the reservation and is refused,
+  // instead of both passing the earlier read and both being saved.
+  let reserved;
+  try {
+    reserved = await updateUsage(store, key, (raw) => {
+      const current = normalizeUsage(raw, localDate);
+      const gateNow = canStartClip(current);
+      if (gateNow !== "ok") return { write: false, reason: gateNow, usage: current };
+      const value = consumeSeconds(current, seconds);
+      value.notesToday += 1;
+      value.notesDay = localDate;
+      return { write: true, value, before: current };
+    });
+  } catch (e) {
+    console.error("transcribe usage");
+    return json({ error: "usage-unavailable" }, 503);
+  }
+  if (!reserved.write) {
+    return json({
+      error: reserved.reason === "daily" ? "daily-cap" : "out-of-minutes",
+      usage: publicUsage(reserved.usage),
+    }, 402);
+  }
+
+  const refund = async () => {
+    try {
+      const undone = await updateUsage(store, key, (raw) => ({
+        write: true,
+        value: refundSeconds(normalizeUsage(raw, localDate), reserved.before, reserved.value),
+      }));
+      return undone.value;
+    } catch (e) {
+      console.error("transcribe refund");
+      return reserved.before;
+    }
+  };
+
   let rawText = "";
   try {
     const transcribeAudio = deps.transcribeAudio || ((audio, meta) => callOpenAI(audio, meta, env));
     rawText = await transcribeAudio(bytes, kind);
   } catch (e) {
-    if (e && e.code === "not-configured") return json({ error: "not-configured", usage: publicUsage(usage) }, 503);
+    const restored = await refund();
+    if (e && e.code === "not-configured") return json({ error: "not-configured", usage: publicUsage(restored) }, 503);
     console.error("transcribe failed");
-    return json({ error: "upstream", usage: publicUsage(usage) }, 502);
+    return json({ error: "upstream", usage: publicUsage(restored) }, 502);
   }
   const text = cleanTranscript(rawText);
-  if (!text) return json({ error: "empty", text: "", usage: publicUsage(usage) });
-
-  try {
-    const saved = await updateUsage(store, key, (raw) => {
-      const current = normalizeUsage(raw, localDate);
-      const value = consumeSeconds(current, seconds);
-      value.notesToday += 1;
-      value.notesDay = localDate;
-      return { write: true, value };
-    });
-    return json({ text, usage: publicUsage(saved.value) });
-  } catch (e) {
-    console.error("transcribe save");
-    return json({ error: "usage-unavailable" }, 503);
+  if (!text) {
+    const restored = await refund();
+    return json({ error: "empty", text: "", usage: publicUsage(restored) });
   }
+  return json({ text, usage: publicUsage(reserved.value) });
 }
 
 export default (req) => handleTranscribe(req);

@@ -13,6 +13,7 @@ import {
   containerDurationSeconds,
   freshUsage,
   grantTopup,
+  refundSeconds,
   localDateFor,
   normalizeUsage,
   paymentGrantsVoice,
@@ -76,6 +77,17 @@ usage = consumeSeconds(usage, 200);
 assert.equal(usage.topupSecondsRemaining, 0);
 assert.ok(usage.allowanceSecondsUsed > MONTHLY_SECONDS);
 assert.equal(remainingSeconds(usage), 0);
+
+const beforeCharge = { ...freshUsage("2026-11-21"), allowanceSecondsUsed: MONTHLY_SECONDS - 5, topupSecondsRemaining: 100, notesToday: 4 };
+const afterCharge = { ...consumeSeconds(beforeCharge, 20), notesToday: 5 };
+const later = { ...consumeSeconds(afterCharge, 10), notesToday: 6 };
+const restored = refundSeconds(later, beforeCharge, afterCharge);
+assert.equal(restored.allowanceSecondsUsed, MONTHLY_SECONDS - 5);
+assert.equal(restored.topupSecondsRemaining, 90);
+assert.equal(restored.notesToday, 5);
+const rolledAway = refundSeconds({ ...afterCharge, periodStart: "2026-12-01", periodEnd: "2027-01-01", notesDay: "2026-12-01", notesToday: 0, allowanceSecondsUsed: 0, topupSecondsRemaining: 0 }, beforeCharge, afterCharge);
+assert.equal(rolledAway.notesToday, 0);
+assert.equal(rolledAway.topupSecondsRemaining, 0);
 
 const topped = grantTopup({ ...freshUsage("2026-11-21"), notesToday: 30 }, "2026-11-21");
 assert.equal(topped.topupSecondsRemaining, TOPUP_SECONDS);
@@ -298,6 +310,70 @@ const base = {
   });
   const res = await handleTranscribe(evil, base);
   assert.equal(res.status, 403);
+}
+
+{
+  const race = memoryUsageStore();
+  const today = localDateFor(new Date(), -660);
+  const [y, m] = today.split("-").map(Number);
+  const periodEnd = `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, "0")}-01`;
+  await race.set(`dev:${DEVICE}`, {
+    v: 1, periodStart: today.slice(0, 8) + "01", periodEnd,
+    allowanceSecondsUsed: MONTHLY_SECONDS - 3, topupSecondsRemaining: 0,
+    notesDay: today, notesToday: 1,
+  }, null);
+  let calls = 0;
+  const depsFor = (say) => ({
+    store: race, env: PREVIEW,
+    checkLicence: async () => ({ enforced: false, ok: false }),
+    transcribeAudio: say,
+  });
+  const first = await handleTranscribe(audioRequest(webm(10000), { durationMs: 10000 }), depsFor(async () => {
+    calls += 1;
+    const second = await handleTranscribe(audioRequest(webm(10000), { durationMs: 10000 }), depsFor(async () => {
+      calls += 1;
+      return "second";
+    }));
+    const secondBody = await second.json();
+    assert.equal(second.status, 402);
+    assert.equal(secondBody.error, "out-of-minutes");
+    return "first";
+  }));
+  const firstBody = await first.json();
+  assert.equal(first.status, 200);
+  assert.equal(firstBody.text, "first");
+  assert.equal(calls, 1);
+  const saved = await race.get(`dev:${DEVICE}`);
+  assert.equal(saved.value.notesToday, 2);
+  assert.ok(saved.value.allowanceSecondsUsed >= MONTHLY_SECONDS);
+}
+
+{
+  const race = memoryUsageStore();
+  const today = localDateFor(new Date(), -660);
+  const [y, m] = today.split("-").map(Number);
+  const periodEnd = `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, "0")}-01`;
+  await race.set(`dev:${DEVICE}`, {
+    v: 1, periodStart: today.slice(0, 8) + "01", periodEnd,
+    allowanceSecondsUsed: 0, topupSecondsRemaining: 0,
+    notesDay: today, notesToday: 29,
+  }, null);
+  let calls = 0;
+  const depsFor = (say) => ({
+    store: race, env: PREVIEW,
+    checkLicence: async () => ({ enforced: false, ok: false }),
+    transcribeAudio: say,
+  });
+  const first = await handleTranscribe(audioRequest(webm(2000)), depsFor(async () => {
+    calls += 1;
+    const second = await handleTranscribe(audioRequest(webm(2000)), depsFor(async () => { calls += 1; return "second"; }));
+    assert.equal(second.status, 402);
+    assert.equal((await second.json()).error, "daily-cap");
+    return "first";
+  }));
+  assert.equal((await first.json()).text, "first");
+  assert.equal(calls, 1);
+  assert.equal((await race.get(`dev:${DEVICE}`)).value.notesToday, 30);
 }
 
 const src = fs.readFileSync(new URL("./functions/transcribe.mjs", import.meta.url), "utf8");

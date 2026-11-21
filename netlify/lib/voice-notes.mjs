@@ -115,6 +115,24 @@ export function grantTopup(usage, localDate) {
   return next;
 }
 
+// Put back one reserved clip. `before` and `after` are the usage document
+// immediately before and after that reservation, so a later clip's charge is
+// left in place. If the period or the local day has already rolled, the
+// reservation expired with it and is not credited into the new period.
+export function refundSeconds(usage, before, after) {
+  if (!usage || !before || !after) return usage;
+  if (usage.periodStart !== before.periodStart || usage.periodEnd !== before.periodEnd) return usage;
+  if (usage.notesDay !== before.notesDay) return usage;
+  const allowanceDelta = Math.max(0, Number(after.allowanceSecondsUsed) - Number(before.allowanceSecondsUsed));
+  const topupDelta = Math.max(0, Number(before.topupSecondsRemaining) - Number(after.topupSecondsRemaining));
+  return {
+    ...usage,
+    allowanceSecondsUsed: Math.max(0, Number(usage.allowanceSecondsUsed) - allowanceDelta),
+    topupSecondsRemaining: Number(usage.topupSecondsRemaining) + topupDelta,
+    notesToday: Math.max(0, Number(usage.notesToday) - 1),
+  };
+}
+
 export function canStartClip(usage) {
   if ((Number(usage.notesToday) || 0) >= DAILY_CAP) return "daily";
   if (remainingSeconds(usage) <= 0) return "out";
