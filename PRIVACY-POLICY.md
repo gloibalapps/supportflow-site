@@ -369,5 +369,24 @@ If a new optional feature involves external storage, synchronisation, artificial
 
 *This policy describes SupportFlow™'s data-handling practices as accurately as possible. It does not constitute legal advice to support workers about their individual privacy, NDIS, taxation, record-keeping or service-provider obligations. Those obligations may vary according to individual circumstances, applicable legislation, NDIS requirements and agreements with participants.*
 
+---
+
+## DRAFT — Voice notes (for Evan's review, not in force)
+
+This section is a draft for review. It is not part of the policy above, and it is not in force, until Evan approves it and the date at the top of this document is updated.
+
+**Proposed addition**
+
+Voice notes is an optional way to dictate a shift note. If you use it:
+
+- The recording is made on your device and is not kept by SupportFlow.
+- The audio file is sent to SupportFlow's transcription service only so it can be turned into text. The audio is not stored and is not written to SupportFlow's logs. The transcript is returned to your device and is not stored on the server.
+- A small usage record is kept against your licence: minutes used in the current period, the period dates, and any top-up minutes. That record does not include the recording, the transcript, or the participant's name.
+- The text is placed in the note box on your device. It is not saved as a note until you choose Save note. You should read it before saving.
+- You are responsible for not recording other people unless they have agreed, and for having authority to record information about a participant.
+- The transcription provider processes the audio under its own terms. The audio may be processed outside Australia. Do not dictate information you are not prepared to send for that one transcription.
+
+Voice notes needs a connection. If the feature is switched off, no audio is sent.
+
 
 

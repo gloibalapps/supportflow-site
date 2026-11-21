@@ -7,8 +7,13 @@ http.createServer(async (req, res) => {
   const u = new URL(req.url, "http://x");
   const fn = u.pathname.match(/^\/\.netlify\/functions\/([\w-]+)$/);
   if (fn) {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    const body = Buffer.concat(chunks);
     const mod = await import(path.join(root, "netlify/functions", fn[1] + ".mjs"));
-    const r = await mod.default(new Request("http://localhost" + req.url, { method: req.method, headers: req.headers }));
+    const init = { method: req.method, headers: req.headers };
+    if (req.method !== "GET" && req.method !== "HEAD") { init.body = body; init.duplex = "half"; }
+    const r = await mod.default(new Request("http://localhost" + req.url, init));
     res.writeHead(r.status, Object.fromEntries(r.headers)); return res.end(await r.text());
   }
   let p = u.pathname === "/" ? "/index.html" : u.pathname === "/admin/dashboard" ? "/admin/dashboard.html" : u.pathname;

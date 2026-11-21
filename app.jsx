@@ -388,6 +388,22 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 .shortcard small{display:block;color:var(--tx-3);font-size:11.8px;line-height:1.4;margin-top:4px;margin-right:28px;max-width:none;min-height:50px}
 .shortcard.wide b,.shortcard.wide small{min-height:auto}
 .shortchev{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:22px;color:var(--tx-3)}
+.vn-compose{display:flex;gap:10px;align-items:flex-end}
+.vn-compose > label.f{flex:1;min-width:0;margin-bottom:13px}
+.vn-miccol{flex:0 0 76px;display:flex;flex-direction:column;align-items:center;gap:6px;margin-bottom:13px}
+.vn-mic{position:relative;width:56px;height:56px;border-radius:50%;border:1px solid var(--brass);background:var(--bg-2);color:var(--tx);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;font-family:inherit;
+  touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.vn-mic svg{display:block;pointer-events:none}
+.vn-mic[data-on="1"]{background:var(--brass);color:var(--brass-ink);border-color:var(--brass)}
+.vn-mic[data-amber="1"]{background:var(--warn);color:#fff;border-color:var(--warn)}
+.vn-mic[data-out="1"],.vn-mic[data-busy="1"]{opacity:.45}
+.vn-mic:focus-visible{outline:2px solid var(--brass);outline-offset:3px}
+.vn-lock{position:absolute;right:-2px;bottom:-2px;width:20px;height:20px;border-radius:50%;background:var(--bg);border:1px solid var(--line);color:var(--tx-2);display:flex;align-items:center;justify-content:center}
+.vn-meta{font-size:11px;line-height:1.35;text-align:center;color:var(--tx-3);width:76px}
+.vn-meta[data-amber="1"]{color:var(--warn);font-weight:700}
+.vn-note{font-size:12px;line-height:1.5;color:var(--tx-2);margin:-4px 0 12px}
+.vn-note[data-warn="1"]{color:var(--warn)}
 @media(max-width:700px){
   .hubpage{width:100%;padding:0 14px;bottom:calc(84px + env(safe-area-inset-bottom))}
   .homehello .greet,.hubhead .disp{font-size:29px}
@@ -531,7 +547,7 @@ async function askModel(prompt, opts) {
 // Verified against the NDIS Pricing Schedule 2026-27 (v1.2, 22 July 2026),
 // Schedule 1 — Disability Support Workers. National column, effective 1 July 2026.
 // https://www.ndis.gov.au/providers/pricing-arrangements
-const APP_VERSION = "21";
+const APP_VERSION = "22";
 
 /* ---------------- device licensing ----------------
    One-off licences owned by a Google account. Basic is A$79 for one device.
@@ -4832,6 +4848,16 @@ function App() {
               </button>
 
               <button className="btn ghost" style={{ width: "100%", justifyContent: "flex-start", textAlign: "left",
+                marginBottom: 10, display: "flex", alignItems: "center", gap: 12, padding: "14px 16px" }}
+                onClick={() => { setNotesPrefill({ participantId: vf.participantId, date: vf.date }); setInvTab("notes"); setVisitFollowUp(null); }}>
+                <span aria-hidden="true" style={{ fontSize: 16, fontWeight: 700, color: "var(--brass)", flex: "0 0 20px", textAlign: "center" }}>✎</span>
+                <span style={{ flex: 1 }}>
+                  <span style={{ display: "block", fontWeight: 600, fontSize: 14 }}>Add a note for this shift</span>
+                  <span style={{ display: "block", fontSize: 11.5, color: "var(--tx-3)", marginTop: 2 }}>Same participant and date, already filled in. Recording does not start on its own.</span>
+                </span>
+              </button>
+
+              <button className="btn ghost" style={{ width: "100%", justifyContent: "flex-start", textAlign: "left",
                 marginBottom: 16, display: "flex", alignItems: "center", gap: 12, padding: "14px 16px",
                 opacity: canInvoiceNow ? 1 : .5, cursor: canInvoiceNow ? "pointer" : "default" }}
                 disabled={!canInvoiceNow}
@@ -8832,6 +8858,569 @@ function Trips({ data, save, m, fy, canCreate, onBlocked, prefill, onSaved }) {
   );
 }
 
+/* ---------------- Voice notes ----------------
+   Hold the mic to dictate into the shift note. The 2:00 countdown is per
+   unsaved note. Monthly minutes and the daily cap are decided by
+   /.netlify/functions/transcribe, which keeps a server-side usage record.
+   Purchase buttons call the checkout placeholder only. Stripe prices are
+   not created yet: STRIPE_PRICE_VOICE_NOTES (A$5/month) and
+   STRIPE_PRICE_VOICE_TOPUP (A$5 one-off). */
+const VOICE_NOTE_SECONDS = 120;
+const VOICE_HOLD_MIN_MS = 500;
+function voiceUiOpen() {
+  if (TEST_MODE) return true;
+  try {
+    const h = location.hostname;
+    if (h === "localhost" || h === "127.0.0.1") return true;
+    if (/^deploy-preview-\d+--[a-z0-9-]+\.netlify\.app$/.test(h)) return true;
+    if (/^cursor-voice-notes-4c72--[a-z0-9-]+\.netlify\.app$/.test(h)) return true;
+  } catch (e) { }
+  return false;
+}
+function voiceGateQuery() {
+  if (!voiceUiOpen()) return "";
+  try {
+    const v = new URLSearchParams(location.search).get("voicegate");
+    if (v === "locked" || v === "empty" || v === "amber" || v === "daily" || v === "low") return v;
+  } catch (e) { }
+  return "";
+}
+function voiceTapMode() {
+  try { return localStorage.getItem("sf_voice_tap_mode") === "1"; } catch (e) { return false; }
+}
+function voiceSetTapMode(on) {
+  try { localStorage.setItem("sf_voice_tap_mode", on ? "1" : "0"); } catch (e) { }
+  try { window.dispatchEvent(new Event("sf-voice-prefs")); } catch (e) { }
+}
+async function voiceHeaders() {
+  const headers = { ...licenceHeaders() };
+  try {
+    if (!headers["X-SF-Device"]) {
+      const id = await licenceDeviceId();
+      if (id) headers["X-SF-Device"] = id;
+    }
+  } catch (e) { }
+  return headers;
+}
+function voiceClock(seconds) {
+  const s = Math.max(0, Math.ceil(seconds));
+  return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+}
+function voiceMins(seconds) {
+  const m = Math.max(0, Number(seconds) || 0) / 60;
+  if (m >= 10) return String(Math.round(m));
+  const n = Math.round(m * 10) / 10;
+  return String(n);
+}
+function voiceRenewal(iso) {
+  // Until the server has a renewal date, use the same calendar-month boundary it uses.
+  let raw = iso;
+  if (!raw) {
+    const now = new Date();
+    const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    raw = next.getFullYear() + "-" + String(next.getMonth() + 1).padStart(2, "0") + "-01";
+  }
+  const d = new Date(String(raw).slice(0, 10) + "T00:00:00");
+  if (Number.isNaN(d.getTime())) return "your renewal";
+  return d.toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" });
+}
+function voiceSplice(value, start, end, text) {
+  const raw = value || "";
+  const a = Math.max(0, Math.min(start == null ? raw.length : start, raw.length));
+  const b = Math.max(a, Math.min(end == null ? a : end, raw.length));
+  const before = raw.slice(0, a);
+  const after = raw.slice(b);
+  const pad = before && !/\s$/.test(before) ? " " : "";
+  const padAfter = after && !/^\s/.test(after) && text && !/\s$/.test(text) ? " " : "";
+  const next = before + pad + text + padAfter + after;
+  return { next, cursor: (before + pad + text).length };
+}
+function voiceMicError(e) {
+  const name = e && e.name;
+  if (!window.isSecureContext || name === "SecurityError") return "Voice notes need a secure connection (https). Open SupportFlow from its https address or the installed icon.";
+  if (name === "NotFoundError" || name === "OverconstrainedError") return "This device doesn't have a microphone Voice notes can use. You can still type.";
+  if (name === "NotAllowedError" || name === "PermissionDeniedError") return "The microphone is blocked for this site. To turn it back on: on iPhone or iPad, Settings, then Safari, then Microphone, Allow. On Android or a computer, tap the lock icon in the address bar, then allow the microphone. Then hold the button again.";
+  return "The microphone couldn't be used. You can still type.";
+}
+function voiceResultHint(error) {
+  if (error === "empty") return "No speech was picked up. Your note is unchanged.";
+  if (error === "not-configured") return "Voice notes aren't switched on yet.";
+  if (error === "daily-cap") return "You've used today's voice notes. Resets at midnight.";
+  if (error === "out-of-minutes") return "Out of voice minutes.";
+  if (error === "rate-limited") return "Voice notes are busy. Try again in a moment. Your note is unchanged.";
+  if (error === "too-large" || error === "bad-audio") return "That recording couldn't be sent. Your note is unchanged.";
+  return "Couldn't transcribe that. Your note is unchanged.";
+}
+function pickVoiceMime() {
+  if (typeof MediaRecorder === "undefined" || !MediaRecorder.isTypeSupported) return "";
+  const types = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
+  for (let i = 0; i < types.length; i++) if (MediaRecorder.isTypeSupported(types[i])) return types[i];
+  return "";
+}
+async function voiceCheckout(product) {
+  // TODO(stripe): STRIPE_PRICE_VOICE_NOTES is A$5/month recurring.
+  // STRIPE_PRICE_VOICE_TOPUP is A$5 one-off for 120 minutes until renewal.
+  // This only calls the placeholder. It does not call Stripe.
+  const headers = await voiceHeaders();
+  const res = await fetch("/.netlify/functions/transcribe", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...headers },
+    body: JSON.stringify({ action: "checkout", product }),
+  });
+  const data = await res.json().catch(() => ({}));
+  return data.message || "Voice notes checkout isn't switched on yet.";
+}
+function VoiceSheet({ label, children, onClose }) {
+  return (
+    <div role="dialog" aria-modal="true" aria-label={label} onClick={onClose}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", zIndex: 80, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 460, padding: 20, borderRadius: "16px 16px 0 0", background: "var(--bg)", color: "var(--tx)" }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+function MicGlyph() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+      <rect x="9" y="3" width="6" height="11" rx="3" />
+      <path d="M6 11a6 6 0 0 0 12 0" />
+      <path d="M12 17v3M8 20h8" />
+    </svg>
+  );
+}
+function LockGlyph() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+      <rect x="5" y="11" width="14" height="10" rx="2" />
+      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+    </svg>
+  );
+}
+
+function VoiceNoteMic({ onText, onBusy, epoch }) {
+  const query = voiceGateQuery();
+  const preview = voiceUiOpen();
+  const buttonRef = useRef(null);
+  const recRef = useRef(null);
+  const streamRef = useRef(null);
+  const chunksRef = useRef([]);
+  const timerRef = useRef(null);
+  const startedRef = useRef(0);
+  const downAtRef = useRef(0);
+  const budgetRef = useRef(VOICE_NOTE_SECONDS);
+  const monthlyBindRef = useRef(false);
+  const discardRef = useRef(false);
+  const reasonRef = useRef("");
+  const doneRef = useRef(false);
+  const holdingRef = useRef(false);
+  const phaseRef = useRef("idle");
+  const api = useRef({});
+  const [phase, setPhase] = useState("idle");
+  const [shown, setShown] = useState(query === "amber" ? 12 : VOICE_NOTE_SECONDS);
+  const [noteLeft, setNoteLeft] = useState(query === "amber" ? 12 : VOICE_NOTE_SECONDS);
+  const [hint, setHint] = useState("");
+  const [sheet, setSheet] = useState(null);
+  const [usage, setUsage] = useState(null);
+  const [access, setAccess] = useState(preview ? "open" : "checking");
+  const [tapMode, setTapMode] = useState(voiceTapMode);
+  const [primed, setPrimed] = useState(() => { try { return sessionStorage.getItem("sf_voice_primed") === "1"; } catch (e) { return false; } });
+  const [consented, setConsented] = useState(() => { try { return localStorage.getItem("sf_voice_consent_v1") === "1"; } catch (e) { return false; } });
+  const [buyMsg, setBuyMsg] = useState("");
+  const noteRef = useRef(noteLeft);
+  const usageRef = useRef(usage);
+  const accessRef = useRef(access);
+  const primedRef = useRef(primed);
+  const consentRef = useRef(consented);
+  noteRef.current = noteLeft;
+  usageRef.current = usage;
+  accessRef.current = access;
+  primedRef.current = primed;
+  consentRef.current = consented;
+  phaseRef.current = phase;
+
+  useEffect(() => { if (onBusy) onBusy(phase === "recording" || phase === "transcribing"); }, [phase]);
+  useEffect(() => {
+    const left = query === "amber" ? 12 : VOICE_NOTE_SECONDS;
+    setNoteLeft(left);
+    setShown(left);
+    setHint("");
+  }, [epoch]);
+  useEffect(() => {
+    const sync = () => setTapMode(voiceTapMode());
+    window.addEventListener("sf-voice-prefs", sync);
+    return () => window.removeEventListener("sf-voice-prefs", sync);
+  }, []);
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      try {
+        const headers = await voiceHeaders();
+        const res = await fetch("/.netlify/functions/transcribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...headers },
+          body: JSON.stringify({ action: "status", tzOffsetMinutes: new Date().getTimezoneOffset() }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (cancel) return;
+        if (data.usage) setUsage(data.usage);
+        if (!preview) setAccess(data.entitled ? "open" : "locked");
+      } catch (e) {
+        if (!cancel && !preview) setAccess("offline");
+      }
+    })();
+    return () => { cancel = true; };
+  }, [epoch]);
+
+  const stopTimer = () => { if (timerRef.current) clearInterval(timerRef.current); timerRef.current = null; };
+  const stopStream = () => {
+    const stream = streamRef.current;
+    streamRef.current = null;
+    if (stream) stream.getTracks().forEach((t) => { try { t.stop(); } catch (e) { } });
+  };
+  const blocked = () => {
+    if (phaseRef.current === "transcribing") return "busy";
+    if (phaseRef.current === "recording") return "";
+    if (query === "locked" || accessRef.current === "locked") return "locked";
+    if (accessRef.current === "checking") return "checking";
+    if (accessRef.current === "offline") return "offline";
+    if (query === "empty" || (usageRef.current && usageRef.current.out)) return "out";
+    if (query === "daily" || (usageRef.current && usageRef.current.dailyLimited)) return "daily";
+    if (!consentRef.current) return "consent";
+    return "";
+  };
+  const openBlocked = (reason) => {
+    if (reason === "locked") setSheet("unlock");
+    else if (reason === "out") setSheet("topup");
+    else if (reason === "daily") setHint("You've used today's voice notes. Resets at midnight.");
+    else if (reason === "consent") setSheet("consent");
+    else if (reason === "offline") setHint("Voice notes need a connection. You can still type.");
+    else if (reason === "checking") setHint("Checking voice notes…");
+  };
+  const finishRecording = async (rec) => {
+    if (doneRef.current) return;
+    doneRef.current = true;
+    stopStream();
+    recRef.current = null;
+    const type = (rec && rec.mimeType) || "audio/webm";
+    const blob = new Blob(chunksRef.current, { type });
+    chunksRef.current = [];
+    if (discardRef.current) { phaseRef.current = "idle"; setPhase("idle"); return; }
+    phaseRef.current = "transcribing";
+    setPhase("transcribing");
+    const elapsed = Math.min(120, Math.max(0.4, (performance.now() - startedRef.current) / 1000));
+    try {
+      if (navigator.onLine === false) throw new Error("offline");
+      const headers = await voiceHeaders();
+      const fd = new FormData();
+      const mp4 = /mp4|m4a/i.test(blob.type);
+      fd.append("audio", blob, mp4 ? "note.mp4" : "note.webm");
+      fd.append("durationMs", String(Math.round(elapsed * 1000)));
+      fd.append("tzOffsetMinutes", String(new Date().getTimezoneOffset()));
+      const res = await fetch("/.netlify/functions/transcribe", { method: "POST", headers, body: fd });
+      const data = await res.json().catch(() => ({}));
+      if (data.usage) setUsage(data.usage);
+      if (data.text && onText) onText(data.text);
+      if (!data.text) setHint(navigator.onLine === false ? "Voice notes need a connection. You can still type." : voiceResultHint(data.error));
+      if (data.error === "out-of-minutes" || (reasonRef.current === "limit" && monthlyBindRef.current)) setSheet("topup");
+      if (data.error === "voice-notes-required" || data.error === "licence-required") setSheet("unlock");
+    } catch (e) {
+      setHint(navigator.onLine === false ? "Voice notes need a connection. You can still type." : "Couldn't transcribe that. Your note is unchanged.");
+    }
+    phaseRef.current = "idle";
+    setPhase("idle");
+  };
+  const endHold = (reason) => {
+    if (phaseRef.current !== "recording") return;
+    const elapsed = (performance.now() - startedRef.current) / 1000;
+    const tooShort = reason !== "limit" && reason !== "tap" && elapsed < VOICE_HOLD_MIN_MS / 1000;
+    discardRef.current = tooShort;
+    reasonRef.current = reason;
+    stopTimer();
+    holdingRef.current = false;
+    if (!tooShort) {
+      const left = Math.max(0, noteRef.current - elapsed);
+      noteRef.current = left;
+      setNoteLeft(left);
+      setShown(left);
+      phaseRef.current = "transcribing";
+      setPhase("transcribing");
+    } else {
+      phaseRef.current = "idle";
+      setPhase("idle");
+      setHint("Keep holding to record");
+      setShown(noteRef.current);
+    }
+    const rec = recRef.current;
+    if (rec && rec.state !== "inactive") { try { rec.stop(); } catch (e) { finishRecording(rec); } }
+    else finishRecording(rec);
+  };
+  api.current.endHold = endHold;
+  const primeMic = async () => {
+    if (!window.isSecureContext) { setHint(voiceMicError({ name: "SecurityError" })); return; }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { setHint(voiceMicError({ name: "NotFoundError" })); return; }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((t) => t.stop());
+      try { sessionStorage.setItem("sf_voice_primed", "1"); } catch (e) { }
+      primedRef.current = true;
+      setPrimed(true);
+      setHint(voiceTapMode() ? "Now tap to start" : "Now hold to record");
+    } catch (e) { setHint(voiceMicError(e)); }
+  };
+  const startRecorder = async () => {
+    if (phaseRef.current !== "idle") return;
+    if (navigator.onLine === false) { setHint("Voice notes need a connection. You can still type."); return; }
+    const monthly = usageRef.current ? Number(usageRef.current.remainingSeconds) : null;
+    if (monthly != null && monthly <= 0) { setSheet("topup"); return; }
+    if (noteRef.current <= 0.4) { setHint("This note has used its 2 minutes. Save the note to start another."); return; }
+    const budget = Math.min(noteRef.current, monthly == null ? noteRef.current : monthly);
+    monthlyBindRef.current = monthly != null && monthly <= noteRef.current + 0.05;
+    if (!window.isSecureContext || !navigator.mediaDevices || typeof MediaRecorder === "undefined") {
+      setHint(!window.isSecureContext ? voiceMicError({ name: "SecurityError" }) : "This browser can't record audio. You can still type.");
+      return;
+    }
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+    catch (e) { setHint(voiceMicError(e)); return; }
+    if (!holdingRef.current && !voiceTapMode()) { stream.getTracks().forEach((t) => t.stop()); return; }
+    if (blocked()) { stream.getTracks().forEach((t) => t.stop()); return; }
+    const mime = pickVoiceMime();
+    let rec;
+    try { rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream); }
+    catch (e) { stream.getTracks().forEach((t) => t.stop()); setHint("This browser can't record audio. You can still type."); return; }
+    streamRef.current = stream;
+    chunksRef.current = [];
+    doneRef.current = false;
+    discardRef.current = false;
+    rec.ondataavailable = (ev) => { if (ev.data && ev.data.size) chunksRef.current.push(ev.data); };
+    rec.onstop = () => finishRecording(rec);
+    recRef.current = rec;
+    try { rec.start(250); }
+    catch (e) { stopStream(); setHint("This browser can't record audio. You can still type."); return; }
+    startedRef.current = performance.now();
+    budgetRef.current = budget;
+    phaseRef.current = "recording";
+    setPhase("recording");
+    setShown(budget);
+    setHint("");
+    let vibrated = false;
+    stopTimer();
+    timerRef.current = setInterval(() => {
+      const left = Math.max(0, budgetRef.current - (performance.now() - startedRef.current) / 1000);
+      setShown(left);
+      if (left <= 10 && !vibrated) {
+        vibrated = true;
+        try { if (navigator.vibrate) navigator.vibrate(200); } catch (e) { }
+      }
+      if (left <= 0) api.current.endHold("limit");
+    }, 200);
+  };
+  const onPointerDown = (e) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    e.preventDefault();
+    downAtRef.current = performance.now();
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { }
+    if (blocked() || !primedRef.current) return;
+    if (!voiceTapMode()) { holdingRef.current = true; startRecorder(); }
+  };
+  const onPointerUp = () => {
+    const elapsed = performance.now() - downAtRef.current;
+    holdingRef.current = false;
+    if (phaseRef.current === "recording") { endHold(voiceTapMode() ? "tap" : "up"); return; }
+    const reason = blocked();
+    if (reason) { openBlocked(reason); return; }
+    if (!primedRef.current) { primeMic(); return; }
+    if (voiceTapMode()) { holdingRef.current = true; startRecorder(); return; }
+    if (elapsed < VOICE_HOLD_MIN_MS) setHint("Keep holding to record");
+  };
+  const onKeyDown = (e) => {
+    if (e.code !== "Space" && e.key !== " ") return;
+    if (e.repeat) { e.preventDefault(); return; }
+    e.preventDefault();
+    const reason = blocked();
+    if (reason) { openBlocked(reason); return; }
+    if (!primedRef.current) { primeMic(); return; }
+    if (voiceTapMode()) {
+      if (phaseRef.current === "recording") endHold("tap");
+      else { holdingRef.current = true; startRecorder(); }
+      return;
+    }
+    holdingRef.current = true;
+    startRecorder();
+  };
+  const onKeyUp = (e) => {
+    if (e.code !== "Space" && e.key !== " ") return;
+    e.preventDefault();
+    holdingRef.current = false;
+    if (!voiceTapMode() && phaseRef.current === "recording") endHold("up");
+  };
+  useEffect(() => {
+    const stop = () => { holdingRef.current = false; if (phaseRef.current === "recording") api.current.endHold("lost"); };
+    const vis = () => { if (document.hidden) stop(); };
+    window.addEventListener("blur", stop);
+    document.addEventListener("visibilitychange", vis);
+    return () => {
+      window.removeEventListener("blur", stop);
+      document.removeEventListener("visibilitychange", vis);
+    };
+  }, []);
+  useEffect(() => () => {
+    stopTimer();
+    try { if (recRef.current && recRef.current.state !== "inactive") recRef.current.stop(); } catch (e) { }
+    stopStream();
+  }, []);
+
+  const acceptConsent = () => {
+    try { localStorage.setItem("sf_voice_consent_v1", "1"); } catch (e) { }
+    consentRef.current = true;
+    setConsented(true);
+    setSheet(null);
+    primeMic();
+  };
+  const buy = async (product) => {
+    setBuyMsg("");
+    try {
+      if (navigator.onLine === false) { setBuyMsg("Voice notes need a connection. You can still type."); return; }
+      setBuyMsg(await voiceCheckout(product));
+    } catch (e) { setBuyMsg("Voice notes checkout isn't switched on yet."); }
+  };
+
+  const locked = query === "locked" || access === "locked" || (!preview && access === "checking");
+  const out = !locked && (query === "empty" || (usage && usage.out));
+  const recording = phase === "recording";
+  const amber = recording && shown <= 10;
+  const low = !recording && !out && (query === "low" || (usage && usage.low));
+  const label = recording ? "Recording, " + voiceClock(shown) + " left. Release to stop."
+    : out ? "Out of voice minutes"
+    : locked ? "Voice notes, locked"
+    : (tapMode ? "Tap to start and stop a voice note" : "Hold to record a voice note");
+  const renewal = voiceRenewal(usage && usage.renewalDate);
+
+  return (
+    <>
+      <div className="vn-miccol">
+        <button
+          ref={buttonRef}
+          type="button"
+          className="vn-mic"
+          data-on={recording ? 1 : 0}
+          data-amber={amber ? 1 : 0}
+          data-out={out ? 1 : 0}
+          data-busy={phase === "transcribing" ? 1 : 0}
+          aria-label={label}
+          aria-pressed={recording}
+          onPointerDown={onPointerDown}
+          onPointerUp={onPointerUp}
+          onPointerCancel={() => { holdingRef.current = false; if (phaseRef.current === "recording") endHold("lost"); }}
+          onLostPointerCapture={() => { holdingRef.current = false; if (phaseRef.current === "recording") endHold("lost"); }}
+          onContextMenu={(e) => e.preventDefault()}
+          onKeyDown={onKeyDown}
+          onKeyUp={onKeyUp}
+        >
+          <MicGlyph />
+          {locked && <span className="vn-lock"><LockGlyph /></span>}
+        </button>
+        <div className="vn-meta num" data-amber={amber ? 1 : 0} aria-live="polite">
+          {recording ? voiceClock(shown) : out ? "Out of voice minutes" : phase === "transcribing" ? "Writing…" : low ? voiceMins(usage ? usage.remainingSeconds : 600) + " min left" : ""}
+        </div>
+      </div>
+      {hint && <div className="vn-note" data-warn={1} style={{ flexBasis: "100%" }}>{hint}</div>}
+      {sheet === "consent" && (
+        <VoiceSheet label="Before you record" onClose={() => setSheet(null)}>
+          <div className="disp" style={{ fontSize: 22, marginBottom: 8 }}>Before you record</div>
+          <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--tx-2)", margin: "0 0 16px" }}>
+            Recording isn't kept. Audio is sent only to transcribe, then deleted. Check the text before saving. Don't record other people without their agreement.
+          </p>
+          <button className="btn" style={{ width: "100%", minHeight: 48 }} onClick={acceptConsent}>I understand</button>
+          <button className="btn ghost" style={{ width: "100%", minHeight: 44, marginTop: 8 }} onClick={() => setSheet(null)}>Not now</button>
+        </VoiceSheet>
+      )}
+      {sheet === "unlock" && (
+        <VoiceSheet label="Voice notes" onClose={() => setSheet(null)}>
+          <div className="eyebrow" style={{ color: "var(--brass)" }}>Voice notes</div>
+          <div className="disp" style={{ fontSize: 22, margin: "6px 0 8px" }}>A$5 a month. Included in Premium.</div>
+          <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--tx-2)", margin: "0 0 16px" }}>
+            Hold the mic to record what happened. 120 minutes a month, and another 120 minutes for A$5 if you need them before renewal.
+          </p>
+          <button className="btn" style={{ width: "100%", minHeight: 48 }} onClick={() => buy("voice_notes")}>Add Voice notes — A$5/month</button>
+          <button className="btn ghost" style={{ width: "100%", minHeight: 44, marginTop: 8 }} onClick={() => setSheet(null)}>Not now</button>
+          {buyMsg && <div style={{ fontSize: 12.5, color: "var(--tx-2)", marginTop: 12, lineHeight: 1.5 }}>{buyMsg}</div>}
+        </VoiceSheet>
+      )}
+      {sheet === "topup" && (
+        <VoiceSheet label="Add voice minutes" onClose={() => setSheet(null)}>
+          <div className="disp" style={{ fontSize: 22, marginBottom: 8 }}>Add another 120 minutes for A$5, valid until {renewal}.</div>
+          <p style={{ fontSize: 13.5, lineHeight: 1.55, color: "var(--tx-3)", margin: "0 0 16px" }}>
+            Top-up minutes are used after the monthly 120, and they end when the subscription renews. The 30 notes a day limit stays.
+          </p>
+          <button className="btn" style={{ width: "100%", minHeight: 48 }} onClick={() => buy("voice_topup")}>Top up</button>
+          <button className="btn ghost" style={{ width: "100%", minHeight: 44, marginTop: 8 }} onClick={() => setSheet(null)}>Not now</button>
+          {buyMsg && <div style={{ fontSize: 12.5, color: "var(--tx-2)", marginTop: 12, lineHeight: 1.5 }}>{buyMsg}</div>}
+        </VoiceSheet>
+      )}
+    </>
+  );
+}
+
+function VoiceNotesSettings() {
+  const preview = voiceUiOpen();
+  const [usage, setUsage] = useState(null);
+  const [entitled, setEntitled] = useState(preview);
+  const [tap, setTap] = useState(voiceTapMode);
+  const [msg, setMsg] = useState("");
+  const [buyMsg, setBuyMsg] = useState("");
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      try {
+        const headers = await voiceHeaders();
+        const res = await fetch("/.netlify/functions/transcribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...headers },
+          body: JSON.stringify({ action: "status", tzOffsetMinutes: new Date().getTimezoneOffset() }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (cancel) return;
+        if (data.usage) setUsage(data.usage);
+        if (typeof data.entitled === "boolean") setEntitled(preview || data.entitled);
+        if (!data.usage && data.entitled === false && !preview) setMsg("");
+      } catch (e) {
+        if (!cancel) setMsg("Couldn't load voice minutes. Connect and open Settings again.");
+      }
+    })();
+    return () => { cancel = true; };
+  }, []);
+  const buy = async () => {
+    try { setBuyMsg(await voiceCheckout("voice_notes")); }
+    catch (e) { setBuyMsg("Voice notes checkout isn't switched on yet."); }
+  };
+  const used = usage ? voiceMins(usage.allowanceSecondsUsed) : "–";
+  const left = usage ? voiceMins(usage.remainingSeconds) : "–";
+  const top = usage ? voiceMins(usage.topupSecondsRemaining) : "–";
+  return (
+    <div className="panel" style={{ marginTop: 18 }}>
+      <div className="eyebrow" style={{ marginBottom: 8 }}>Voice notes</div>
+      <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.6, marginBottom: 12 }}>
+        {used} min used of 120 this month. {left} min left, including top-up. Top-up: {top} min. Renews {usage ? voiceRenewal(usage.renewalDate) : "—"}.
+      </div>
+      <label className="check" style={{ marginBottom: 8 }}>
+        <input type="checkbox" checked={tap} onChange={(e) => { setTap(e.target.checked); voiceSetTapMode(e.target.checked); }} />
+        <span>Tap to start and stop</span>
+      </label>
+      <div style={{ fontSize: 12, color: "var(--tx-3)", lineHeight: 1.55 }}>
+        Off means press and hold the mic, including with the space bar when the mic is focused. On is the same 2 minute countdown, for someone who can't hold the button.
+      </div>
+      {!preview && !entitled && (
+        <button className="btn" style={{ width: "100%", marginTop: 12, minHeight: 48 }} onClick={buy}>Add Voice notes — A$5/month</button>
+      )}
+      {msg && <div style={{ fontSize: 12.5, color: "var(--warn)", marginTop: 10 }}>{msg}</div>}
+      {buyMsg && <div style={{ fontSize: 12.5, color: "var(--tx-2)", marginTop: 10 }}>{buyMsg}</div>}
+    </div>
+  );
+}
+
+
 function Notes({ data, save, prefill, onPrefillConsumed }) {
   // One box to speak the shift in your own words, then Tidy this up sorts
   // it into the five sections NDIS's own record-keeping guidance points to
@@ -8876,7 +9465,42 @@ function Notes({ data, save, prefill, onPrefillConsumed }) {
   const [tidyErr, setTidyErr] = useState("");
   const [idOn, setIdOn] = useState(true);
   const [editingId, setEditingId] = useState(null);
+  const [voiceBusy, setVoiceBusy] = useState(false);
+  const [voiceEpoch, setVoiceEpoch] = useState(0);
+  const roughRef = useRef(null);
+  const fieldRefs = useRef({});
+  const selRef = useRef({ field: "rough", start: null, end: null });
   const canShare = typeof navigator !== "undefined" && !!navigator.share;
+  const rememberCaret = (field, el) => {
+    if (!el) return;
+    selRef.current = { field, start: el.selectionStart, end: el.selectionEnd };
+  };
+  const insertTranscript = (text) => {
+    const snap = selRef.current;
+    setF((cur) => {
+      if (!cur.tidied) {
+        const { next, cursor } = voiceSplice(cur.rough, snap.start, snap.end, text);
+        requestAnimationFrame(() => {
+          const el = roughRef.current;
+          if (!el) return;
+          el.focus();
+          try { el.setSelectionRange(cursor, cursor); } catch (e) { }
+          selRef.current = { field: "rough", start: cursor, end: cursor };
+        });
+        return { ...cur, rough: next };
+      }
+      const key = FIELDS.some(([k]) => k === snap.field) ? snap.field : "supportProvided";
+      const { next, cursor } = voiceSplice(cur[key] || "", snap.start, snap.end, text);
+      requestAnimationFrame(() => {
+        const el = fieldRefs.current[key];
+        if (!el) return;
+        el.focus();
+        try { el.setSelectionRange(cursor, cursor); } catch (e) { }
+        selRef.current = { field: key, start: cursor, end: cursor };
+      });
+      return { ...cur, [key]: next };
+    });
+  };
 
   const startEdit = (n) => {
     setEditingId(n.id);
@@ -8887,10 +9511,11 @@ function Notes({ data, save, prefill, onPrefillConsumed }) {
       rough: n.body || "" });
     setTidyErr("");
     setSendFor(null);
+    setVoiceEpoch((n) => n + 1);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const cancelEdit = () => { setEditingId(null); setF(blank()); setTidyErr(""); };
+  const cancelEdit = () => { setEditingId(null); setF(blank()); setTidyErr(""); setVoiceEpoch((n) => n + 1); };
 
   const tidy = async () => {
     const source = f.tidied ? assembleBody(f) : f.rough;
@@ -8934,6 +9559,7 @@ function Notes({ data, save, prefill, onPrefillConsumed }) {
     }
     setF(blank());
     setTidyErr("");
+    setVoiceEpoch((n) => n + 1);
   };
 
   const rows = data.notes.filter((n) => filter === "all" || (filter === "shared" ? n.shared : !n.shared));
@@ -9014,15 +9640,25 @@ function Notes({ data, save, prefill, onPrefillConsumed }) {
           </label>
         </div>
         {!f.tidied ? (
-          <label className="f"><span>What happened</span>
-            <textarea style={{ minHeight: 130 }} value={f.rough} onChange={(e) => setF({ ...f, rough: e.target.value })}
-              placeholder="Talk about the shift in your own words, however it comes out. Tidy this up sorts it into the right sections for you." />
-          </label>
+          <div className="vn-compose">
+            <label className="f"><span>What happened</span>
+              <textarea ref={roughRef} style={{ minHeight: 130 }} readOnly={voiceBusy} value={f.rough}
+                onChange={(e) => setF({ ...f, rough: e.target.value })}
+                onSelect={(e) => rememberCaret("rough", e.target)}
+                onKeyUp={(e) => rememberCaret("rough", e.target)}
+                onClick={(e) => rememberCaret("rough", e.target)}
+                placeholder="Talk about the shift in your own words, however it comes out. Tidy this up sorts it into the right sections for you." />
+            </label>
+            <VoiceNoteMic onText={insertTranscript} onBusy={setVoiceBusy} epoch={voiceEpoch} />
+          </div>
         ) : (
           <>
-            <div style={{ fontSize: 11.5, color: "var(--tx-3)", lineHeight: 1.6, marginBottom: 12 }}>
-              Sorted into the five NDIS-aligned sections. A section marked <b style={{ color: "var(--warn)" }}>missing</b> just
-              means nothing in what you said covered it, fill it in yourself or leave it and save as-is, your call.
+            <div className="vn-compose">
+              <div style={{ flex: 1, fontSize: 11.5, color: "var(--tx-3)", lineHeight: 1.6, marginBottom: 12 }}>
+                Sorted into the five NDIS-aligned sections. A section marked <b style={{ color: "var(--warn)" }}>missing</b> just
+                means nothing in what you said covered it, fill it in yourself or leave it and save as-is, your call.
+              </div>
+              <VoiceNoteMic onText={insertTranscript} onBusy={setVoiceBusy} epoch={voiceEpoch} />
             </div>
             {FIELDS.map(([key, label]) => {
               const empty = !f[key] || !f[key].trim();
@@ -9030,7 +9666,12 @@ function Notes({ data, save, prefill, onPrefillConsumed }) {
                 <label className="f" key={key}>
                   <span style={{ color: empty ? "var(--warn)" : undefined }}>{label}{empty ? " — missing" : ""}</span>
                   <textarea style={{ minHeight: 64, borderColor: empty ? "var(--warn)" : undefined }}
-                    value={f[key]} onChange={(e) => setF({ ...f, [key]: e.target.value })} />
+                    readOnly={voiceBusy}
+                    ref={(el) => { fieldRefs.current[key] = el; }}
+                    value={f[key]} onChange={(e) => setF({ ...f, [key]: e.target.value })}
+                    onSelect={(e) => rememberCaret(key, e.target)}
+                    onKeyUp={(e) => rememberCaret(key, e.target)}
+                    onClick={(e) => rememberCaret(key, e.target)} />
                 </label>
               );
             })}
@@ -9045,9 +9686,9 @@ function Notes({ data, save, prefill, onPrefillConsumed }) {
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           {AI.enabled() && (
-            <button className="btn ghost" onClick={tidy} disabled={busy || !hasContent(f)}>{busy ? "Writing…" : "Tidy this up"}</button>
+            <button className="btn ghost" onClick={tidy} disabled={voiceBusy || busy || !hasContent(f)}>{busy ? "Writing…" : "Tidy this up"}</button>
           )}
-          <button className="btn" onClick={add} disabled={!hasContent(f)}>{editingId ? "Save changes" : "Save note"}</button>
+          <button className="btn" onClick={add} disabled={voiceBusy || !hasContent(f)}>{editingId ? "Save changes" : "Save note"}</button>
           {editingId && <button className="btn ghost" onClick={cancelEdit}>Cancel</button>}
         </div>
         {tidyErr && <div style={{ fontSize: 12, color: "var(--warn)", marginTop: 10 }}>{tidyErr}</div>}
@@ -9596,6 +10237,10 @@ const MANUAL = [
       [
         "Shift notes",
         "Work → Notes. Write a note against a participant and mark it private or shareable. That mark is about how you have written it, plain and factual for someone else to read, or your own private observations. Ticking it does not send anything."
+      ],
+      [
+        "Voice notes",
+        "On Work → Notes, hold the mic beside What happened. Let go to stop. A tap that is too short does not record. The first press asks for the microphone, then you hold again. Each note has 2 minutes, shared across holds, and saving starts the 2 minutes again. The words land in the box and stay unsaved until you tap Save note. Voice notes is A$5 a month, included in Premium, with 120 minutes a month and 30 notes a day. Under 10 minutes left, a warning shows under the mic. Settings has Tap to start and stop, and the minutes used, minutes left, top-up minutes and renewal date. Recording is not kept: the audio is sent only to be transcribed, then deleted. Check the text before saving, and don't record other people without their agreement."
       ],
       [
         "Sending a note",
@@ -11752,6 +12397,8 @@ function Settings({ data, save, wipeAll, rerun, startPane, helpInitialView }) {
       {licence && licence.phase === "ok" && (
         <LicencePanel licence={licence} open={openSection === "licence"} onToggle={() => toggleSection("licence")} />
       )}
+
+      <VoiceNotesSettings />
 
       <div className={"stepcard" + (profileOK ? " done" : "")}>
         <span className="stepnum">{profileOK ? "✓" : "1"}</span>

@@ -287,6 +287,40 @@ automatically once the trip is ticked for an invoice.
 required structure to think about while you're writing it, just talk about
 what happened.
 
+### Voice notes
+
+Hold the microphone beside **What happened**. Let go and that clip is typed
+into the box, at the cursor if you had placed one. A short tap does not
+record: keep holding. The first time, the phone asks for the microphone and
+you then hold again. Nothing is saved until you tap **Save note**.
+
+Each note has **2:00**, shared across every hold. The countdown only moves
+while you are holding, turns amber at **0:10**, and stops on its own at
+**0:00** even if your finger is still down. Saving the note starts the 2
+minutes again. While a recording is being typed in, the box cannot be edited
+and Save and Tidy are switched off.
+
+After a shift is saved, **Add a note for this shift** opens Notes with that
+participant and date filled in. It does not start recording.
+
+Voice notes is **A$5 a month**, and it is included in Premium. You get
+**120 minutes a month**. A **A$5** top-up adds another 120 minutes, used
+after the monthly allowance, and those extra minutes last until the
+subscription renews. They do not raise the limit of **30 voice notes a
+day**, which resets at midnight. Under 10 minutes left, a warning sits under
+the mic. At zero, the mic greys out and says **Out of voice minutes**.
+
+In **Settings → Voice notes** you can switch on **Tap to start and stop**
+(same countdown), and see minutes used, minutes left, top-up minutes and the
+renewal date. Keyboard: focus the mic and hold the space bar.
+
+The first time, the app says the recording is not kept, the audio is sent
+only to be transcribed and then deleted, you should check the text before
+saving, and you should not record other people without their agreement.
+Voice notes need a connection. If the microphone is blocked, use the lock
+icon in the address bar (or Settings → Safari → Microphone on iPhone) and
+allow it, then hold again.
+
 ### Tidy this up
 
 Once you've written something, tap **Tidy this up**. This only appears if the
