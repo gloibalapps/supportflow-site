@@ -317,6 +317,16 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 .btn.x:hover{color:var(--warn);background:none;border:0}
 
 .callout{background:var(--bg-3);border-left:2px solid var(--brass);border-radius:0 10px 10px 0;padding:13px 16px;font-size:12.5px;color:var(--tx-2);line-height:1.55}
+.tutorial{background:var(--bg-2);border:1px solid var(--line);border-radius:12px;padding:14px 14px 12px;margin:0 0 14px;scroll-margin-top:78px}
+.tutorial ul{margin:8px 0 0;padding-left:18px}
+.tutorial li{margin:5px 0;font-size:13px;line-height:1.5;color:var(--tx-2)}
+.tutorial-row{margin-top:14px}
+.tutorial-row .tutoriallink{display:block;width:100%;white-space:normal}
+.tutorial-row .len{color:var(--tx-3);font-weight:500}
+.tutoriallink{background:none;border:0;padding:0;color:var(--tx);font:inherit;font-weight:600;cursor:pointer;text-align:left;text-decoration:underline;text-decoration-color:var(--brass);text-underline-offset:3px}
+.tutoriallink:hover{color:var(--brass)}
+a.btn{display:inline-flex;align-items:center;text-decoration:none}
+.manualq{scroll-margin-top:78px}
 .startcard{position:relative;border:1.5px solid var(--brass);border-radius:14px;background:var(--bg-2);padding:22px 20px 20px;margin-bottom:18px;box-shadow:0 6px 20px rgba(0,0,0,.14)}
 .startlead{font-size:12.5px;color:var(--brass);font-weight:600;letter-spacing:.02em;margin-bottom:5px;text-transform:uppercase}
 .empty{padding:44px 20px;text-align:center;color:var(--tx-3);font-size:13.5px;line-height:1.65}
@@ -445,6 +455,12 @@ function pickManualContext(question) {
       const score = words.reduce((n, w) => n + (hay.includes(w) ? 1 : 0), 0);
       if (score > 0) hits.push({ q, a, score });
     });
+  });
+  TUTORIALS.forEach((v) => {
+    const a = `Watch the video (${v.minutes} min) at https://www.youtube.com/watch?v=${v.id}. Or read: ` + v.topics.map((t) => t.label).join("; ") + ".";
+    const hay = (v.title + " " + a).toLowerCase();
+    const score = words.reduce((n, w) => n + (hay.includes(w) ? 1 : 0), 0);
+    if (score > 0) hits.push({ q: "Video " + v.n + ". " + v.title, a, score });
   });
   hits.sort((a, b) => b.score - a.score);
   return hits.slice(0, 4).map((h) => `Q: ${h.q}\nA: ${h.a}`).join("\n\n");
@@ -9492,6 +9508,166 @@ const FAQ = [
 ];
 
 
+// Ten public tutorials on the NDIS SupportFlow channel. Each card offers the
+// video, or the same topics already written in this manual. Lengths and IDs
+// are the "NDIS SupportFlow Tutorial" playlist (PLAmxq9wJKsAg).
+const TUTORIALS = [
+  {
+    n: 1, id: "sXZew6yrAcg", title: "Getting Started", length: "1:56", minutes: 2, section: "Getting started",
+    topics: [
+      { label: "What SupportFlow handles, and what it does not", section: "Getting started", q: "What this app does, and doesn't" },
+      { label: "Five free invoice credits and the Lifetime licence", section: "Getting started", q: "What SupportFlow costs" },
+    ],
+  },
+  {
+    n: 2, id: "oBTxFKBki7M", title: "Install on Android, iPhone, Windows & Mac + Your Details", length: "1:47", minutes: 2, section: "Getting started",
+    topics: [
+      { label: "Install on Android", section: "Getting started", q: "Installing on Android" },
+      { label: "Install on iPhone or iPad", section: "Getting started", q: "Installing on iPhone or iPad" },
+      { label: "Install on a Windows PC", section: "Getting started", q: "Installing on a Windows PC" },
+      { label: "Install on a Mac", section: "Getting started", q: "Installing on a Mac" },
+      { label: "Name, ABN and bank details", section: "Getting started", q: "Setup step 3 – Your details" },
+    ],
+  },
+  {
+    n: 3, id: "FDNGIsgXMqk", title: "Adding a Plan Manager & Setting Payment Terms (NDIS)", length: "1:03", minutes: 1, section: "People",
+    topics: [
+      { label: "Add a plan manager", section: "Getting started", q: "Setup step 4 – Plan managers" },
+      { label: "Company, accounts email, phone and payment terms", section: "People", q: "Participants and plan managers" },
+      { label: "Who is linked to that plan manager", section: "People", q: "Participants and plan managers" },
+    ],
+  },
+  {
+    n: 4, id: "jW-OcpEeY2A", title: "Adding a Participant, Funding Type & Default Rates (NDIS)", length: "1:13", minutes: 1, section: "People",
+    topics: [
+      { label: "Add a participant and their NDIS number", section: "Getting started", q: "Setup step 5 – Participants" },
+      { label: "Plan managed, self managed or NDIA managed", section: "Getting started", q: "Setup step 5 – Participants" },
+      { label: "Link their plan manager", section: "People", q: "Participants and plan managers" },
+      { label: "Usual support item, rate and service agreement", section: "Getting started", q: "Setup step 5 – Participants" },
+      { label: "Kilometre rate", text: "Invoices use one travel rate for every participant, under Settings → Support item rates. It is not stored separately on each person. The hourly figure on a participant is the rate for the support item you usually bill them for." },
+    ],
+  },
+  {
+    n: 5, id: "LalRGuYEhNU", title: "Adding a Shift, NDIS Line Items & Price Limits", length: "1:26", minutes: 1, section: "Work",
+    topics: [
+      { label: "Add a shift", section: "Work", q: "Adding a shift" },
+      { label: "The NDIS line item and price", section: "Work", q: "Adding a shift" },
+      { label: "Evening, night, midnight and public holidays", section: "Work", q: "How the time-of-day rules work" },
+      { label: "Scheduled and completed", section: "Work", q: "Scheduled, completed, cancelled" },
+      { label: "Breaks", text: "There is no break field. Enter the start and finish of the support. SupportFlow works out the hours from those two times." },
+    ],
+  },
+  {
+    n: 6, id: "AgoKAyv3gDM", title: "Logging Travel Kilometres & Writing Shift Notes (NDIS)", length: "1:38", minutes: 2, section: "Work",
+    topics: [
+      { label: "Log kilometres", section: "Work", q: "Logging travel" },
+      { label: "Write a shift note", section: "Work", q: "Shift notes" },
+      { label: "Send a note", section: "Work", q: "Sending a note" },
+    ],
+  },
+  {
+    n: 7, id: "pamrCvBMwX0", title: "Creating an NDIS Invoice, PDF Preview & Payment Tracking", length: "1:39", minutes: 2, section: "Invoicing",
+    topics: [
+      { label: "Create an invoice from unbilled shifts and travel", section: "Invoicing", q: "Creating an invoice" },
+      { label: "Preview the PDF", section: "Invoicing", q: "Sending it" },
+      { label: "Sent, Overdue and Paid", section: "Invoicing", q: "Sending it" },
+      { label: "Invoiced shifts and trips lock", section: "Invoicing", q: "Why billed work locks" },
+    ],
+  },
+  {
+    n: 8, id: "J_risqpSUxk", title: "Logging Expenses, Tax Set-Aside, ATO Claim Check & GST (NDIS)", length: "2:36", minutes: 3, section: "Expenses, tax and GST",
+    topics: [
+      { label: "Log an expense", section: "Expenses, tax and GST", q: "Logging an expense" },
+      { label: "Tax set-aside", section: "Expenses, tax and GST", q: "The set-aside figure" },
+      { label: "Cents per kilometre", section: "Expenses, tax and GST", q: "Your vehicle" },
+      { label: "ATO claim check", section: "Expenses, tax and GST", q: "The deduction checker" },
+      { label: "Accountant pack", section: "Expenses, tax and GST", q: "Accountant pack" },
+      { label: "Starting point for this year", section: "Expenses, tax and GST", q: "Starting point for this year" },
+      { label: "The $75,000 GST threshold", section: "Expenses, tax and GST", q: "The trap" },
+      { label: "Quarterly BAS worksheet", section: "Expenses, tax and GST", q: "Lodging your BAS" },
+    ],
+  },
+  {
+    n: 9, id: "---bKNiLHbw", title: "NDIS Service Agreements & Incident Register Walkthrough", length: "3:11", minutes: 3, section: "People",
+    topics: [
+      { label: "Why a service agreement matters for GST", section: "People", q: "Why service agreements matter" },
+      { label: "Generate a service agreement PDF", section: "People", q: "Letting the app write one" },
+      { label: "Signed date, where it is kept, and the 30-day review", section: "People", q: "Recording and reviewing" },
+      { label: "Record an incident", section: "People", q: "Recording an incident" },
+      { label: "Registered provider prompts and the Commission reference", section: "People", q: "Reportable incident prompts" },
+      { label: "Export the incident register PDF", section: "People", q: "Incident register PDF" },
+    ],
+  },
+  {
+    n: 10, id: "2Qkbfx3qRMs", title: "Backups, PIN Lock & Data Security", length: "3:06", minutes: 3, section: "Your data and security",
+    topics: [
+      { label: "Encrypted backups to Google Drive or OneDrive", section: "Your data and security", q: "Automatic Google Drive backups" },
+      { label: "The backup password", section: "Your data and security", q: "Every backup is encrypted" },
+      { label: "The recovery code", section: "Your data and security", q: "Your recovery code" },
+      { label: "Back up now", section: "Your data and security", q: "Back up now, change account or disconnect" },
+      { label: "Restore a backup", section: "Your data and security", q: "Restoring a backup" },
+      { label: "Move to a new device", section: "Your data and security", q: "Moving to a new phone or PC" },
+      { label: "Restore your licence", section: "Your data and security", q: "What transfers and what does not" },
+      { label: "PIN, fingerprint or face unlock", section: "Your data and security", q: "Setting a PIN and fingerprint unlock" },
+      { label: "Lock now", section: "Your data and security", q: "When the app locks again" },
+      { label: "Privacy and security", section: "Your data and security", q: "Privacy and security" },
+    ],
+  },
+];
+
+function manualDomId(section, q) {
+  return "mq-" + (section + "--" + q).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+function TutorialCard({ video, onOpenTopic }) {
+  return (
+    <div className="tutorial" id={"manual-video-" + video.n}>
+      <div className="eyebrow">Video {video.n} · {video.length}</div>
+      <div style={{ fontSize: 14.5, fontWeight: 600, color: "var(--tx)", margin: "3px 0 10px", lineHeight: 1.35 }}>{video.title}</div>
+      <a className="btn tiny" href={"https://www.youtube.com/watch?v=" + video.id} target="_blank" rel="noopener noreferrer"
+        aria-label={"Watch the video (" + video.minutes + " min): " + video.title}>
+        Watch the video ({video.minutes} min) ↗
+      </a>
+      <div style={{ fontSize: 12, color: "var(--tx-3)", margin: "12px 0 2px" }}>Or read these topics</div>
+      <ul>
+        {video.topics.map((t) => (
+          <li key={t.label}>
+            {t.q
+              ? <button type="button" className="tutoriallink" onClick={() => onOpenTopic(t)}>{t.label}</button>
+              : <span><span style={{ fontWeight: 600, color: "var(--tx)" }}>{t.label}.</span> {t.text}</span>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function TutorialIndex({ onOpenVideo }) {
+  return (
+    <div className="tutorial" id="video-tutorials">
+      <div className="eyebrow">Video tutorials</div>
+      <div style={{ fontSize: 13, color: "var(--tx-2)", lineHeight: 1.55, marginTop: 4 }}>
+        Ten short videos on the NDIS SupportFlow channel, in order. Watch one, or open its title and read the topics beside that part of the manual.
+      </div>
+      <div>
+        {TUTORIALS.map((v) => (
+          <div className="tutorial-row" key={v.n}>
+            <button type="button" className="tutoriallink" onClick={() => onOpenVideo(v)}>
+              {v.n}. {v.title} <span className="len">· {v.length}</span>
+            </button>
+            <div style={{ marginTop: 6 }}>
+              <a className="btn tiny" href={"https://www.youtube.com/watch?v=" + v.id} target="_blank" rel="noopener noreferrer"
+                aria-label={"Watch the video (" + v.minutes + " min): " + v.title}>
+                Watch the video ({v.minutes} min) ↗
+              </a>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // The manual, in the app rather than in a file nobody opens. Same accordion
 // pattern as the FAQ so there is one thing to learn, not two.
 const MANUAL = [
@@ -9545,7 +9721,7 @@ const MANUAL = [
       ],
       [
         "Setup step 5 – Participants",
-        "For each person: name, NDIS number, and how their plan is managed. Plan managed means their manager is billed, so link them. Self managed and NDIA managed are billed directly, so they need their own payment terms. Set the item you usually bill them for, so new invoices open on the right code. Set their area, which decides your travel time cap. Setting them up as a private client (not NDIS) is covered under Invoicing."
+        "For each person: name, NDIS number, and how their plan is managed. Plan managed means their manager is billed, so link them. Self managed and NDIA managed are billed directly, so they need their own payment terms. Set the item you usually bill them for, so new invoices open on the right code. The rate beside that item is the published price; change it if yours differs. Tick the service agreement if one is already signed. Set their area, which decides your travel time cap. Setting them up as a private client (not NDIS) is covered under Invoicing."
       ],
       [
         "Red means it still needs you",
@@ -9727,7 +9903,7 @@ const MANUAL = [
     "q": [
       [
         "Participants and plan managers",
-        "People → Participants lists everyone you support; Add participant opens the same form used in setup, and tapping a person opens their record to edit. People → Plan managers is the same for plan management companies, including their payment terms, which set the due date on every invoice. Emails and phone numbers are checked as you type."
+        "People → Participants lists everyone you support; Add participant opens the same form used in setup, and tapping a person opens their record to edit. People → Plan managers is the same for plan management companies, including their payment terms, which set the due date on every invoice. Tap a plan manager to edit the company, accounts email, phone or payment terms. The list shows how many participants are linked to each one. Emails and phone numbers are checked as you type."
       ],
       [
         "The due date is blank",
@@ -9759,7 +9935,7 @@ const MANUAL = [
       ],
       [
         "Reportable incident prompts",
-        "For a registered provider, SupportFlow flags the common NDIS Commission reportable-incident categories. Most are shown as a 24-hour notification timeframe from when the provider became aware. An unauthorised restrictive practice is shown as five business days, with a stronger 24-hour warning when harm is recorded. These are prompts, not a legal determination — check the current Commission guidance and submit through the official portal."
+        "For a registered provider, SupportFlow flags the common NDIS Commission reportable-incident categories. Most are shown as a 24-hour notification timeframe from when the provider became aware. An unauthorised restrictive practice is shown as five business days, with a stronger 24-hour warning when harm is recorded. These are prompts, not a legal determination — check the current Commission guidance and submit through the official portal. If you have made that notification, record it on the incident and keep the Commission reference. SupportFlow does not send the report."
       ],
       [
         "SupportFlow does not report for you",
@@ -10304,7 +10480,38 @@ function Help({ data, initialView = "manual" }) {
     setOpen(null);
   }, [initialView]);
   const [query, setQuery] = useState("");
+  const [pendingScroll, setPendingScroll] = useState(null);
   const set = view === "manual" ? MANUAL : FAQ;
+
+  useEffect(() => {
+    if (!pendingScroll) return;
+    let tries = 0;
+    let timer;
+    const go = () => {
+      const el = document.getElementById(pendingScroll);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+        setPendingScroll(null);
+        return;
+      }
+      if (tries++ < 10) timer = setTimeout(go, 40);
+    };
+    go();
+    return () => clearTimeout(timer);
+  }, [pendingScroll, open, view, query]);
+
+  const openTopic = (topic) => {
+    setQuery("");
+    setView("manual");
+    setOpen("section:" + topic.section + ":" + topic.q);
+    setPendingScroll(manualDomId(topic.section, topic.q));
+  };
+  const openVideo = (video) => {
+    setQuery("");
+    setView("manual");
+    setOpen("section:" + video.section);
+    setPendingScroll("manual-video-" + video.n);
+  };
 
   const searchResults = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -10317,6 +10524,11 @@ function Help({ data, initialView = "manual" }) {
           hits.push({ sectionTitle: sec.t, q, a });
         }
       });
+    });
+    const broad = ["video", "videos", "tutorial", "tutorials", "youtube"].includes(term);
+    TUTORIALS.forEach((v) => {
+      const blob = (v.title + " " + v.topics.map((t) => t.label + " " + (t.text || "")).join(" ")).toLowerCase();
+      if (blob.includes(term) || broad) hits.push({ sectionTitle: "Video tutorials", q: v.n + ". " + v.title, a: "", video: v });
     });
     return hits;
   }, [query]);
@@ -10357,7 +10569,7 @@ function Help({ data, initialView = "manual" }) {
                   </button>
                   {on && (
                     <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.8, paddingBottom: 16, maxWidth: "62ch" }}>
-                      {r.a}
+                      {r.video ? <TutorialCard video={r.video} onOpenTopic={openTopic} /> : r.a}
                     </div>
                   )}
                 </div>
@@ -10374,12 +10586,15 @@ function Help({ data, initialView = "manual" }) {
       </div>
 
       {view === "manual" ? (
+        <>
         <div style={{ margin: "18px 0 8px" }}>
           <div className="disp" style={{ fontSize: 20, marginBottom: 5 }}>User manual</div>
           <div style={{ fontSize: 12.5, color: "var(--tx-2)", lineHeight: 1.55 }}>
-            Everything you need to set up and use SupportFlow.
+            Everything you need to set up and use SupportFlow. Each video below opens on YouTube in a new tab, or you can read the same topics here.
           </div>
         </div>
+        <TutorialIndex onOpenVideo={openVideo} />
+        </>
       ) : view !== "support" ? (
         <div className="panel">
           <div className="eyebrow" style={{ marginBottom: 10 }}>
@@ -10437,11 +10652,14 @@ function Help({ data, initialView = "manual" }) {
               {sec.d && <div style={{ fontSize: 12, color: "var(--tx-2)", fontWeight: 500, marginTop: 5, lineHeight: 1.55 }}>{sec.d}</div>}
             </div>
           )}
+          {view === "manual" && TUTORIALS.filter((v) => v.section === sec.t).map((v) => (
+            <TutorialCard key={v.n} video={v} onOpenTopic={openTopic} />
+          ))}
           {sectionOn && sec.q.map(([q, a]) => {
             const id = view === "manual" ? sectionId + ":" + q : (sec.g || sec.t) + q;
             const on = open === id;
             return (
-              <div key={q} style={{ borderBottom: "1px solid var(--line-2)" }}>
+              <div key={q} id={view === "manual" ? manualDomId(sec.t, q) : undefined} className={view === "manual" ? "manualq" : undefined} style={{ borderBottom: "1px solid var(--line-2)" }}>
                 <button
                   onClick={() => setOpen(on ? (view === "manual" ? sectionId : null) : id)}
                   style={{ width: "100%", textAlign: "left", background: "none", border: 0, padding: "14px 0",
