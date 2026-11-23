@@ -29,9 +29,8 @@ backups matter, see [Backing up](#17-backing-up-important).
 
 <a href="https://www.youtube.com/watch?v=sXZew6yrAcg" target="_blank" rel="noopener noreferrer"><strong>Watch the video (2 min)</strong></a>
 
-Or read these topics:
+Or read this topic:
 
-- [What SupportFlow handles, and what it does not](#what-this-app-is-for)
 - [Five free invoice credits and the Lifetime licence](#19-licence)
 
 ### How this manual is laid out
@@ -46,23 +45,6 @@ It follows the order you'll actually meet things in the app:
 | **People** tab | Participants and plan managers · Service agreements · Incidents |
 | **Your data and security** | Backing up · App lock · Licence · Settings |
 | **Help** | If something looks wrong · Words you'll see · Sending feedback · Checking things yourself · Where the numbers come from |
-
-<a id="video-tutorials"></a>
-
-## Video tutorials
-
-Ten short videos on the NDIS SupportFlow channel, in playlist order. Watch one, or jump to the topics beside the part of this manual it explains. Each watch link opens YouTube in a new tab.
-
-1. **[Getting Started](#video-1-getting-started)** (1:56) — <a href="https://www.youtube.com/watch?v=sXZew6yrAcg" target="_blank" rel="noopener noreferrer"><strong>Watch the video (2 min)</strong></a>
-2. **[Install on Android, iPhone, Windows & Mac + Your Details](#video-2-install)** (1:47) — <a href="https://www.youtube.com/watch?v=oBTxFKBki7M" target="_blank" rel="noopener noreferrer"><strong>Watch the video (2 min)</strong></a>
-3. **[Adding a Plan Manager & Setting Payment Terms](#video-3-plan-managers)** (1:03) — <a href="https://www.youtube.com/watch?v=FDNGIsgXMqk" target="_blank" rel="noopener noreferrer"><strong>Watch the video (1 min)</strong></a>
-4. **[Adding a Participant, Funding Type & Default Rates](#video-4-participants)** (1:13) — <a href="https://www.youtube.com/watch?v=jW-OcpEeY2A" target="_blank" rel="noopener noreferrer"><strong>Watch the video (1 min)</strong></a>
-5. **[Adding a Shift, NDIS Line Items & Price Limits](#video-5-shifts)** (1:26) — <a href="https://www.youtube.com/watch?v=LalRGuYEhNU" target="_blank" rel="noopener noreferrer"><strong>Watch the video (1 min)</strong></a>
-6. **[Logging Travel Kilometres & Writing Shift Notes](#video-6-travel-and-notes)** (1:38) — <a href="https://www.youtube.com/watch?v=AgoKAyv3gDM" target="_blank" rel="noopener noreferrer"><strong>Watch the video (2 min)</strong></a>
-7. **[Creating an NDIS Invoice, PDF Preview & Payment Tracking](#video-7-invoices)** (1:39) — <a href="https://www.youtube.com/watch?v=pamrCvBMwX0" target="_blank" rel="noopener noreferrer"><strong>Watch the video (2 min)</strong></a>
-8. **[Logging Expenses, Tax Set-Aside, ATO Claim Check & GST](#video-8-expenses-tax-gst)** (2:36) — <a href="https://www.youtube.com/watch?v=J_risqpSUxk" target="_blank" rel="noopener noreferrer"><strong>Watch the video (3 min)</strong></a>
-9. **[NDIS Service Agreements & Incident Register Walkthrough](#video-9-agreements-incidents)** (3:11) — <a href="https://www.youtube.com/watch?v=---bKNiLHbw" target="_blank" rel="noopener noreferrer"><strong>Watch the video (3 min)</strong></a>
-10. **[Backups, PIN Lock & Data Security](#video-10-backups-pin-security)** (3:06) — <a href="https://www.youtube.com/watch?v=2Qkbfx3qRMs" target="_blank" rel="noopener noreferrer"><strong>Watch the video (3 min)</strong></a>
 
 ---
 
@@ -250,8 +232,6 @@ Only the middle content scrolls; the main top header and bottom navigation remai
 
 Or read these topics:
 
-- [Add a shift](#5-shifts-the-calendar)
-- [The NDIS line item and price](#5-shifts-the-calendar)
 - [Evening, night, midnight and public holidays](#the-time-of-day-rules)
 - [Scheduled and completed](#scheduled-completed-cancelled)
 
@@ -340,7 +320,6 @@ participant, so it belongs in your service agreement.
 
 Or read these topics:
 
-- [Log kilometres](#6-travel)
 - [Write a shift note](#7-shift-notes)
 - [Send a note](#sending-a-note)
 
@@ -359,8 +338,6 @@ automatically once the trip is ticked for an invoice.
 ---
 
 ## 7. Shift notes
-
-<a href="https://www.youtube.com/watch?v=AgoKAyv3gDM" target="_blank" rel="noopener noreferrer"><strong>Watch the video (2 min)</strong></a> — Logging Travel Kilometres & Writing Shift Notes. Kilometres are in [Travel](#video-6-travel-and-notes).
 
 **Work → Notes.** Write about the shift in your own words, in one box. No
 required structure to think about while you're writing it, just talk about
@@ -489,8 +466,7 @@ passed on.
 Or read these topics:
 
 - [Create an invoice from unbilled shifts and travel](#where-it-starts)
-- [Preview the PDF](#sending)
-- [Sent, Overdue and Paid](#sending)
+- [Preview the PDF, and Sent, Overdue and Paid](#sending)
 - [Invoiced shifts and trips lock](#two-safety-nets)
 
 Invoices are built by **ticking work**, not typed up on their own.
@@ -663,14 +639,12 @@ Then open the tracker and tap **Turn on phone notifications** again.
 
 Or read these topics:
 
-- [Log an expense](#11-expenses)
 - [Tax set-aside](#12-tax)
 - [Cents per kilometre](#vehicle)
 - [ATO claim check](#the-deduction-checker)
 - [Accountant pack](#accountant-pack)
 - [Starting point for this year](#starting-point-for-this-year)
-- [The $75,000 GST threshold](#13-gst)
-- [Quarterly BAS worksheet](#13-gst)
+- [The $75,000 GST threshold and the quarterly BAS worksheet](#13-gst)
 
 **Money → Expenses → Add an expense.** Enter the date, category, what it was and the amount.
 
@@ -683,8 +657,6 @@ Expenses you log feed straight into the tax set-aside on **Money → Tax** and i
 ---
 
 ## 12. Tax
-
-<a href="https://www.youtube.com/watch?v=J_risqpSUxk" target="_blank" rel="noopener noreferrer"><strong>Watch the video (3 min)</strong></a> — Logging Expenses, Tax Set-Aside, ATO Claim Check & GST. The full topic list is under [Expenses](#video-8-expenses-tax-gst).
 
 **Money → Tax** shows **what to put aside**: current rates plus the Medicare
 levy, on income less expenses and vehicle deduction, counting only **paid**
@@ -792,8 +764,6 @@ day, and the app tells you when you're down to your last five.
 
 ## 13. GST
 
-<a href="https://www.youtube.com/watch?v=J_risqpSUxk" target="_blank" rel="noopener noreferrer"><strong>Watch the video (3 min)</strong></a> — Logging Expenses, Tax Set-Aside, ATO Claim Check & GST. The full topic list is under [Expenses](#video-8-expenses-tax-gst).
-
 Most NDIS supports are **GST-free**, so you don't add 10%. The trap:
 
 **GST-free income still counts toward the $75,000 threshold.** Being GST-free
@@ -828,8 +798,6 @@ lodgement itself, the app doesn't submit anything to the ATO.
 Or read these topics:
 
 - [Add a plan manager](#step-4-plan-managers)
-- [Company, accounts email, phone and payment terms](#14-participants-and-plan-managers)
-- [Who is linked to that plan manager](#14-participants-and-plan-managers)
 
 <a id="video-4-participants"></a>
 
@@ -839,10 +807,7 @@ Or read these topics:
 
 Or read these topics:
 
-- [Add a participant and their NDIS number](#step-5-participants)
-- [Plan managed, self managed or NDIA managed](#step-5-participants)
-- [Link their plan manager](#14-participants-and-plan-managers)
-- [Usual support item, rate and service agreement](#step-5-participants)
+- [Add a participant, funding type, usual support item and service agreement](#step-5-participants)
 
 Invoices use one travel rate for every participant, under **Settings → Support item rates**. It is not stored separately on each person. The hourly figure on a participant is the rate for the support item you usually bill them for.
 
@@ -864,12 +829,9 @@ Invoices use one travel rate for every participant, under **Settings → Support
 
 Or read these topics:
 
-- [Why a service agreement matters for GST](#15-service-agreements)
 - [Generate a service agreement PDF](#two-buttons-per-person)
 - [Signed date, where it is kept, and the 30-day review](#dates-and-details)
-- [Record an incident](#16-incidents)
-- [Registered provider prompts and the Commission reference](#16-incidents)
-- [Export the incident register PDF](#16-incidents)
+- [Record an incident, registered-provider prompts and the register PDF](#16-incidents)
 
 A written agreement is one of **four conditions** keeping your supports
 GST-free. Miss one and a support may become taxable, you could owe 10% you
@@ -912,8 +874,6 @@ signing.
 
 ## 16. Incidents
 
-<a href="https://www.youtube.com/watch?v=---bKNiLHbw" target="_blank" rel="noopener noreferrer"><strong>Watch the video (3 min)</strong></a> — NDIS Service Agreements & Incident Register Walkthrough. The full topic list is under [Service agreements](#video-9-agreements-incidents).
-
 Use **People → Incidents** to keep an incident register. Record the affected person, date/time, when you became aware, location, factual description, harm/impact, immediate actions, people involved or witnesses, participant support, follow-up and corrective/preventative actions.
 
 Under **Settings → Business & invoice details**, set whether you are a registered NDIS provider. Registered-provider mode adds reportable-incident prompts using the current NDIS Commission categories and common notification timeframes. Most listed reportable incidents show a 24-hour timeframe; unauthorised restrictive practice shows five business days, with a 24-hour warning when harm is recorded. SupportFlow does not decide legal reportability and does not submit a report for you. If you have made that notification, record it on the incident and keep the Commission reference. Use the official Commission guidance/portal. If anyone is in immediate danger, call 000.
@@ -932,10 +892,9 @@ Under **Settings → Business & invoice details**, set whether you are a registe
 
 Or read these topics:
 
-- [Encrypted backups to Google Drive or OneDrive](#automatic-backups)
+- [Encrypted backups and Back up now](#automatic-backups)
 - [The backup password](#every-backup-is-encrypted)
 - [The recovery code](#your-recovery-code-if-you-forget-the-password)
-- [Back up now](#automatic-backups)
 - [Restore a backup](#restoring)
 - [Move to a new device](#moving-to-a-new-phone-or-pc)
 - [Restore your licence](#restoring-on-a-new-device)
@@ -1018,8 +977,6 @@ seconds.
 ---
 
 ## 18. App lock
-
-<a href="https://www.youtube.com/watch?v=2Qkbfx3qRMs" target="_blank" rel="noopener noreferrer"><strong>Watch the video (3 min)</strong></a> — Backups, PIN Lock & Data Security. The full topic list is under [Backing up](#video-10-backups-pin-security).
 
 **Settings → Lock the app**, near the top of Settings. Light and dark mode are the pill in the top header, immediately left of **?**, not a Settings panel.
 
@@ -1151,7 +1108,7 @@ than their own panel.
 
 <a id="privacy-and-security"></a>
 
-**Privacy & security** is also available from Settings. <a href="https://www.youtube.com/watch?v=2Qkbfx3qRMs" target="_blank" rel="noopener noreferrer"><strong>Watch the video (3 min)</strong></a> on backups, the PIN lock and this page, or read the topics under [Backing up](#video-10-backups-pin-security). It explains where your data is stored, cloud backups, information shared with other services, and links to the full public Privacy Policy and Terms of Use.
+**Privacy & security** is also available from Settings. It explains where your data is stored, cloud backups, information shared with other services, and links to the full public Privacy Policy and Terms of Use.
 
 ---
 

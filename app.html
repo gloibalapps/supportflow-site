@@ -408,9 +408,6 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 .tutorial{background:var(--bg-2);border:1px solid var(--line);border-radius:12px;padding:14px 14px 12px;margin:0 0 14px;scroll-margin-top:78px}
 .tutorial ul{margin:8px 0 0;padding-left:18px}
 .tutorial li{margin:5px 0;font-size:13px;line-height:1.5;color:var(--tx-2)}
-.tutorial-row{margin-top:14px}
-.tutorial-row .tutoriallink{display:block;width:100%;white-space:normal}
-.tutorial-row .len{color:var(--tx-3);font-weight:500}
 .tutoriallink{background:none;border:0;padding:0;color:var(--tx);font:inherit;font-weight:600;cursor:pointer;text-align:left;text-decoration:underline;text-decoration-color:var(--brass);text-underline-offset:3px}
 .tutoriallink:hover{color:var(--brass)}
 a.btn{display:inline-flex;align-items:center;text-decoration:none}
@@ -9621,25 +9618,21 @@ const TUTORIALS = [
     n: 3, id: "FDNGIsgXMqk", title: "Adding a Plan Manager & Setting Payment Terms (NDIS)", length: "1:03", minutes: 1, section: "People",
     topics: [
       { label: "Add a plan manager", section: "Getting started", q: "Setup step 4 – Plan managers" },
-      { label: "Company, accounts email, phone and payment terms", section: "People", q: "Participants and plan managers" },
-      { label: "Who is linked to that plan manager", section: "People", q: "Participants and plan managers" },
+      { label: "Company, accounts email, phone, payment terms and who is linked", section: "People", q: "Participants and plan managers" },
     ],
   },
   {
     n: 4, id: "jW-OcpEeY2A", title: "Adding a Participant, Funding Type & Default Rates (NDIS)", length: "1:13", minutes: 1, section: "People",
     topics: [
-      { label: "Add a participant and their NDIS number", section: "Getting started", q: "Setup step 5 – Participants" },
-      { label: "Plan managed, self managed or NDIA managed", section: "Getting started", q: "Setup step 5 – Participants" },
+      { label: "Add a participant, funding type, usual support item and service agreement", section: "Getting started", q: "Setup step 5 – Participants" },
       { label: "Link their plan manager", section: "People", q: "Participants and plan managers" },
-      { label: "Usual support item, rate and service agreement", section: "Getting started", q: "Setup step 5 – Participants" },
       { label: "Kilometre rate", text: "Invoices use one travel rate for every participant, under Settings → Support item rates. It is not stored separately on each person. The hourly figure on a participant is the rate for the support item you usually bill them for." },
     ],
   },
   {
     n: 5, id: "LalRGuYEhNU", title: "Adding a Shift, NDIS Line Items & Price Limits", length: "1:26", minutes: 1, section: "Work",
     topics: [
-      { label: "Add a shift", section: "Work", q: "Adding a shift" },
-      { label: "The NDIS line item and price", section: "Work", q: "Adding a shift" },
+      { label: "Add a shift and the NDIS line item", section: "Work", q: "Adding a shift" },
       { label: "Evening, night, midnight and public holidays", section: "Work", q: "How the time-of-day rules work" },
       { label: "Scheduled and completed", section: "Work", q: "Scheduled, completed, cancelled" },
       { label: "Breaks", text: "There is no break field. Enter the start and finish of the support. SupportFlow works out the hours from those two times." },
@@ -9657,8 +9650,7 @@ const TUTORIALS = [
     n: 7, id: "pamrCvBMwX0", title: "Creating an NDIS Invoice, PDF Preview & Payment Tracking", length: "1:39", minutes: 2, section: "Invoicing",
     topics: [
       { label: "Create an invoice from unbilled shifts and travel", section: "Invoicing", q: "Creating an invoice" },
-      { label: "Preview the PDF", section: "Invoicing", q: "Sending it" },
-      { label: "Sent, Overdue and Paid", section: "Invoicing", q: "Sending it" },
+      { label: "Preview the PDF, and Sent, Overdue and Paid", section: "Invoicing", q: "Sending it" },
       { label: "Invoiced shifts and trips lock", section: "Invoicing", q: "Why billed work locks" },
     ],
   },
@@ -9683,7 +9675,7 @@ const TUTORIALS = [
       { label: "Signed date, where it is kept, and the 30-day review", section: "People", q: "Recording and reviewing" },
       { label: "Record an incident", section: "People", q: "Recording an incident" },
       { label: "Registered provider prompts and the Commission reference", section: "People", q: "Reportable incident prompts" },
-      { label: "Export the incident register PDF", section: "People", q: "Incident register PDF" },
+      { label: "Export the incident register", section: "People", q: "Incident register PDF" },
     ],
   },
   {
@@ -9726,32 +9718,6 @@ function TutorialCard({ video, onOpenTopic }) {
           </li>
         ))}
       </ul>
-    </div>
-  );
-}
-
-function TutorialIndex({ onOpenVideo }) {
-  return (
-    <div className="tutorial" id="video-tutorials">
-      <div className="eyebrow">Video tutorials</div>
-      <div style={{ fontSize: 13, color: "var(--tx-2)", lineHeight: 1.55, marginTop: 4 }}>
-        Ten short videos on the NDIS SupportFlow channel, in order. Watch one, or open its title and read the topics beside that part of the manual.
-      </div>
-      <div>
-        {TUTORIALS.map((v) => (
-          <div className="tutorial-row" key={v.n}>
-            <button type="button" className="tutoriallink" onClick={() => onOpenVideo(v)}>
-              {v.n}. {v.title} <span className="len">· {v.length}</span>
-            </button>
-            <div style={{ marginTop: 6 }}>
-              <a className="btn tiny" href={"https://www.youtube.com/watch?v=" + v.id} target="_blank" rel="noopener noreferrer"
-                aria-label={"Watch the video (" + v.minutes + " min): " + v.title}>
-                Watch the video ({v.minutes} min) ↗
-              </a>
-            </div>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
@@ -10594,12 +10560,6 @@ function Help({ data, initialView = "manual" }) {
     setOpen("section:" + topic.section + ":" + topic.q);
     setPendingScroll(manualDomId(topic.section, topic.q));
   };
-  const openVideo = (video) => {
-    setQuery("");
-    setView("manual");
-    setOpen("section:" + video.section);
-    setPendingScroll("manual-video-" + video.n);
-  };
 
   const searchResults = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -10612,11 +10572,6 @@ function Help({ data, initialView = "manual" }) {
           hits.push({ sectionTitle: sec.t, q, a });
         }
       });
-    });
-    const broad = ["video", "videos", "tutorial", "tutorials", "youtube"].includes(term);
-    TUTORIALS.forEach((v) => {
-      const blob = (v.title + " " + v.topics.map((t) => t.label + " " + (t.text || "")).join(" ")).toLowerCase();
-      if (blob.includes(term) || broad) hits.push({ sectionTitle: "Video tutorials", q: v.n + ". " + v.title, a: "", video: v });
     });
     return hits;
   }, [query]);
@@ -10657,7 +10612,7 @@ function Help({ data, initialView = "manual" }) {
                   </button>
                   {on && (
                     <div style={{ fontSize: 13.5, color: "var(--tx-2)", lineHeight: 1.8, paddingBottom: 16, maxWidth: "62ch" }}>
-                      {r.video ? <TutorialCard video={r.video} onOpenTopic={openTopic} /> : r.a}
+                      {r.a}
                     </div>
                   )}
                 </div>
@@ -10678,10 +10633,9 @@ function Help({ data, initialView = "manual" }) {
         <div style={{ margin: "18px 0 8px" }}>
           <div className="disp" style={{ fontSize: 20, marginBottom: 5 }}>User manual</div>
           <div style={{ fontSize: 12.5, color: "var(--tx-2)", lineHeight: 1.55 }}>
-            Everything you need to set up and use SupportFlow. Each video below opens on YouTube in a new tab, or you can read the same topics here.
+            Everything you need to set up and use SupportFlow. Where a part of the manual has a video, that part has one watch link, or you can read it here.
           </div>
         </div>
-        <TutorialIndex onOpenVideo={openVideo} />
         </>
       ) : view !== "support" ? (
         <div className="panel">
