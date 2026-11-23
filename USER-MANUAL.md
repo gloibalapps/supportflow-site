@@ -23,6 +23,16 @@ backups matter, see [Backing up](#17-backing-up-important).
 
 > **This manual is also inside the app.** Tap **?** in the fixed top header, then **Manual & Help**. The in-app version is written to tap through on a phone and follows the same order as this one.
 
+<a id="video-1-getting-started"></a>
+
+**1. Getting Started** (1:56), on the NDIS SupportFlow channel.
+
+<a href="https://www.youtube.com/watch?v=sXZew6yrAcg" target="_blank" rel="noopener noreferrer"><strong>Watch the video (2 min)</strong></a>
+
+Or read this topic:
+
+- [Five free invoice credits and the Lifetime licence](#19-licence)
+
 ### How this manual is laid out
 
 It follows the order you'll actually meet things in the app:
@@ -39,6 +49,22 @@ It follows the order you'll actually meet things in the app:
 ---
 
 ## 1. Installing SupportFlow
+
+<a id="video-2-install"></a>
+
+**2. Install on Android, iPhone, Windows & Mac + Your Details** (1:47)
+
+<a href="https://www.youtube.com/watch?v=oBTxFKBki7M" target="_blank" rel="noopener noreferrer"><strong>Watch the video (2 min)</strong></a>
+
+Or read these topics:
+
+- [Install on Android](#android-phone-or-tablet)
+- [Install on iPhone or iPad](#iphone-or-ipad)
+- [Install on a Windows PC](#windows-pc)
+- [Install on a Mac](#mac)
+- [Name, ABN and bank details](#step-3-your-details)
+
+SupportFlow is a Progressive Web App## 1. Installing SupportFlow
 
 SupportFlow is a Progressive Web App (PWA). You can use it in a browser, or install it so it opens like an app from your phone, tablet or computer. Installing it does not create a SupportFlow cloud account or move your working records to a SupportFlow server. Your records remain on that browser/app installation, with encrypted backups stored in the Google Drive account you connect.
 
@@ -118,6 +144,8 @@ Your records live on this device only, so this step is your safety net. Three th
 
 See [Backing up](#17-backing-up-important) for how the password, the recovery code and restoring work.
 
+<a id="step-3-your-details"></a>
+
 ### Step 3 – Your details
 
 Name and **ABN** are required. They print on every invoice, and an invoice without an ABN isn't valid, whoever pays you may have to withhold 47%.
@@ -126,6 +154,8 @@ Add your bank details so they appear on invoices for payment.
 
 > No ABN? Apply free at **abr.gov.au**. Never pay a website that offers to get
 > one for you.
+
+<a id="step-4-plan-managers"></a>
 
 ### Step 4 – Plan managers
 
@@ -141,6 +171,8 @@ none, use **"I don't deal with any"**.
 
 Email addresses and phone numbers are checked as you type. A phone number must be a valid Australian mobile or landline, a 13/1300/1800 number, or an international number starting with **+**. If something doesn't look right, a message appears under the field and **Save** stays greyed out until it's fixed. The same checks apply when you add or edit a plan manager or a participant later.
 
+<a id="step-5-participants"></a>
+
 ### Step 5 – Participants
 
 - Name and **NDIS number**, or tick **"Not an NDIS participant, private
@@ -149,7 +181,7 @@ Email addresses and phone numbers are checked as you type. A phone number must b
  - **Plan managed** → their plan manager is billed. Link them from the list.
  - **Self managed** → they pay you. Enter their payment terms.
  - **NDIA managed** → claimed through myplace. Enter their terms.
-- **The item you usually bill them for**: new invoices open on this code. For
+- **The item you usually bill them for**: new invoices open on this code. The rate beside an NDIS item is the published price; change it if yours differs. For
  a private client this is a free-text description and your own rate instead
 - **Their area**: sets your travel time cap (30 minutes metro and regional
  centres, 60 regional, none remote)
@@ -194,6 +226,21 @@ Only the middle content scrolls; the main top header and bottom navigation remai
 
 ## 5. Shifts: the calendar
 
+<a id="video-5-shifts"></a>
+
+**5. Adding a Shift, NDIS Line Items & Price Limits** (1:26)
+
+<a href="https://www.youtube.com/watch?v=LalRGuYEhNU" target="_blank" rel="noopener noreferrer"><strong>Watch the video (1 min)</strong></a>
+
+Or read these topics:
+
+- [Evening, night, midnight and public holidays](#the-time-of-day-rules)
+- [Scheduled and completed](#scheduled-completed-cancelled)
+
+There is no break field. Enter the start and finish of the support. SupportFlow works out the hours from those two times.
+
+**Work → Shifts.**## 5. Shifts: the calendar
+
 **Work → Shifts.** A month calendar. Use it for work you've done *and* work
 coming up.
 
@@ -203,6 +250,8 @@ NDIS support item applies and shows you why before you save:
 > **Self-Care, saturday**
 > 01_013_0107_1_1 · $103.54/hr
 > *Delivered on a Saturday.*
+
+<a id="scheduled-completed-cancelled"></a>
 
 ### Scheduled, completed, cancelled
 
@@ -266,6 +315,19 @@ participant, so it belongs in your service agreement.
 ---
 
 ## 6. Travel
+
+<a id="video-6-travel-and-notes"></a>
+
+**6. Logging Travel Kilometres & Writing Shift Notes** (1:38)
+
+<a href="https://www.youtube.com/watch?v=AgoKAyv3gDM" target="_blank" rel="noopener noreferrer"><strong>Watch the video (2 min)</strong></a>
+
+Or read these topics:
+
+- [Write a shift note](#7-shift-notes)
+- [Send a note](#sending-a-note)
+
+**Work → Travel.**## 6. Travel
 
 **Work → Travel.** Date, participant, and the distance, either typed directly
 as kilometres or worked out from an odometer start and finish reading. Tick
@@ -400,6 +462,20 @@ passed on.
 ---
 
 ## 8. Invoices
+
+<a id="video-7-invoices"></a>
+
+**7. Creating an NDIS Invoice, PDF Preview & Payment Tracking** (1:39)
+
+<a href="https://www.youtube.com/watch?v=pamrCvBMwX0" target="_blank" rel="noopener noreferrer"><strong>Watch the video (2 min)</strong></a>
+
+Or read these topics:
+
+- [Create an invoice from unbilled shifts and travel](#where-it-starts)
+- [Preview the PDF, and Sent, Overdue and Paid](#sending)
+- [Invoiced shifts and trips lock](#two-safety-nets)
+
+Invoices are built by **ticking work**## 8. Invoices
 
 Invoices are built by **ticking work**, not typed up on their own.
 
@@ -563,6 +639,23 @@ Then open the overdue invoice payment tracker and tap **Turn on phone notificati
 
 ## 11. Expenses
 
+<a id="video-8-expenses-tax-gst"></a>
+
+**8. Logging Expenses, Tax Set-Aside, ATO Claim Check & GST** (2:36)
+
+<a href="https://www.youtube.com/watch?v=J_risqpSUxk" target="_blank" rel="noopener noreferrer"><strong>Watch the video (3 min)</strong></a>
+
+Or read these topics:
+
+- [Tax set-aside](#12-tax)
+- [Cents per kilometre](#vehicle)
+- [ATO claim check](#the-deduction-checker)
+- [Accountant pack](#accountant-pack)
+- [Starting point for this year](#starting-point-for-this-year)
+- [The $75,000 GST threshold and the quarterly BAS worksheet](#13-gst)
+
+**Money → Expenses → Add an expense.**## 11. Expenses
+
 **Money → Expenses → Add an expense.** Enter the date, category, what it was and the amount.
 
 If you're registered for GST, two more fields appear: the **GST shown on the receipt**, and the **business-use percentage** (100 unless part of it was private, such as a phone bill). The app shows the potential GST credit as an estimate; not every business purchase is creditable.
@@ -706,7 +799,31 @@ lodgement itself, the app doesn't submit anything to the ATO.
 
 ## 14. Participants and plan managers
 
-**People → Participants** lists everyone you support. **Add participant** opens the same form used in setup, and tapping a person opens their record to edit. **People → Plan managers** is the same for plan management companies, including their payment terms, which set the due date on every invoice. Emails and phone numbers are checked as you type.
+<a id="video-3-plan-managers"></a>
+
+**3. Adding a Plan Manager & Setting Payment Terms** (1:03)
+
+<a href="https://www.youtube.com/watch?v=FDNGIsgXMqk" target="_blank" rel="noopener noreferrer"><strong>Watch the video (1 min)</strong></a>
+
+Or read these topics:
+
+- [Add a plan manager](#step-4-plan-managers)
+
+<a id="video-4-participants"></a>
+
+**4. Adding a Participant, Funding Type & Default Rates** (1:13)
+
+<a href="https://www.youtube.com/watch?v=jW-OcpEeY2A" target="_blank" rel="noopener noreferrer"><strong>Watch the video (1 min)</strong></a>
+
+Or read these topics:
+
+- [Add a participant, funding type, usual support item and service agreement](#step-5-participants)
+
+Invoices use one travel rate for every participant, under **Settings → Support item rates**. It is not stored separately on each person. The hourly figure on a participant is the rate for the support item you usually bill them for.
+
+**People → Participants**## 14. Participants and plan managers
+
+**People → Participants** lists everyone you support. **Add participant** opens the same form used in setup, and tapping a person opens their record to edit. **People → Plan managers** is the same for plan management companies, including their payment terms, which set the due date on every invoice. Tap a plan manager to edit the company, accounts email, phone or payment terms. The list shows how many participants are linked to each one. Emails and phone numbers are checked as you type.
 
 - **The due date is blank on an invoice:** the payer has no payment terms. Add them on their record.
 - **An invoice says "No billing email":** the plan manager or participant has no email on file. Add it on their record.
@@ -715,6 +832,20 @@ lodgement itself, the app doesn't submit anything to the ATO.
 ---
 
 ## 15. Service agreements
+
+<a id="video-9-agreements-incidents"></a>
+
+**9. NDIS Service Agreements & Incident Register Walkthrough** (3:11)
+
+<a href="https://www.youtube.com/watch?v=---bKNiLHbw" target="_blank" rel="noopener noreferrer"><strong>Watch the video (3 min)</strong></a>
+
+Or read these topics:
+
+- [Generate a service agreement PDF](#two-buttons-per-person)
+- [Signed date, where it is kept, and the 30-day review](#dates-and-details)
+- [Record an incident, registered-provider prompts and the register PDF](#16-incidents)
+
+A written agreement## 15. Service agreements
 
 A written agreement is one of **four conditions** keeping your supports
 GST-free. Miss one and a support may become taxable, you could owe 10% you
@@ -759,13 +890,33 @@ signing.
 
 Use **People → Incidents** to keep an incident register. Record the affected person, date/time, when you became aware, location, factual description, harm/impact, immediate actions, people involved or witnesses, participant support, follow-up and corrective/preventative actions.
 
-Under **Settings → Business & invoice details**, set whether you are a registered NDIS provider. Registered-provider mode adds reportable-incident prompts using the current NDIS Commission categories and common notification timeframes. Most listed reportable incidents show a 24-hour timeframe; unauthorised restrictive practice shows five business days, with a 24-hour warning when harm is recorded. SupportFlow does not decide legal reportability and does not submit a report for you. Use the official Commission guidance/portal. If anyone is in immediate danger, call 000.
+Under **Settings → Business & invoice details**, set whether you are a registered NDIS provider. Registered-provider mode adds reportable-incident prompts using the current NDIS Commission categories and common notification timeframes. Most listed reportable incidents show a 24-hour timeframe; unauthorised restrictive practice shows five business days, with a 24-hour warning when harm is recorded. SupportFlow does not decide legal reportability and does not submit a report for you. If you have made that notification, record it on the incident and keep the Commission reference. Use the official Commission guidance/portal. If anyone is in immediate danger, call 000.
 
 **Export register PDF** creates a local PDF summary. Incident records are stored locally with other SupportFlow records and are included in encrypted backups.
 
 ---
 
 ## 17. Backing up (important)
+
+<a id="video-10-backups-pin-security"></a>
+
+**10. Backups, PIN Lock & Data Security** (3:06)
+
+<a href="https://www.youtube.com/watch?v=2Qkbfx3qRMs" target="_blank" rel="noopener noreferrer"><strong>Watch the video (3 min)</strong></a>
+
+Or read these topics:
+
+- [Encrypted backups and Back up now](#automatic-backups)
+- [The backup password](#every-backup-is-encrypted)
+- [The recovery code](#your-recovery-code-if-you-forget-the-password)
+- [Restore a backup](#restoring)
+- [Move to a new device](#moving-to-a-new-phone-or-pc)
+- [Restore your licence](#restoring-on-a-new-device)
+- [PIN, fingerprint or face unlock](#18-app-lock)
+- [Lock now](#locking-it-yourself)
+- [Privacy and security](#privacy-and-security)
+
+**Everything is on this device only.**## 17. Backing up (important)
 
 **Everything is on this device only.** Clear your browser data, lose the phone
 or delete the app, and the records go.
@@ -775,6 +926,8 @@ or delete the app, and the records go.
 During onboarding you create **one backup password** and confirm it. That password protects every new SupportFlow backup until you deliberately change it. You do **not** need to type it again for each new backup on the same device.
 
 SupportFlow does not keep the readable password and cannot recover or reset it. The device retains the derived encryption credential required to create later encrypted backups. Backup files are encrypted on the device with AES-256 before they are uploaded to the connected Google Drive.
+
+<a id="your-recovery-code-if-you-forget-the-password"></a>
 
 ### Your recovery code (if you forget the password)
 
@@ -968,6 +1121,8 @@ scroll of settings.
 
 GST status and turnover live inside **Business & invoice details**, rather
 than their own panel.
+
+<a id="privacy-and-security"></a>
 
 **Privacy & security** is also available from Settings. It explains where your data is stored, cloud backups, information shared with other services, and links to the full public Privacy Policy and Terms of Use.
 
