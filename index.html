@@ -479,12 +479,10 @@
       <span class="jumps-lead">Jump to:</span>
       <div class="jumps-row" id="jump-to">
         <a href="#guided">Getting started <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M4 9l4 4 4-4"/></svg></a>
-        <a href="#shifts">Shifts <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M4 9l4 4 4-4"/></svg></a>
         <a href="#travel">Travel <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M4 9l4 4 4-4"/></svg></a>
         <a href="#invoices">Invoices <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M4 9l4 4 4-4"/></svg></a>
         <a href="#follow-ups">Payment reminders <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M4 9l4 4 4-4"/></svg></a>
         <a href="#tax">Tax <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M4 9l4 4 4-4"/></svg></a>
-        <a href="#trust">Privacy <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M4 9l4 4 4-4"/></svg></a>
         <a href="#plans">Pricing <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M4 9l4 4 4-4"/></svg></a>
       </div>
     </nav>
@@ -494,12 +492,16 @@
 <style>
     .tracker-sub{max-width:620px;margin:10px auto 0;color:var(--muted);font-size:16px;line-height:1.55}
     .try-free{margin:14px 0 0;font-size:14px;color:var(--muted)}
-    .jumps{margin:18px auto 0;max-width:720px}
+    .jumps{margin:18px auto 0;max-width:860px}
     .jumps-lead{display:block;margin:0 0 10px;font-size:13px;font-weight:600;letter-spacing:.02em;color:var(--muted)}
     .jumps-row{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
     .jumps-row a{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:8px 14px;border:1px solid var(--line);border-radius:999px;background:var(--ink-2);color:var(--paper);font-size:14px;font-weight:600;line-height:1.2;text-decoration:none}
     .jumps-row a:hover{border-color:var(--brass);color:var(--brass-lift)}
     .jumps-row a:focus-visible{outline:2px solid var(--brass-lift);outline-offset:3px}
+    @media (max-width:420px){
+      .jumps-row{gap:6px}
+      .jumps-row a{padding:8px 11px;font-size:13.5px}
+    }
     .try-free b{color:var(--brass-lift);font-weight:650}
 </style>
 
@@ -543,35 +545,40 @@
 
 <section id="guided" class="guided" aria-labelledby="guided-title">
   <style>
-    .guided{max-width:1120px;margin:0 auto;padding:clamp(48px,7vw,96px) clamp(20px,3.6vw,40px) clamp(12px,2vw,20px)}
+    .guided{max-width:1120px;margin:0 auto;padding:clamp(40px,6vw,72px) clamp(20px,3.6vw,40px) clamp(24px,4vw,40px)}
     .guided .sec-head{margin-bottom:0}
-    .guided .trust-grid{margin-top:clamp(28px,4vw,42px);grid-template-columns:repeat(2,minmax(0,1fr))}
-    .guided .lead{text-align:center;color:var(--muted);font-size:clamp(14.5px,1.7vw,17px);line-height:1.65;max-width:46ch;margin:clamp(28px,4vw,40px) auto 0}
-    @media (max-width:700px){.guided .trust-grid{grid-template-columns:1fr}}
+    .guided-layout{display:grid;grid-template-columns:minmax(200px,280px) 1fr;gap:clamp(22px,4vw,48px);align-items:center;margin-top:clamp(22px,3vw,36px)}
+    .guided .shot{max-width:280px}
+    .guided .shot img.shot-setup{display:block}
+    .guided .trust-grid{margin-top:0;grid-template-columns:1fr}
+    @media (max-width:820px){
+      .guided-layout{grid-template-columns:1fr}
+      .guided .shot{max-width:260px}
+    }
   </style>
   <div class="sec-head">
     <h2 id="guided-title">Guided through the app, from the first step</h2>
-    <p>Setup is explained as you do it. After that, the menus, manual and assistant are how you find each part of the app.</p>
+    <p>Setup is explained while you do it, and help stays close by afterwards.</p>
   </div>
-  <div class="trust-grid">
-    <div class="tcard">
-      <b>Guided setup</b>
-      <span>Guided setup walks you through a PIN, an encrypted backup, your business details, plan managers and your first participant. Each step states what is required, and the numbered progress stays in view. You may look through the app with demo data first. Starting setup replaces that demo with your own records.</span>
+  <div class="guided-layout">
+    <div class="shot">
+      <img class="shot-setup" src="./shot-setup-light.png" alt="The SupportFlow welcome screen in light mode, with the four setup steps and the button to start guided setup" />
     </div>
-    <div class="tcard">
-      <b>Menus for everyday work</b>
-      <span>Home, Work, Money and People stay in the navigation. Home shows your totals. Work, Money and People open a shortcut page first, so you choose the task, such as shifts, travel, notes, invoices or participants, before those records appear. Back returns you to the shortcuts.</span>
-    </div>
-    <div class="tcard">
-      <b>Manual, tutorials and assistant</b>
-      <span>The help menu opens a searchable user manual, with links to ten short tutorials on the same topics. It also opens the SupportFlow Assistant, which answers questions about using the app and can take you to the relevant screen. The assistant does not provide tax, legal or NDIS advice.</span>
-    </div>
-    <div class="tcard">
-      <b>Profile menu</b>
-      <span>The profile menu shows your licence and holds Settings, Privacy and security, and Feedback and support.</span>
+    <div class="trust-grid">
+      <div class="tcard">
+        <b>Guided setup</b>
+        <span>SupportFlow walks you through a PIN, a secure backup, your business details and your first participant. You can look around with sample data first.</span>
+      </div>
+      <div class="tcard">
+        <b>Clear menus</b>
+        <span>Each part of the day has its own place. You pick the task, such as a shift, a trip or an invoice, before any records are shown.</span>
+      </div>
+      <div class="tcard">
+        <b>Help in the app</b>
+        <span>The manual is in the app, with ten short tutorials. You can ask the assistant how to do something, and it does not give tax, legal or NDIS advice.</span>
+      </div>
     </div>
   </div>
-  <p class="lead">The shift register comes next, with the notes, expenses and agreements kept alongside the work.</p>
 </section>
 
 <section id="shifts" aria-labelledby="shifts-title" style="max-width:1120px;margin:0 auto;padding:clamp(40px,5vw,64px) clamp(20px,3.6vw,40px) clamp(20px,3vw,36px)">
