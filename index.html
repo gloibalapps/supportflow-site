@@ -57,45 +57,6 @@
         "offers": [{ "@type": "Offer", "name": "Basic", "price": "79.00", "priceCurrency": "AUD", "description": "Basic, one device, one-off payment" }, { "@type": "Offer", "name": "Premium", "price": "129.00", "priceCurrency": "AUD", "description": "Premium, two devices and overdue invoice payment tracker, one-off." }],
       "inLanguage": "en-AU"
     }
-,
-    {
-      "@type": "FAQPage",
-      "@id": "https://supportflow.work/#faq",
-      "mainEntity": [
-        {
-          "@type": "Question",
-          "name": "Is my participant information private?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Yes. Your records stay on your device by default and are not stored in a central SupportFlow database."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "What happens if I lose or change my phone?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Your records live on that device only. If you've backed up, an encrypted file with a passphrase only you know, you restore it on a new device and you're back. If you haven't backed up, that data is genuinely gone, the same as any other file on a lost phone."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "Does it work without internet?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Once you've opened it successfully one time, the core app keeps working with no connection at all. A few features that genuinely need the internet, like sending an email or the optional deduction checker, wait until you're back online."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "How do I get started?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Open SupportFlow and try 5 free invoices for 30 days, no card needed. Then complete the setup for your business, PIN and encrypted backup."
-          }
-        }
-      ]
-    }
   ]
 }
 </script>
@@ -476,7 +437,7 @@
     <div class="brand"><img class="seal-img" src="/logo-tile-512.png" width="32" height="32" alt="" aria-hidden="true"><div class="wm"><div class="wordmark">SupportFlow</div><div class="wm-fy" id="wm-fy">2026–27</div></div></div>
     <div class="topacts">
       <button type="button" class="tb-btn tb-theme" id="tb-theme" aria-label="Dark mode. Switch to light mode" title="Switch to light mode"><svg class="ic-moon" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path fill="#8EA0B4" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="ic-sun" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="#C8913A" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2" fill="#E0A83F" stroke="none"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></svg></button>
-      <a class="tb-btn tb-help" href="#faq" aria-label="Help and questions" title="Help and questions">?</a>
+      <a class="tb-btn tb-help" href="#trust" aria-label="Privacy and your records" title="Privacy and your records">?</a>
       <div class="tb-menuwrap">
         <button type="button" class="tb-menubtn" id="tb-menubtn" aria-label="Menu" aria-expanded="false" aria-controls="tb-menu"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
         <nav class="tb-menu" id="tb-menu" hidden>
@@ -547,26 +508,13 @@
 </script>
 
 <section style="max-width:1120px;margin:0 auto;padding:clamp(40px,5vw,64px) clamp(20px,3.6vw,40px) clamp(20px,3vw,36px)">
-  <div class="sec-head" style="margin-bottom:clamp(24px,3.5vw,40px)">
-    <h2>Everything in one place</h2>
-    <p>Built around how you actually work — log once and let the app connect the rest.</p>
+  <div class="sec-head" style="margin-bottom:0">
+    <h2>Shifts, notes and business records</h2>
   </div>
   <div class="trust-grid">
     <div class="tcard">
       <b>Shifts</b>
       <span>Log every shift with dates, times, participants and support type. Your calendar and register, always up to date.</span>
-    </div>
-    <div class="tcard">
-      <b>Invoices</b>
-      <span>NDIS item codes built in. Tick the shifts, pick a participant, and the invoice fills itself. Send or save as PDF.</span>
-    </div>
-    <div class="tcard">
-      <b>Travel &amp; kilometres</b>
-      <span>Record a trip once — it attaches to the invoice at the NDIS rate and counts toward your vehicle deduction at the ATO rate.</span>
-    </div>
-    <div class="tcard">
-      <b>Tax estimate</b>
-      <span>A running figure showing what to set aside after expenses and your vehicle deduction. No June surprises.</span>
     </div>
     <div class="tcard">
       <b>Progress notes &amp; incidents</b>
@@ -655,9 +603,8 @@
     </div>
 
     <p style="color:var(--muted-2);font-size:13px;line-height:1.75;max-width:52ch;margin:clamp(30px,4vw,44px) auto 0">
-      The same goes for shifts. Log one and the app helps match it to the applicable support item,
-      weekday, evening, Saturday or public holiday, then puts it on the invoice and counts it
-      toward your tax. You enter it once.
+      The same applies to a shift. From the times you enter, the app helps match the support item:
+      weekday, evening, Saturday or public holiday.
     </p>
   </div>
 </section>
@@ -692,7 +639,7 @@
   </style>
   <div class="sec-head">
     <h2 id="guided-title">Guided through the app, from the first step</h2>
-    <p>SupportFlow includes guided setup and clear menus for day-to-day work. The first steps are explained as you complete them, and afterwards each task has a known place, with the manual and short tutorials beside you.</p>
+    <p>Setup is explained as you do it. After that, the menus, manual and assistant are how you find each part of the app.</p>
   </div>
   <div class="trust-grid">
     <div class="tcard">
@@ -709,10 +656,10 @@
     </div>
     <div class="tcard">
       <b>Profile menu</b>
-      <span>The profile menu shows your licence and holds Settings, Privacy and security, and Feedback and support. Once a PIN is set, you can lock the app from that menu.</span>
+      <span>The profile menu shows your licence and holds Settings, Privacy and security, and Feedback and support.</span>
     </div>
   </div>
-  <p class="lead">If you decide to continue after your free invoices, the one-off plans are set out below.</p>
+  <p class="lead">The one-off plans are set out below.</p>
 </section>
 
 <section id="plans" class="plans" aria-labelledby="plans-title">
@@ -756,40 +703,8 @@
 <!-- ============ GET STARTED ============ -->
 <section class="big" id="get-started"><div class="big-in">
 <h2>Your support work, organised.</h2>
-<p class="lede">Manage shifts, notes, travel and invoices on your phone or computer.</p>
-<div class="actions"><a class="btn" href="./app">Try 5 free invoices</a></div>
+<div class="actions" style="margin-top:8px"><a class="btn" href="./app">Try 5 free invoices</a></div>
 </div></section>
-
-<!-- ============ FAQ ============ -->
-<section class="sec" id="faq">
-  <div class="sec-head">
-    <h2>Before you ask</h2>
-    <p>The questions people actually have, answered plainly.</p>
-  </div>
-
-  <div class="trust-grid">
-    <div class="tcard">
-      <b>Is my participant information private?</b>
-      <span>Yes. Your records stay on your device by default and are not stored in a central SupportFlow database.</span>
-    </div>
-    <div class="tcard">
-      <b>What happens if I lose or change my phone?</b>
-      <span>Your records live on that device only. If you've backed up, an encrypted file with a
-        passphrase only you know, you restore it on a new device and you're back. If you haven't
-        backed up, that data is genuinely gone, the same as any other file on a lost phone.</span>
-    </div>
-    <div class="tcard">
-      <b>Does it work without internet?</b>
-      <span>Once you've opened it successfully one time, the core app keeps working with no
-        connection at all. A few features that genuinely need the internet, like sending an email or
-        the optional deduction checker, wait until you're back online.</span>
-    </div>
-    <div class="tcard">
-      <b>How do I get started?</b>
-      <span>Open SupportFlow and try 5 free invoices for 30 days, no card needed. Then complete the setup for your business, PIN and encrypted backup.</span>
-    </div>
-  </div>
-</section>
 
 <div class="install" id="install" role="region" aria-label="Install app">
   <p><b>Install SupportFlow</b>: add it to your home screen and it works offline.</p>
@@ -799,7 +714,7 @@
 
 
 <!-- ============ TRUST ============ -->
-<section class="trust">
+<section class="trust" id="trust">
   <div class="trust-in">
     <div class="sec-head" style="margin-bottom:0">
       <h2>Your participant records stay with you</h2>
@@ -818,11 +733,11 @@
       </div>
       <div class="tcard">
         <b>Backups are encrypted</b>
-        <span>AES-256 with a passphrase only you know, applied before the file leaves your device.</span>
+        <span>AES-256 with a passphrase only you know, applied before the file leaves your device. If you've backed up, you restore it on a new device and you're back. If you haven't backed up, that data is genuinely gone, the same as any other file on a lost phone.</span>
       </div>
       <div class="tcard">
         <b>Works offline</b>
-        <span>Once opened successfully once, the core app keeps working with no connection at all.</span>
+        <span>Once opened successfully once, the core app keeps working with no connection at all. A few features that genuinely need the internet, like sending an email or the optional deduction checker, wait until you're back online.</span>
       </div>
     </div>
 
