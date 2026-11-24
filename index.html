@@ -478,12 +478,12 @@
     <nav class="jumps rise" aria-label="Jump to a section">
       <span class="jumps-lead">Jump to:</span>
       <div class="jumps-row" id="jump-to">
-        <a href="#guided">Getting started <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M4 9l4 4 4-4"/></svg></a>
-        <a href="#travel">Travel <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M4 9l4 4 4-4"/></svg></a>
-        <a href="#invoices">Invoices <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M4 9l4 4 4-4"/></svg></a>
-        <a href="#follow-ups">Payment reminders <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M4 9l4 4 4-4"/></svg></a>
-        <a href="#tax">Tax <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M4 9l4 4 4-4"/></svg></a>
-        <a href="#plans">Pricing <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M4 9l4 4 4-4"/></svg></a>
+        <a href="#guided">Getting started</a><span class="jumps-sep" aria-hidden="true">·</span>
+        <a href="#travel">Travel</a><span class="jumps-sep" aria-hidden="true">·</span>
+        <a href="#invoices">Invoices</a><span class="jumps-sep" aria-hidden="true">·</span>
+        <a href="#follow-ups">Payment reminders</a><span class="jumps-sep" aria-hidden="true">·</span>
+        <a href="#tax">Tax</a><span class="jumps-sep" aria-hidden="true">·</span>
+        <a href="#plans">Pricing</a>
       </div>
     </nav>
   </main>
@@ -492,16 +492,13 @@
 <style>
     .tracker-sub{max-width:620px;margin:10px auto 0;color:var(--muted);font-size:16px;line-height:1.55}
     .try-free{margin:14px 0 0;font-size:14px;color:var(--muted)}
-    .jumps{margin:18px auto 0;max-width:860px}
-    .jumps-lead{display:block;margin:0 0 10px;font-size:13px;font-weight:600;letter-spacing:.02em;color:var(--muted)}
-    .jumps-row{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
-    .jumps-row a{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:8px 14px;border:1px solid var(--line);border-radius:999px;background:var(--ink-2);color:var(--paper);font-size:14px;font-weight:600;line-height:1.2;text-decoration:none}
-    .jumps-row a:hover{border-color:var(--brass);color:var(--brass-lift)}
+    .jumps{margin:18px auto 0;max-width:40rem}
+    .jumps-lead{display:block;margin:0 0 2px;font-size:13px;font-weight:600;letter-spacing:.02em;color:var(--muted)}
+    .jumps-row{display:flex;flex-wrap:wrap;justify-content:center;align-items:center}
+    .jumps-row a{display:inline-flex;align-items:center;min-height:44px;padding:8px 2px;border:0;background:none;color:var(--brass-lift);font-size:14.5px;font-weight:600;line-height:1.4;text-decoration:underline;text-underline-offset:3px}
+    .jumps-row a:hover{color:var(--brass)}
     .jumps-row a:focus-visible{outline:2px solid var(--brass-lift);outline-offset:3px}
-    @media (max-width:420px){
-      .jumps-row{gap:6px}
-      .jumps-row a{padding:8px 11px;font-size:13.5px}
-    }
+    .jumps-sep{color:var(--muted);padding:0 8px;font-weight:400;line-height:1}
     .try-free b{color:var(--brass-lift);font-weight:650}
 </style>
 
