@@ -463,13 +463,13 @@
     <nav class="jumps rise" aria-label="Jump to a section">
       <span class="jumps-lead">Jump to:</span>
       <div class="jumps-row">
+        <a href="#guided">Getting started <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M4 9l4 4 4-4"/></svg></a>
         <a href="#shifts">Shifts <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M4 9l4 4 4-4"/></svg></a>
         <a href="#travel">Travel <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M4 9l4 4 4-4"/></svg></a>
         <a href="#invoices">Invoices <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M4 9l4 4 4-4"/></svg></a>
         <a href="#follow-ups">Payment reminders <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M4 9l4 4 4-4"/></svg></a>
         <a href="#tax">Tax <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M4 9l4 4 4-4"/></svg></a>
         <a href="#trust">Privacy <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M4 9l4 4 4-4"/></svg></a>
-        <a href="#guided">Getting started <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M4 9l4 4 4-4"/></svg></a>
         <a href="#plans">Pricing <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M4 9l4 4 4-4"/></svg></a>
       </div>
     </nav>
@@ -525,6 +525,39 @@
   }).catch(function(){});
 })();
 </script>
+
+<section id="guided" class="guided" aria-labelledby="guided-title">
+  <style>
+    .guided{max-width:1120px;margin:0 auto;padding:clamp(48px,7vw,96px) clamp(20px,3.6vw,40px) clamp(12px,2vw,20px)}
+    .guided .sec-head{margin-bottom:0}
+    .guided .trust-grid{margin-top:clamp(28px,4vw,42px);grid-template-columns:repeat(2,minmax(0,1fr))}
+    .guided .lead{text-align:center;color:var(--muted);font-size:clamp(14.5px,1.7vw,17px);line-height:1.65;max-width:46ch;margin:clamp(28px,4vw,40px) auto 0}
+    @media (max-width:700px){.guided .trust-grid{grid-template-columns:1fr}}
+  </style>
+  <div class="sec-head">
+    <h2 id="guided-title">Guided through the app, from the first step</h2>
+    <p>Setup is explained as you do it. After that, the menus, manual and assistant are how you find each part of the app.</p>
+  </div>
+  <div class="trust-grid">
+    <div class="tcard">
+      <b>Guided setup</b>
+      <span>Guided setup walks you through a PIN, an encrypted backup, your business details, plan managers and your first participant. Each step states what is required, and the numbered progress stays in view. You may look through the app with demo data first. Starting setup replaces that demo with your own records.</span>
+    </div>
+    <div class="tcard">
+      <b>Menus for everyday work</b>
+      <span>Home, Work, Money and People stay in the navigation. Home shows your totals. Work, Money and People open a shortcut page first, so you choose the task, such as shifts, travel, notes, invoices or participants, before those records appear. Back returns you to the shortcuts.</span>
+    </div>
+    <div class="tcard">
+      <b>Manual, tutorials and assistant</b>
+      <span>The help menu opens a searchable user manual, with links to ten short tutorials on the same topics. It also opens the SupportFlow Assistant, which answers questions about using the app and can take you to the relevant screen. The assistant does not provide tax, legal or NDIS advice.</span>
+    </div>
+    <div class="tcard">
+      <b>Profile menu</b>
+      <span>The profile menu shows your licence and holds Settings, Privacy and security, and Feedback and support.</span>
+    </div>
+  </div>
+  <p class="lead">The shift register comes next, with the notes, expenses and agreements kept alongside the work.</p>
+</section>
 
 <section id="shifts" aria-labelledby="shifts-title" style="max-width:1120px;margin:0 auto;padding:clamp(40px,5vw,64px) clamp(20px,3.6vw,40px) clamp(20px,3vw,36px)">
   <div class="sec-head" style="margin-bottom:0">
@@ -672,39 +705,6 @@
       Full detail on how backups, locking and sharing work is in the Privacy Policy.
     </p>
   </div>
-</section>
-
-<section id="guided" class="guided" aria-labelledby="guided-title">
-  <style>
-    .guided{max-width:1120px;margin:0 auto;padding:clamp(48px,7vw,96px) clamp(20px,3.6vw,40px) clamp(12px,2vw,20px)}
-    .guided .sec-head{margin-bottom:0}
-    .guided .trust-grid{margin-top:clamp(28px,4vw,42px);grid-template-columns:repeat(2,minmax(0,1fr))}
-    .guided .lead{text-align:center;color:var(--muted);font-size:clamp(14.5px,1.7vw,17px);line-height:1.65;max-width:46ch;margin:clamp(28px,4vw,40px) auto 0}
-    @media (max-width:700px){.guided .trust-grid{grid-template-columns:1fr}}
-  </style>
-  <div class="sec-head">
-    <h2 id="guided-title">Guided through the app, from the first step</h2>
-    <p>Setup is explained as you do it. After that, the menus, manual and assistant are how you find each part of the app.</p>
-  </div>
-  <div class="trust-grid">
-    <div class="tcard">
-      <b>Guided setup</b>
-      <span>Guided setup walks you through a PIN, an encrypted backup, your business details, plan managers and your first participant. Each step states what is required, and the numbered progress stays in view. You may look through the app with demo data first. Starting setup replaces that demo with your own records.</span>
-    </div>
-    <div class="tcard">
-      <b>Menus for everyday work</b>
-      <span>Home, Work, Money and People stay in the navigation. Home shows your totals. Work, Money and People open a shortcut page first, so you choose the task, such as shifts, travel, notes, invoices or participants, before those records appear. Back returns you to the shortcuts.</span>
-    </div>
-    <div class="tcard">
-      <b>Manual, tutorials and assistant</b>
-      <span>The help menu opens a searchable user manual, with links to ten short tutorials on the same topics. It also opens the SupportFlow Assistant, which answers questions about using the app and can take you to the relevant screen. The assistant does not provide tax, legal or NDIS advice.</span>
-    </div>
-    <div class="tcard">
-      <b>Profile menu</b>
-      <span>The profile menu shows your licence and holds Settings, Privacy and security, and Feedback and support.</span>
-    </div>
-  </div>
-  <p class="lead">The one-off plans are set out below.</p>
 </section>
 
 <section id="plans" class="plans" aria-labelledby="plans-title">
