@@ -2,8 +2,13 @@
 // Owner-only stats. Token checked server-side with a constant-time compare.
 import crypto from "node:crypto";
 import { dashboardStats, statsConfigured, stripeStats, stripeConfigured, visitorStats } from "../lib/stats.mjs";
+import { composeOwner } from "../lib/owner-stats.mjs";
 
 const J = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", "X-Robots-Tag": "noindex" } });
+
+function safeErr(s) {
+  return String(s || "").replace(/\b[sr]k_(?:live|test)_[A-Za-z0-9]+\b/g, "[redacted]").slice(0, 120);
+}
 
 function authorised(req) {
   const want = process.env.ADMIN_DASHBOARD_TOKEN || "";
@@ -25,7 +30,10 @@ export default async (req) => {
       stripeConfigured() ? stripeStats({ days }).catch((e) => ({ error: String(e.message || e).slice(0, 80) })) : null,
     ]);
     const visits = await visitorStats({ days }).catch(() => null);
-    return J({ generatedAt: new Date().toISOString(), ...base, visits, stripe: stripe && !stripe.error ? stripe : null, stripeError: stripe?.error || (stripe ? null : "STRIPE_SECRET_KEY not set") });
+    const stripeError = stripe?.error ? safeErr(stripe.error) : (stripe ? null : "STRIPE_SECRET_KEY not set");
+    const stripeOk = stripe && !stripe.error ? stripe : null;
+    const owner = composeOwner(base.owner, { visits, stripe: stripeOk, stripeError });
+    return J({ generatedAt: new Date().toISOString(), ...base, visits, stripe: stripeOk, stripeError, owner });
   } catch (e) {
     return J({ error: "failed" }, 500);
   }
