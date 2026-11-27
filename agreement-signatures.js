@@ -52,8 +52,33 @@ export function normaliseStrokes(strokes) {
   return out;
 }
 
+export const SIGNATURE_IMAGE_MAX = { width: 640, height: 220 };
+// A stored upload should stay well under this so several parties fit in localStorage.
+export const SIGNATURE_UPLOAD_MAX_CHARS = 80000;
+
 export function isSignatureImage(value) {
-  return typeof value === "string" && value.startsWith("data:image/png") && value.length > "data:image/png".length && value.length <= MAX_SIG_CHARS;
+  if (typeof value !== "string" || value.length > MAX_SIG_CHARS) return false;
+  const png = value.startsWith("data:image/png");
+  const jpeg = value.startsWith("data:image/jpeg");
+  if (!png && !jpeg) return false;
+  const prefix = png ? "data:image/png" : "data:image/jpeg";
+  return value.length > prefix.length + 1;
+}
+
+export function signatureImageFormat(value) {
+  if (!isSignatureImage(value)) return "";
+  return value.startsWith("data:image/png") ? "PNG" : "JPEG";
+}
+
+// Fit a photo inside the signature box without enlarging a small image.
+export function signatureFit(srcW, srcH, maxW = SIGNATURE_IMAGE_MAX.width, maxH = SIGNATURE_IMAGE_MAX.height) {
+  const w = Number(srcW);
+  const h = Number(srcH);
+  const boxW = Math.max(1, Number(maxW) || SIGNATURE_IMAGE_MAX.width);
+  const boxH = Math.max(1, Number(maxH) || SIGNATURE_IMAGE_MAX.height);
+  if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return { width: boxW, height: boxH };
+  const scale = Math.min(1, boxW / w, boxH / h);
+  return { width: Math.max(1, Math.round(w * scale)), height: Math.max(1, Math.round(h * scale)) };
 }
 
 export function blankParty({ id, role, name, customRole } = {}) {
@@ -135,6 +160,21 @@ export function suggestedPartyName(role, participant, profile, managers) {
     return (linked && linked.name) || "";
   }
   return "";
+}
+
+// An uploaded photo replaces whatever was signed before. Strokes are cleared
+// because the picture is the signature. Redo can bring the previous one back.
+export function importSignature(party, dataUrl, signedAt) {
+  const p = sanitiseParty(party, 0);
+  if (!isSignatureImage(dataUrl)) return p;
+  const had = !!(p.signature || (p.strokes && p.strokes.length));
+  return {
+    ...p,
+    strokes: [],
+    signature: dataUrl,
+    signedAt: p.signedAt || (typeof signedAt === "string" ? signedAt.slice(0, 10) : ""),
+    redo: had ? { signature: p.signature, strokes: p.strokes, signedAt: p.signedAt } : null,
+  };
 }
 
 export function commitStroke(party, stroke, png, signedAt) {

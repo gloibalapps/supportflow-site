@@ -314,6 +314,7 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 .btn.tiny{padding:6px 12px;font-size:12px;border-radius:8px}
 .sigpad{width:100%;height:148px;touch-action:none;background:#fff;border-radius:10px;border:1px dashed var(--line);display:block;cursor:crosshair}
 .sigactions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.sigfile{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .btn.x{background:none;border:0;color:var(--warn);padding:6px 7px;font-size:15px;
   display:inline-flex;align-items:center;justify-content:center}
 .btn.x:hover{color:var(--warn);background:none;border:0}
@@ -7267,17 +7268,101 @@ function drawSignatureStrokes(canvas, strokes) {
   });
 }
 
+let signatureImageToken = 0;
+function drawUploadedSignature(canvas, src) {
+  const token = ++signatureImageToken;
+  const img = new Image();
+  img.onload = () => {
+    if (token !== signatureImageToken) return;
+    const rect = canvas.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const cssW = rect.width || canvas.clientWidth || 300;
+    const cssH = rect.height || canvas.clientHeight || 148;
+    const w = Math.max(1, Math.round(cssW * dpr));
+    const h = Math.max(1, Math.round(cssH * dpr));
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
+    }
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const scale = Math.min(canvas.width / img.width, canvas.height / img.height);
+    const dw = img.width * scale;
+    const dh = img.height * scale;
+    ctx.drawImage(img, (canvas.width - dw) / 2, (canvas.height - dh) / 2, dw, dh);
+  };
+  img.src = src;
+}
+
+function compressSignatureFile(file) {
+  return new Promise((resolve, reject) => {
+    const type = (file && file.type) || "";
+    const name = (file && file.name) || "";
+    if (!/image\/(png|jpeg|jpg|pjpeg|webp)/i.test(type) && !/\.(png|jpe?g|webp)$/i.test(name)) {
+      reject(new Error("Use a PNG or JPG photo."));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Couldn't read that image."));
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        let box = signatureFit(img.naturalWidth || img.width, img.naturalHeight || img.height);
+        let quality = 0.72;
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        let url = "";
+        for (let attempt = 0; attempt < 6; attempt++) {
+          canvas.width = box.width;
+          canvas.height = box.height;
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, box.width, box.height);
+          ctx.drawImage(img, 0, 0, box.width, box.height);
+          url = canvas.toDataURL("image/jpeg", quality);
+          if (isSignatureImage(url) && url.length <= SIGNATURE_UPLOAD_MAX_CHARS) {
+            resolve(url);
+            return;
+          }
+          quality = Math.max(0.4, quality - 0.1);
+          box = {
+            width: Math.max(80, Math.round(box.width * 0.75)),
+            height: Math.max(40, Math.round(box.height * 0.75)),
+          };
+        }
+        if (isSignatureImage(url)) resolve(url);
+        else reject(new Error("That image is too large to store."));
+      };
+      img.onerror = () => reject(new Error("Couldn't read that image. Use a PNG or JPG."));
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 function SignaturePad({ party, label, onChange }) {
   const canvasRef = useRef(null);
+  const fileRef = useRef(null);
   const partyRef = useRef(party);
   partyRef.current = party;
   const drawing = useRef(null);
+  const [fileErr, setFileErr] = useState("");
 
   const redraw = (strokes, active) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const list = active && active.length ? [...(strokes || []), active] : (strokes || []);
-    drawSignatureStrokes(canvas, list);
+    if (active && active.length) {
+      drawSignatureStrokes(canvas, [...(strokes || []), active]);
+      return;
+    }
+    if (strokes && strokes.length) {
+      drawSignatureStrokes(canvas, strokes);
+      return;
+    }
+    const image = partyRef.current && partyRef.current.signature;
+    if (image) drawUploadedSignature(canvas, image);
+    else drawSignatureStrokes(canvas, []);
   };
 
   useEffect(() => {
@@ -7345,7 +7430,21 @@ function SignaturePad({ party, label, onChange }) {
     onChange({ ...dropped.party, signature: png });
   };
 
+  const onFile = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    setFileErr("");
+    try {
+      const url = await compressSignatureFile(file);
+      onChange(importSignature(partyRef.current, url, today()));
+    } catch (err) {
+      setFileErr(err && err.message ? err.message : "Couldn't use that image.");
+    }
+  };
+
   const ink = !!(party.signature || (party.strokes && party.strokes.length));
+  const uploaded = !!(party.signature && !(party.strokes && party.strokes.length));
   return (
     <div>
       <canvas
@@ -7361,8 +7460,18 @@ function SignaturePad({ party, label, onChange }) {
       <div className="sigactions">
         <button type="button" className="btn ghost tiny" onClick={undo} disabled={!(party.strokes && party.strokes.length)}>Undo</button>
         <button type="button" className="btn ghost tiny" onClick={() => onChange(redoParty(partyRef.current))} disabled={!party.redo}>Redo</button>
-        <button type="button" className="btn ghost tiny" onClick={() => onChange(clearParty(partyRef.current))} disabled={!ink}>Clear</button>
+        <button type="button" className="btn ghost tiny" onClick={() => { setFileErr(""); onChange(clearParty(partyRef.current)); }} disabled={!ink}>Clear</button>
+        <button type="button" className="btn ghost tiny" onClick={() => fileRef.current && fileRef.current.click()}>{uploaded ? "Replace image" : "Upload signature"}</button>
+        <input
+          ref={fileRef}
+          className="sigfile"
+          type="file"
+          accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp"
+          aria-label={`Upload a signature image, ${label}`}
+          onChange={onFile}
+        />
       </div>
+      {fileErr ? <div style={{ fontSize: 12, color: "var(--warn)", marginTop: 6 }}>{fileErr}</div> : null}
     </div>
   );
 }
@@ -7377,7 +7486,7 @@ function AgreementSigners({ participant, profile, managers, parties, onChange, s
       <div style={{ fontSize: 12.5, color: "var(--tx-2)", lineHeight: 1.6, marginBottom: 10 }}>
         The participant and the sole trader are here to start. Add anyone else who needs to sign,
         such as a nominee or guardian, a plan manager, a support coordinator or a witness.
-        Each person signs with a finger, a mouse or a trackpad.
+        Each person signs with a finger, a mouse or a trackpad, or uploads a PNG or JPG of their signature.
       </div>
       {signed.length > 0 && (
         <div style={{ fontSize: 12.5, color: "var(--tx-2)", lineHeight: 1.55, marginBottom: 10 }}>
@@ -9563,8 +9672,33 @@ function normaliseStrokes(strokes) {
   return out;
 }
 
+const SIGNATURE_IMAGE_MAX = { width: 640, height: 220 };
+// A stored upload should stay well under this so several parties fit in localStorage.
+const SIGNATURE_UPLOAD_MAX_CHARS = 80000;
+
 function isSignatureImage(value) {
-  return typeof value === "string" && value.startsWith("data:image/png") && value.length > "data:image/png".length && value.length <= MAX_SIG_CHARS;
+  if (typeof value !== "string" || value.length > MAX_SIG_CHARS) return false;
+  const png = value.startsWith("data:image/png");
+  const jpeg = value.startsWith("data:image/jpeg");
+  if (!png && !jpeg) return false;
+  const prefix = png ? "data:image/png" : "data:image/jpeg";
+  return value.length > prefix.length + 1;
+}
+
+function signatureImageFormat(value) {
+  if (!isSignatureImage(value)) return "";
+  return value.startsWith("data:image/png") ? "PNG" : "JPEG";
+}
+
+// Fit a photo inside the signature box without enlarging a small image.
+function signatureFit(srcW, srcH, maxW = SIGNATURE_IMAGE_MAX.width, maxH = SIGNATURE_IMAGE_MAX.height) {
+  const w = Number(srcW);
+  const h = Number(srcH);
+  const boxW = Math.max(1, Number(maxW) || SIGNATURE_IMAGE_MAX.width);
+  const boxH = Math.max(1, Number(maxH) || SIGNATURE_IMAGE_MAX.height);
+  if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return { width: boxW, height: boxH };
+  const scale = Math.min(1, boxW / w, boxH / h);
+  return { width: Math.max(1, Math.round(w * scale)), height: Math.max(1, Math.round(h * scale)) };
 }
 
 function blankParty({ id, role, name, customRole } = {}) {
@@ -9646,6 +9780,21 @@ function suggestedPartyName(role, participant, profile, managers) {
     return (linked && linked.name) || "";
   }
   return "";
+}
+
+// An uploaded photo replaces whatever was signed before. Strokes are cleared
+// because the picture is the signature. Redo can bring the previous one back.
+function importSignature(party, dataUrl, signedAt) {
+  const p = sanitiseParty(party, 0);
+  if (!isSignatureImage(dataUrl)) return p;
+  const had = !!(p.signature || (p.strokes && p.strokes.length));
+  return {
+    ...p,
+    strokes: [],
+    signature: dataUrl,
+    signedAt: p.signedAt || (typeof signedAt === "string" ? signedAt.slice(0, 10) : ""),
+    redo: had ? { signature: p.signature, strokes: p.strokes, signedAt: p.signedAt } : null,
+  };
 }
 
 function commitStroke(party, stroke, png, signedAt) {
@@ -9870,9 +10019,10 @@ async function makeAgreementPDF(pt, profile, r) {
     page(Math.max(40, who.length * 4 + 36));
     doc.setFont("helvetica", "bold").setFontSize(8).setTextColor(150, 150, 142);
     doc.text(String(roleName).toUpperCase(), L, y); y += 5;
-    if (party.signature && String(party.signature).indexOf("data:image/png") === 0) {
+    const sigFormat = signatureImageFormat(party.signature);
+    if (sigFormat) {
       try {
-        doc.addImage(party.signature, "PNG", L, y, 62, 22, undefined, "FAST");
+        doc.addImage(party.signature, sigFormat, L, y, 62, 22, undefined, "FAST");
         y += 24;
       } catch (e) {
         doc.setDrawColor(180, 180, 172).line(L, y + 14, L + 70, y + 14);
@@ -10382,7 +10532,7 @@ const MANUAL = [
       ],
       [
         "Letting the app write one",
-        "People → Agreements lists everyone with their agreement status. Each agreement starts with the participant and the sole trader, and you can add other signing parties such as a nominee, plan manager, support coordinator or witness. Each person signs on screen with a finger, mouse or trackpad. Download writes the PDF from what you have already entered, including those signatures with the signer's name and the date signed, plus ABN, NDIS number, plan management, rates, travel, payment terms, and clauses on cancellations, responsibilities, ending the agreement, GST and complaints. It is a starting point, not legal advice, so have it looked over before the first one is signed."
+        "People → Agreements lists everyone with their agreement status. Each agreement starts with the participant and the sole trader, and you can add other signing parties such as a nominee, plan manager, support coordinator or witness. Each person signs on screen with a finger, mouse or trackpad, or uploads a PNG or JPG of a signature they already have. Download writes the PDF from what you have already entered, including those signatures with the signer's name and the date signed, plus ABN, NDIS number, plan management, rates, travel, payment terms, and clauses on cancellations, responsibilities, ending the agreement, GST and complaints. It is a starting point, not legal advice, so have it looked over before the first one is signed."
       ],
       [
         "Recording and reviewing",

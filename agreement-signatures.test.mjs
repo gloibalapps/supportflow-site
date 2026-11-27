@@ -5,9 +5,11 @@ import {
   AGREEMENT_ROLES, agreementRoleLabel, defaultAgreementParties, resolveAgreementParties,
   commitStroke, clearParty, redoParty, dropLastStroke, addParty, removeParty, blankParty,
   suggestedPartyName, partiesForSave, patchParty, requiredPartiesSigned, agreementStatusFromParties,
+  importSignature, isSignatureImage, signatureFit, signatureImageFormat, SIGNATURE_UPLOAD_MAX_CHARS,
 } from "./agreement-signatures.js";
 
 const PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+const JPEG = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABQODxIPDRQSEBIXFRQYHjIhHhwcHj0sLiQySUBMS0dARkVQWnNiUFVtVkVGZIhlbXd7gYKBTmCNl4x9lnN+gXz/2wBDARUXFx4aHjshITt8U0ZTfHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHz/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAj/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCfAAH/2Q==";
 const STROKE = [[0.15, 0.7], [0.4, 0.3], [0.72, 0.62]];
 
 test("defaults are the participant and the sole trader, and are not treated as saved", () => {
@@ -115,4 +117,40 @@ test("the agreement is signed only when the participant and the sole trader have
   assert.equal(explicit.agreement, true);
   assert.equal(explicit.agreementDate, "2026-01-02");
   assert.equal(explicit.agreementSignedSource, "explicit");
+});
+
+test("an uploaded signature image replaces a drawing and still counts as signed", () => {
+  assert.equal(isSignatureImage(JPEG), true);
+  assert.equal(signatureImageFormat(JPEG), "JPEG");
+  assert.equal(signatureImageFormat(PNG), "PNG");
+  assert.equal(isSignatureImage("data:image/gif;base64,AAAA"), false);
+  assert.equal(isSignatureImage("data:image/jpeg;base64," + "A".repeat(500001)), false);
+  assert.ok(JPEG.length < SIGNATURE_UPLOAD_MAX_CHARS);
+  assert.deepEqual(signatureFit(2000, 1000), { width: 440, height: 220 });
+  assert.deepEqual(signatureFit(100, 40), { width: 100, height: 40 });
+
+  const drawn = commitStroke(blankParty({ id: "party-participant", role: "participant", name: "Riley Williams" }), STROKE, PNG, "2026-11-01");
+  const uploaded = importSignature(drawn, JPEG, "2026-11-27");
+  assert.equal(uploaded.signature, JPEG);
+  assert.equal(uploaded.strokes.length, 0);
+  assert.equal(uploaded.signedAt, "2026-11-01");
+  assert.equal(uploaded.redo.strokes.length, 1);
+  const restored = redoParty(uploaded);
+  assert.equal(restored.signature, PNG);
+  assert.equal(restored.strokes.length, 1);
+
+  const parties = [
+    importSignature(blankParty({ id: "party-participant", role: "participant", name: "Riley" }), JPEG, "2026-11-27"),
+    importSignature(blankParty({ id: "party-worker", role: "worker", name: "Sam" }), JPEG, "2026-11-27"),
+    importSignature(blankParty({ id: "w", role: "witness", name: "Jane" }), PNG, "2026-11-27"),
+  ];
+  assert.equal(requiredPartiesSigned(parties), true);
+  const saved = JSON.parse(JSON.stringify(partiesForSave(parties)));
+  assert.equal(saved.every((p) => p.signature === JPEG || p.signature === PNG), true);
+  assert.equal(saved.every((p) => p.strokes.length === 0), true);
+  const status = agreementStatusFromParties({ agreement: false }, saved, "2026-11-27");
+  assert.equal(status.agreement, true);
+  assert.equal(status.agreementSignedSource, "parties");
+  const cleared = agreementStatusFromParties(status, [clearParty(saved[0]), saved[1], saved[2]], "2026-11-27");
+  assert.equal(cleared.agreement, false);
 });
