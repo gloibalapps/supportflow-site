@@ -4,7 +4,9 @@
 //     without its `export` keywords (app.jsx is a classic in-browser script).
 //  2. Copies accountant-pack.js into app.jsx between the @@ACCOUNTANT_PACK
 //     markers, the same way. That file is the only list of PDF fields.
-//  3. Re-inlines app.jsx into app.html's <script id="appsrc"> block
+//  3. Copies participant-plan.js into app.jsx between the @@PARTICIPANT_PLAN
+//     markers, the same way. That file decides when a participant can be saved.
+//  4. Re-inlines app.jsx into app.html's <script id="appsrc"> block
 //     (README: "paste app.jsx back into that block").
 // Then syntax-check with: node build-app.mjs --check  (needs @babel/core + @babel/preset-react resolvable)
 import fs from "node:fs";
@@ -20,6 +22,11 @@ const p0 = src.indexOf(PACK_START), p1 = src.indexOf(PACK_END);
 if (p0 < 0 || p1 < p0) throw new Error("accountant pack markers not found in app.jsx");
 const pack = fs.readFileSync("accountant-pack.js", "utf8").replace(/^export\s+/gm, "").trim();
 src = src.slice(0, p0 + PACK_START.length) + "\n" + pack + "\n" + src.slice(p1);
+const PLAN_START = "/* @@PARTICIPANT_PLAN_START */", PLAN_END = "/* @@PARTICIPANT_PLAN_END */";
+const q0 = src.indexOf(PLAN_START), q1 = src.indexOf(PLAN_END);
+if (q0 < 0 || q1 < q0) throw new Error("participant plan markers not found in app.jsx");
+const planRules = fs.readFileSync("participant-plan.js", "utf8").replace(/^export\s+/gm, "").trim();
+src = src.slice(0, q0 + PLAN_START.length) + "\n" + planRules + "\n" + src.slice(q1);
 fs.writeFileSync("app.jsx", src);
 
 const html = fs.readFileSync("app.html", "utf8");

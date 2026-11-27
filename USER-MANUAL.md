@@ -175,18 +175,24 @@ Email addresses and phone numbers are checked as you type. A phone number must b
 
 ### Step 5 – Participants
 
+Adding someone starts with how their plan is managed, before the rest of the form. The same questions appear on **People → Participants → Add participant**. Editing someone already on file skips them.
+
+- **Plan-managed.** Invoices are sent to their plan manager. SupportFlow asks whether that plan manager is already saved. Choose them from the list (a search box appears once you have many), or add them first. Name, invoice email and payment terms are required. Payment terms set the due date. You cannot save the participant until a plan manager is linked.
+- **Self-managed.** There is no plan manager. Invoices go to the participant or their nominee, so their billing email is required. Enter the payment terms you agreed with them.
+- **NDIA-managed (agency-managed).** There is no plan manager, and that step is skipped. Claims are lodged in the NDIA myplace provider portal. SupportFlow does not email the NDIA. The invoice you keep is still addressed to the participant, and their payment terms set its due date. The payment tracker reminds you to check myplace.
+
+Then the participant form:
+
 - Name and **NDIS number**, or tick **"Not an NDIS participant, private
  client"** if they're not, see [Private clients](#9-private-clients-non-ndis)
-- **How their plan is managed**: decides who gets the invoice:
- - **Plan managed** → their plan manager is billed. Link them from the list.
- - **Self managed** → they pay you. Enter their payment terms.
- - **NDIA managed** → claimed through myplace. Enter their terms.
 - **The item you usually bill them for**: new invoices open on this code. The rate beside an NDIS item is the published price; change it if yours differs. For
  a private client this is a free-text description and your own rate instead
 - **Their area**: sets your travel time cap (30 minutes metro and regional
  centres, 60 regional, none remote)
 - **Service agreement**: tick if signed. You can also do this later, and
  generate the document itself, from **People → Service agreements**, see [Service agreements](#15-service-agreements)
+
+If you open a plan-managed participant who has no plan manager, the record shows a reminder to add one. Saving stays off until they are linked. Other participants stay editable as before.
 
 When all five are done you land on Home. Anything still missing is listed in the checklist on **Money → Tax**.
 
@@ -823,7 +829,7 @@ Invoices use one travel rate for every participant, under **Settings → Support
 
 **People → Participants**## 14. Participants and plan managers
 
-**People → Participants** lists everyone you support. **Add participant** opens the same form used in setup, and tapping a person opens their record to edit. **People → Plan managers** is the same for plan management companies, including their payment terms, which set the due date on every invoice. Tap a plan manager to edit the company, accounts email, phone or payment terms. The list shows how many participants are linked to each one. Emails and phone numbers are checked as you type.
+**People → Participants** lists everyone you support. **Add participant** asks how the plan is managed before the form, the same questions as [Step 5](#step-5-participants). Plan-managed participants need a plan manager on file before they can be saved. Self-managed participants need the billing email invoices are sent to. NDIA-managed participants skip the plan manager. Tapping a person opens their record to edit without those questions. If a plan-managed participant has no plan manager, the record asks you to add one. **People → Plan managers** is the list of plan management companies, including their payment terms, which set the due date on every invoice sent to them. Tap a plan manager to edit the company, accounts email, phone or payment terms. The list shows how many participants are linked to each one. Emails and phone numbers are checked as you type.
 
 - **The due date is blank on an invoice:** the payer has no payment terms. Add them on their record.
 - **An invoice says "No billing email":** the plan manager or participant has no email on file. Add it on their record.

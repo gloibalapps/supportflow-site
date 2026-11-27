@@ -403,6 +403,29 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 .btn.x{background:none;border:0;color:var(--warn);padding:6px 7px;font-size:15px;
   display:inline-flex;align-items:center;justify-content:center}
 .btn.x:hover{color:var(--warn);background:none;border:0}
+.choicebtn{
+  display:flex;flex-direction:column;align-items:flex-start;justify-content:center;
+  width:100%;min-height:44px;margin:0 0 8px;padding:12px 14px;border-radius:12px;
+  border:1px solid var(--line);background:var(--bg-2);color:var(--tx);
+  font-family:inherit;font-size:15px;font-weight:600;text-align:left;cursor:pointer;
+}
+.choicebtn small{display:block;font-weight:400;color:var(--tx-3);font-size:12.5px;margin-top:3px;line-height:1.45}
+.choicebtn[aria-pressed="true"],.choicehit[data-on="1"]{border-color:var(--brass);box-shadow:0 0 0 1px var(--brass)}
+.choicehit{
+  display:flex;gap:12px;align-items:flex-start;min-height:44px;margin:0 0 8px;padding:12px 14px;
+  border-radius:12px;border:1px solid var(--line);background:var(--bg-2);cursor:pointer;
+}
+.choicehit span{font-weight:600;font-size:15px;color:var(--tx);line-height:1.35}
+.choicehit small{display:block;font-weight:400;color:var(--tx-3);font-size:12.5px;margin-top:3px;line-height:1.45}
+.choicehit input{width:20px;height:20px;margin-top:2px;accent-color:var(--brass);flex:0 0 20px}
+.choicebtn:focus-visible,.choicehit:focus-within,.intake input:focus-visible,.intake select:focus-visible,.intake textarea:focus-visible,.intake .btn:focus-visible{
+  outline:2px solid var(--brass);outline-offset:2px;
+}
+.intake input,.intake select,.intake .btn{min-height:44px}
+.intake .disp:focus{outline:2px solid var(--brass);outline-offset:4px}
+.planactions{position:sticky;bottom:84px;z-index:6;display:flex;gap:8px;flex-wrap:wrap;background:var(--bg);padding:10px 0;margin-top:8px}
+.planstep{border:0;padding:0;margin:0 0 14px}
+.planstep legend{padding:0;margin:0 0 12px;width:100%}
 
 .callout{background:var(--bg-3);border-left:2px solid var(--brass);border-radius:0 10px 10px 0;padding:13px 16px;font-size:12.5px;color:var(--tx-2);line-height:1.55}
 .tutorial{background:var(--bg-2);border:1px solid var(--line);border-radius:12px;padding:14px 14px 12px;margin:0 0 14px;scroll-margin-top:78px}
@@ -1393,7 +1416,7 @@ const firstIncompleteStep = (data) => {
   if (!profileOK) return 1;
   if (data.managers.length === 0 && data.participants.some((x) => x.planType === "plan")) return 2;
   if (data.participants.length === 0) return 3;
-  if (data.participants.some((x) => x.planType === "plan" && !x.managerId)) return 2;
+  if (data.participants.some((x) => x.planType === "plan" && !managerById(data.managers, x.managerId))) return 2;
   return 3;
 };
 
@@ -1818,6 +1841,11 @@ const invTotal = (i) => (i.lines || []).reduce((s, l) => s + Number(l.qty || 0) 
 function resolve(inv, data) {
   const pt = data.participants.find((x) => x.id === inv.participantId) || null;
   const mgr = pt ? data.managers.find((x) => x.id === pt.managerId) || null : null;
+  // "plan" bills the linked plan manager (name, email, address, terms).
+  // "self" bills the participant: their email is the billing contact.
+  // "agency" (NDIA-managed) uses that same participant address on the PDF.
+  // Claims are lodged in myplace, and the payment tracker reminds the worker
+  // to check the portal instead of emailing a payer. See NDIA_MANAGED_EXPLAIN.
   const selfManaged = pt?.planType !== "plan";
   const terms = Number((selfManaged ? pt?.terms : mgr?.terms) || 0);
   return {
@@ -1941,6 +1969,186 @@ const termsHint = (n) => {
 
 const PLAN_TYPES = [["plan", "Plan managed"], ["self", "Self managed"], ["agency", "NDIA / agency managed"]];
 const planLabel = (v) => (PLAN_TYPES.find((p) => p[0] === v) || PLAN_TYPES[0])[1];
+
+/* ---------------- participant plan save rules ----------------
+   Whether a participant can be saved, and how a new plan manager is created
+   and linked. The block between the markers is copied from
+   participant-plan.js by build-app.mjs. Edit that file. */
+/* @@PARTICIPANT_PLAN_START */
+// SupportFlow participant plan rules.
+// ONE source of truth for saving a participant against how their plan is
+// managed. Inlined into app.jsx by build-app.mjs between the
+// @@PARTICIPANT_PLAN markers. Keep it dependency-free plain JS.
+//
+// Storage is unchanged. Plan managers are not a database table and not a
+// free-text field. They already live in the on-device record as
+// data.managers[]. A participant stores planType ("plan" | "self" |
+// "agency") and managerId, which points at data.managers[].id.
+// Existing participants are never rewritten by these helpers. A failed
+// save returns the same data object it was given.
+
+const PLAN_MANAGED = "plan";
+const SELF_MANAGED = "self";
+const NDIA_MANAGED = "agency";
+
+// Show a search box once the saved list is long enough that scanning it is
+// the slow part. Shorter lists are just buttons.
+const PLAN_MANAGER_SEARCH_AT = 6;
+
+const PLAN_TYPE_CHOICES = [
+  ["plan", "Plan-managed", "Invoices are sent to their plan manager."],
+  ["self", "Self-managed", "Invoices go to the participant or their nominee."],
+  ["agency", "NDIA-managed (agency-managed)", "Claims go through the NDIA myplace portal. No plan manager."],
+];
+
+const PLAN_MANAGER_EXPLAIN =
+  "Invoices for plan-managed participants are sent to their plan manager, so without one your invoices have nowhere to go.";
+
+const PLAN_MANAGER_REQUIRED_MESSAGE =
+  "Add a plan manager before saving. " + PLAN_MANAGER_EXPLAIN;
+
+const SELF_MANAGED_EXPLAIN =
+  "Invoices for self-managed participants go to the participant or their nominee. Add the billing email those invoices should use.";
+
+const SELF_MANAGED_EMAIL_MESSAGE =
+  "Add the billing email invoices should go to. For a self-managed participant that is the participant or their nominee.";
+
+// NDIA-managed (planType "agency") already has no plan manager in the app.
+// resolve() addresses the invoice PDF to the participant, the same as
+// self-managed, because planType !== "plan". The payment tracker treats
+// "agency" separately: reminders tell the worker to check the myplace
+// provider portal and are not emailed to a payer. This step does not invent
+// a second billing path. It skips the plan manager and says that plainly.
+const NDIA_MANAGED_EXPLAIN =
+  "NDIA-managed (agency-managed) claims are lodged in the NDIA myplace provider portal. There is no plan manager to invoice. SupportFlow still keeps payment terms on the participant, which set the due date on the invoice you hold for your records. Portal reminders go to you, not to a plan manager.";
+
+function isInvoiceEmail(v) {
+  return /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(String(v || "").trim());
+}
+
+function managerById(managers, id) {
+  const key = String(id || "").trim();
+  if (!key) return null;
+  return (managers || []).find((m) => m && m.id === key) || null;
+}
+
+function filterPlanManagers(managers, query) {
+  const q = String(query || "").trim().toLowerCase();
+  const list = Array.isArray(managers) ? managers.filter(Boolean) : [];
+  if (!q) return list.slice();
+  return list.filter((m) => [m.name, m.email, m.contact].join(" ").toLowerCase().includes(q));
+}
+
+function planChoiceLabel(planType) {
+  const row = PLAN_TYPE_CHOICES.find((c) => c[0] === planType);
+  return row ? row[1] : PLAN_TYPE_CHOICES[0][1];
+}
+
+// Name, invoice email, and payment terms are what invoice sending and the
+// due date actually read (manager name, email, address, terms). Address is
+// optional because a blank address already prints as blank. Contact, phone
+// and ABN are stored when entered so the existing plan-manager record shape
+// stays intact, and are not required to send an invoice.
+function planManagerDraftError(draft) {
+  const name = String(draft?.name || "").trim();
+  const email = String(draft?.email || "").trim();
+  const terms = String(draft?.terms ?? "").trim();
+  if (!name) return "Enter the plan manager's name.";
+  if (!isInvoiceEmail(email)) return "Enter the invoice email invoices should be sent to.";
+  if (!(Number(terms) > 0)) return "Enter payment terms in days. They set the due date on invoices sent to this plan manager.";
+  return "";
+}
+
+function normalisePlanManager(draft, id) {
+  return {
+    id,
+    name: String(draft?.name || "").trim(),
+    contact: String(draft?.contact || "").trim(),
+    email: String(draft?.email || "").trim().toLowerCase(),
+    phone: String(draft?.phone || "").trim(),
+    address: String(draft?.address || "").trim(),
+    abn: String(draft?.abn || "").trim(),
+    terms: String(draft?.terms ?? "").trim(),
+    notes: String(draft?.notes || "").trim(),
+  };
+}
+
+function participantSaveError(participant, managers) {
+  if (!participant || participant.planType !== PLAN_MANAGED) return "";
+  if (managerById(managers, participant.managerId)) return "";
+  return PLAN_MANAGER_REQUIRED_MESSAGE;
+}
+
+// New self-managed participants need the billing email resolve() already
+// uses (participant.email). Existing self-managed records stay saveable
+// without one, so older participants remain editable.
+function selfManagedBillingError(participant) {
+  if (!participant || participant.planType !== SELF_MANAGED || participant.id) return "";
+  if (isInvoiceEmail(participant.email)) return "";
+  return SELF_MANAGED_EMAIL_MESSAGE;
+}
+
+function participantPlanBlock(participant, managers, pendingManager) {
+  if (!participant) return "";
+  if (participant.planType === PLAN_MANAGED && pendingManager) {
+    return planManagerDraftError(pendingManager);
+  }
+  return participantSaveError(participant, managers) || selfManagedBillingError(participant);
+}
+
+// Creates a pending plan manager and links it in the same save when needed.
+// Refuses a plan-managed participant with no real manager. Self-managed and
+// NDIA-managed participants are saved with no plan manager. On any refusal
+// the original data object is returned untouched.
+function applyParticipantSave(data, participant, pendingManager, options) {
+  const idFactory = (options && options.idFactory) || (() => Math.random().toString(36).slice(2, 10));
+  const base = data && typeof data === "object" ? data : {};
+  const managers = Array.isArray(base.managers) ? base.managers.slice() : [];
+  const participants = Array.isArray(base.participants) ? base.participants.slice() : [];
+  const isNew = !participant?.id;
+  let createdManager = null;
+  let managerId = String(participant?.managerId || "").trim();
+
+  if (participant?.planType === PLAN_MANAGED && pendingManager) {
+    const draftError = planManagerDraftError(pendingManager);
+    if (draftError) return { ok: false, error: draftError, data: base, participant: null, createdManager: null };
+    const id = String(pendingManager.id || "").trim() || idFactory();
+    createdManager = normalisePlanManager(pendingManager, id);
+    const at = managers.findIndex((m) => m && m.id === id);
+    if (at >= 0) managers[at] = { ...managers[at], ...createdManager };
+    else managers.push(createdManager);
+    managerId = id;
+  }
+
+  const next = {
+    ...participant,
+    planType: participant?.planType || PLAN_MANAGED,
+    managerId: participant?.planType === PLAN_MANAGED ? managerId : (isNew ? "" : String(participant?.managerId || "")),
+  };
+
+  const error = participantSaveError(next, managers) || selfManagedBillingError(next);
+  if (error) return { ok: false, error, data: base, participant: null, createdManager: null };
+
+  let saved;
+  if (next.id) {
+    const at = participants.findIndex((p) => p && p.id === next.id);
+    if (at >= 0) participants[at] = { ...participants[at], ...next };
+    else participants.push(next);
+    saved = participants[at >= 0 ? at : participants.length - 1];
+  } else {
+    saved = { ...next, id: idFactory() };
+    participants.push(saved);
+  }
+
+  return {
+    ok: true,
+    error: "",
+    data: { ...base, managers, participants },
+    participant: saved,
+    createdManager,
+  };
+}
+/* @@PARTICIPANT_PLAN_END */
 
 /* ---------------- Payment tracker: shared rules ----------------
    Business days, chase stages and templates. The block between the markers
@@ -5047,7 +5255,7 @@ function Summary({ data, save, m, go, newInvoice, resume, snoozeBackup, dismissB
   const todo = [
     !data.profile.name || !data.profile.abn ? "Your name and ABN" : "",
     data.participants.length === 0 ? "At least one participant" : "",
-    data.participants.some((x) => x.planType === "plan" && !x.managerId) ? "A plan manager linked to every plan-managed participant" : "",
+    data.participants.some((x) => x.planType === "plan" && !managerById(data.managers, x.managerId)) ? "A plan manager linked to every plan-managed participant" : "",
     data.managers.some((x) => !x.terms) || data.participants.some((x) => x.planType !== "plan" && !x.terms) ? "Payment terms on every payer: they set the invoice due date" : "",
     data.participants.some((x) => !x.defaultCode) ? "A usual support item on every participant: it opens their invoices" : "",
     data.participants.some((x) => !x.agreement) ? "A written service agreement with each participant. Participants → Service agreements can write one" : "",
@@ -6679,7 +6887,7 @@ function Welcome({ onSetup, onDemo }) {
 const STEPS = [
   { n: 1, title: "Your details", lead: "Required", hint: "Your name and ABN appear on every invoice you issue. Without them an invoice isn't valid, so this comes first." },
   { n: 2, title: "Plan managers", lead: "Required if you invoice any", hint: "Add every plan management company you deal with, including their payment terms. That\u2019s what pre-fills the due date on invoices. Do this before participants, so each one can be linked in a tap." },
-  { n: 3, title: "Participants", lead: "Required", hint: "Add the people you support and flag how each plan is managed. Plan managed links to the manager who pays you; self or NDIA managed needs their own payment terms. Set the item you usually bill them for and new invoices open on it." },
+  { n: 3, title: "Participants", lead: "Required", hint: "Add the people you support. The first question is how their plan is managed. Plan-managed invoices go to a plan manager, so one has to be linked before you can save them. Self-managed invoices go to the participant. NDIA-managed claims go through the myplace portal." },
 ];
 
 const SETUP_LABELS = ["PIN", "Backup", "Details", "Managers", "Participants"];
@@ -6729,17 +6937,29 @@ function Onboarding({ data, save, close, help, openPrivacy, startStep }) {
   const [p, setP] = useState(data.profile);
   const [mf, setMf] = useState(null);
   const [pf, setPf] = useState(null);
+  const [partWizard, setPartWizard] = useState(false);
+  const [partPending, setPartPending] = useState(null);
+  const [partError, setPartError] = useState("");
 
   const pf0 = { name: "", ndisNumber: "", nonNdis: false, planType: "plan", managerId: "", terms: "", defaultCode: "", defaultDescription: "", defaultRate: "", agreement: false, agreementDate: "", agreementReview: "", agreementWhere: "", email: "", phone: "", address: "", planEnd: "", notes: "" };
   const mf0 = { name: "", contact: "", email: "", phone: "", abn: "", address: "", terms: "14", notes: "" };
 
   const profileOK = !!(p.name || "").trim() && isValidAbn(p.abn);
   const partsOK = data.participants.length > 0;
-  const needsMgr = data.participants.some((x) => x.planType === "plan" && !x.managerId);
+  const needsMgr = data.participants.some((x) => x.planType === "plan" && !managerById(data.managers, x.managerId));
 
   const saveProfile = () => save({ ...data, profile: { ...p, name: toProperName(p.name), abn: formatAbn(p.abn) } });
   const addMgr = () => { save({ ...data, managers: [...data.managers, { ...mf, abn: formatAbn(mf.abn), id: uid() }] }); setMf(null); setMgrDecided(true); };
-  const addPart = () => { save({ ...data, participants: [...data.participants, { ...pf, name: toProperName(pf.name), ndisNumber: ndisDigits(pf.ndisNumber), id: uid() }] }); setPf(null); };
+  const addPart = () => {
+    const prepared = { ...pf, name: toProperName(pf.name), ndisNumber: ndisDigits(pf.ndisNumber), email: normaliseEmail(pf.email) };
+    const result = applyParticipantSave(data, prepared, pf.planType === "plan" ? partPending : null, { idFactory: uid });
+    if (!result.ok) { setPartError(result.error); return; }
+    save(result.data);
+    setPf(null);
+    setPartPending(null);
+    setPartError("");
+    setPartWizard(false);
+  };
   const finish = () => { save({ ...data, profile: p, onboarded: true }); close(); };
 
   const Head = ({ i, ok }) => {
@@ -6928,7 +7148,7 @@ function Onboarding({ data, save, close, help, openPrivacy, startStep }) {
           <Head i={3} ok={partsOK && !needsMgr} />
           {data.participants.map((x) => {
             const mg = data.managers.find((g) => g.id === x.managerId);
-            const gap = x.planType === "plan" && !x.managerId;
+            const gap = x.planType === "plan" && !managerById(data.managers, x.managerId);
             return (
               <div className="row" key={x.id}>
                 <span className="dot" style={{ background: gap ? "var(--req)" : "var(--good)" }} />
@@ -6941,8 +7161,28 @@ function Onboarding({ data, save, close, help, openPrivacy, startStep }) {
               </div>
             );
           })}
-          {pf ? (
-            <div className="panel" style={{ marginTop: 14 }}>
+          {partWizard ? (
+            <div style={{ marginTop: 14 }}>
+              <ParticipantPlanIntake
+                managers={data.managers}
+                onCancel={() => setPartWizard(false)}
+                onReady={(choice) => {
+                  setPartPending(choice.newManager || null);
+                  setPf({
+                    ...(pf || pf0),
+                    planType: choice.planType,
+                    managerId: choice.planType === "plan" && !choice.newManager ? (choice.managerId || "") : "",
+                  });
+                  setPartError("");
+                  setPartWizard(false);
+                }}
+              />
+            </div>
+          ) : pf ? (
+            <div className="panel intake" style={{ marginTop: 14 }}>
+              <button type="button" className="btn ghost" style={{ minHeight: 44, marginBottom: 14 }} onClick={() => setPartWizard(true)}>
+                Change how their plan is managed
+              </button>
               <div className="two">
                 <label className="f req"><span>Full name</span>
                   <input value={pf.name || ""} onChange={(e) => setPf({ ...pf, name: e.target.value })}
@@ -6971,10 +7211,17 @@ function Onboarding({ data, save, close, help, openPrivacy, startStep }) {
                 </label>
               </div>
               <label className="f"><span>How is their plan managed?</span>
-                <select value={pf.planType} onChange={(e) => setPf({ ...pf, planType: e.target.value, managerId: e.target.value === "plan" ? pf.managerId : "" })}>
+                <select value={pf.planType} onChange={(e) => {
+                  const planType = e.target.value;
+                  if (planType !== "plan") setPartPending(null);
+                  setPf({ ...pf, planType, managerId: planType === "plan" ? pf.managerId : "" });
+                }}>
                   {PLAN_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                 </select>
               </label>
+              {pf.planType === "self" && <div className="callout" style={{ marginBottom: 14 }}>{SELF_MANAGED_EXPLAIN}</div>}
+              {pf.planType === "agency" && <div className="callout" style={{ marginBottom: 14 }}>{NDIA_MANAGED_EXPLAIN}</div>}
+              {pf.planType === "plan" && <div className="callout" style={{ marginBottom: 14 }}>{PLAN_MANAGER_EXPLAIN}</div>}
               {pf.planType !== "plan" && (
                 <label className="f req">
                   <span style={{ color: pf.terms ? undefined : "var(--req)" }}>Payment terms in days: required, they pay you directly</span>
@@ -6983,10 +7230,15 @@ function Onboarding({ data, save, close, help, openPrivacy, startStep }) {
                   {pf.terms ? <em style={{ fontSize: 11.5, color: "var(--good)", fontStyle: "normal", marginTop: 5, display: "block" }}>{termsHint(pf.terms)}</em> : null}
                 </label>
               )}
-              {pf.planType === "plan" && (
+              {pf.planType === "plan" && partPending ? (
+                <div className="callout" style={{ marginBottom: 14 }}>
+                  New plan manager: <b style={{ color: "var(--tx)" }}>{partPending.name}</b>
+                  {partPending.email ? <> · {partPending.email}</> : null}. Saved together with this participant.
+                </div>
+              ) : pf.planType === "plan" && (
                 data.managers.length ? (
                   <label className="f"><span>Link their plan manager: this is who gets invoiced</span>
-                    <select value={pf.managerId} onChange={(e) => setPf({ ...pf, managerId: e.target.value })}>
+                    <select value={pf.managerId} onChange={(e) => { setPartPending(null); setPf({ ...pf, managerId: e.target.value }); }}>
                       <option value="">Choose…</option>
                       {data.managers.map((mg) => <option key={mg.id} value={mg.id}>{mg.name}</option>)}
                     </select>
@@ -6998,7 +7250,7 @@ function Onboarding({ data, save, close, help, openPrivacy, startStep }) {
                   </label>
                 ) : (
                   <div className="callout" style={{ borderColor: "var(--req)" }}>
-                    No plan managers on file yet. Go back to step 2 and add theirs first, or set them as self managed.
+                    No plan managers on file yet. Use “Change how their plan is managed” and add theirs before saving, or choose self-managed or NDIA-managed.
                   </div>
                 )
               )}
@@ -7075,13 +7327,19 @@ function Onboarding({ data, save, close, help, openPrivacy, startStep }) {
               <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
                 <button className="btn" onClick={addPart}
                   disabled={!pf.name.trim() || (pf.nonNdis ? (!(pf.defaultDescription || "").trim() || !pf.defaultRate) : !pf.defaultCode) ||
-                    (pf.planType === "plan" ? !pf.managerId : !pf.terms) ||
+                    !!participantPlanBlock(pf, data.managers, pf.planType === "plan" ? partPending : null) ||
+                    (pf.planType !== "plan" && !pf.terms) ||
                     (!pf.nonNdis && !isValidNdisNumber(pf.ndisNumber)) || !isValidEmail(pf.email) || !isValidPhone(pf.phone)}>Add participant</button>
-                <button className="btn ghost" onClick={() => setPf(null)}>Cancel</button>
+                <button className="btn ghost" onClick={() => { setPf(null); setPartPending(null); setPartError(""); }}>Cancel</button>
               </div>
+              {(partError || participantPlanBlock(pf, data.managers, pf.planType === "plan" ? partPending : null)) && (
+                <div role="alert" style={{ fontSize: 13, color: "var(--req)", marginTop: 12, lineHeight: 1.5 }}>
+                  {partError || participantPlanBlock(pf, data.managers, pf.planType === "plan" ? partPending : null)}
+                </div>
+              )}
             </div>
           ) : (
-            <button className="btn" style={{ marginTop: 14 }} onClick={() => setPf(pf0)}>Add a participant</button>
+            <button className="btn" style={{ marginTop: 14, minHeight: 44 }} onClick={() => { setPartError(""); setPartPending(null); setPartWizard(true); }}>Add a participant</button>
           )}
         </div>
       )}
@@ -7313,6 +7571,194 @@ function Claimable({ data, save, seed }) {
   );
 }
 
+/* ---------------- Add-participant plan step ---------------- */
+// Shown before the participant form when someone is new. Editing an existing
+// participant does not come through here, except planOnly, which is the
+// "add a plan manager" prompt on a record that is already plan-managed.
+function ParticipantPlanIntake({ managers, onCancel, onReady, planOnly }) {
+  const [step, setStep] = useState(planOnly ? "plan-ask" : "type");
+  const [planType, setPlanType] = useState("");
+  const [query, setQuery] = useState("");
+  const [picked, setPicked] = useState("");
+  const [draft, setDraft] = useState({ name: "", contact: "", email: "", phone: "", address: "", abn: "", terms: "14", notes: "" });
+  const [error, setError] = useState("");
+  const list = filterPlanManagers(managers, query);
+  const showSearch = (managers || []).length >= PLAN_MANAGER_SEARCH_AT;
+  const setD = (patch) => setDraft({ ...draft, ...patch });
+
+  const back = () => {
+    setError("");
+    if (step === "type") { onCancel(); return; }
+    if (step === "plan-ask") { if (planOnly) onCancel(); else setStep("type"); return; }
+    if (step === "existing" || step === "create") { setStep("plan-ask"); return; }
+    setStep("type");
+  };
+
+  return (
+    <div className="intake">
+      <div className="bandhead" style={{ marginBottom: 16 }}>
+        <div className="disp" aria-live="polite" style={{ fontSize: 27 }}>
+          {step === "create" ? "Add plan manager" : step === "existing" ? "Choose their plan manager" : planOnly ? "Add a plan manager" : "New participant"}
+        </div>
+        <button type="button" className="btn ghost" onClick={back}>{step === "type" || (planOnly && step === "plan-ask") ? "Cancel" : "Back"}</button>
+      </div>
+
+      {step === "type" && (
+        <>
+          <fieldset className="planstep">
+            <legend className="disp" style={{ fontSize: 22 }}>How is their plan managed?</legend>
+            {PLAN_TYPE_CHOICES.map(([value, label, hint]) => (
+              <label key={value} className="choicehit" data-on={planType === value ? "1" : "0"}>
+                <input type="radio" name="sf-new-plan-type" value={value} checked={planType === value}
+                  onChange={() => { setPlanType(value); setError(""); }} />
+                <span>{label}<small>{hint}</small></span>
+              </label>
+            ))}
+          </fieldset>
+          <button type="button" className="btn" disabled={!planType} onClick={() => {
+            if (planType === "plan") setStep("plan-ask");
+            else setStep(planType === "self" ? "self" : "agency");
+          }}>Continue</button>
+        </>
+      )}
+
+      {step === "plan-ask" && (
+        <>
+          <div className="disp" style={{ fontSize: 22, marginBottom: 8 }}>Is their plan manager already saved in SupportFlow?</div>
+          <p style={{ fontSize: 14, color: "var(--tx-2)", lineHeight: 1.55, margin: "0 0 14px" }}>{PLAN_MANAGER_EXPLAIN}</p>
+          <button type="button" className="choicebtn" onClick={() => { setError(""); setStep("existing"); }}>
+            Yes, choose a saved plan manager
+            <small>{(managers || []).length ? `${managers.length} saved` : "None saved yet"}</small>
+          </button>
+          <button type="button" className="choicebtn" onClick={() => { setError(""); setStep("create"); }}>
+            No, add a plan manager
+            <small>Name, invoice email and payment terms, then the participant form</small>
+          </button>
+        </>
+      )}
+
+      {step === "existing" && (
+        <>
+          <p style={{ fontSize: 14, color: "var(--tx-2)", lineHeight: 1.55, margin: "0 0 14px" }}>{PLAN_MANAGER_EXPLAIN}</p>
+          {(managers || []).length === 0 ? (
+            <div className="callout" style={{ borderColor: "var(--warn)", marginBottom: 14 }} role="status">
+              No plan managers saved yet. Add one to continue.
+            </div>
+          ) : (
+            <>
+              {showSearch && (
+                <label className="f">
+                  <span>Search plan managers</span>
+                  <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Name or email" aria-label="Search plan managers" />
+                </label>
+              )}
+              {error && <div role="alert" style={{ fontSize: 13, color: "var(--req)", margin: "8px 0", lineHeight: 1.5 }}>{error}</div>}
+              <div className="planactions">
+                <button type="button" className="btn" disabled={!picked} onClick={() => {
+                  if (!managerById(managers, picked)) { setError("Choose a plan manager from the list."); return; }
+                  onReady({ planType: "plan", managerId: picked, newManager: null });
+                }}>Use this plan manager</button>
+                <button type="button" className="btn ghost" onClick={() => { setError(""); setStep("create"); }}>Add a plan manager</button>
+              </div>
+              {list.length === 0 ? (
+                <div className="callout" role="status">No plan manager matches that search.</div>
+              ) : list.map((m) => (
+                <button type="button" key={m.id} className="choicebtn" aria-pressed={picked === m.id}
+                  onClick={() => { setPicked(m.id); setError(""); }}>
+                  {m.name || "Unnamed plan manager"}
+                  <small>{m.email || "No invoice email"}{m.terms ? ` · ${m.terms} day terms` : ""}</small>
+                </button>
+              ))}
+            </>
+          )}
+          {!(managers || []).length && (
+            <button type="button" className="btn" onClick={() => { setError(""); setStep("create"); }}>Add a plan manager</button>
+          )}
+        </>
+      )}
+
+      {step === "create" && (
+        <>
+          <p style={{ fontSize: 14, color: "var(--tx-2)", lineHeight: 1.55, margin: "0 0 14px" }}>{PLAN_MANAGER_EXPLAIN}</p>
+          <label className="f req">
+            <span style={{ color: draft.name.trim() ? undefined : "var(--req)" }}>Company name, required</span>
+            <input value={draft.name} autoComplete="organization" style={draft.name.trim() ? {} : { borderColor: "var(--req)" }}
+              onChange={(e) => setD({ name: e.target.value })} />
+          </label>
+          <label className="f req">
+            <span style={{ color: isInvoiceEmail(draft.email) ? undefined : "var(--req)" }}>Invoice email, required</span>
+            <input type="email" autoComplete="email" value={draft.email} placeholder="accounts@…"
+              style={isInvoiceEmail(draft.email) ? {} : { borderColor: "var(--req)" }}
+              onChange={(e) => setD({ email: e.target.value })}
+              onBlur={() => setD({ email: normaliseEmail(draft.email) })} />
+            {draft.email.trim() && !isInvoiceEmail(draft.email) && (
+              <em style={{ fontSize: 11.5, color: "var(--warn)", fontStyle: "normal", marginTop: 5, display: "block" }}>Enter a valid email address.</em>
+            )}
+          </label>
+          <label className="f req">
+            <span style={{ color: Number(draft.terms) > 0 ? undefined : "var(--req)" }}>Payment terms in days, required</span>
+            <input type="number" value={draft.terms} placeholder="e.g. 14"
+              style={Number(draft.terms) > 0 ? {} : { borderColor: "var(--req)" }}
+              onChange={(e) => setD({ terms: e.target.value })} />
+            {Number(draft.terms) > 0 ? <em style={{ fontSize: 11.5, color: "var(--good)", fontStyle: "normal", marginTop: 5, display: "block" }}>{termsHint(draft.terms)}</em> : (
+              <em style={{ fontSize: 11.5, color: "var(--tx-3)", fontStyle: "normal", marginTop: 5, display: "block" }}>These terms set the due date on invoices sent to this plan manager.</em>
+            )}
+          </label>
+          <label className="f">
+            <span>Postal address, optional</span>
+            <input value={draft.address} autoComplete="street-address" onChange={(e) => setD({ address: e.target.value })}
+              onBlur={() => setD({ address: toAddressCase(draft.address) })} />
+            <em style={{ fontSize: 11.5, color: "var(--tx-3)", fontStyle: "normal", marginTop: 5, display: "block" }}>Prints on the invoice when you add it.</em>
+          </label>
+          <details style={{ marginBottom: 14 }}>
+            <summary style={{ minHeight: 44, display: "flex", alignItems: "center", cursor: "pointer", color: "var(--tx-2)", fontSize: 14 }}>More details, optional</summary>
+            <div style={{ marginTop: 12 }}>
+              <label className="f"><span>Contact person</span>
+                <input value={draft.contact} autoComplete="name" onChange={(e) => setD({ contact: e.target.value })} />
+              </label>
+              <label className="f"><span>Phone</span>
+                <input value={draft.phone} autoComplete="tel" onChange={(e) => setD({ phone: e.target.value })}
+                  onBlur={() => setD({ phone: normalisePhone(draft.phone) })} />
+              </label>
+              <label className="f"><span>ABN</span>
+                <input value={draft.abn} onChange={(e) => setD({ abn: e.target.value })}
+                  onBlur={() => setD({ abn: formatAbn(draft.abn) })} placeholder="11 digits" />
+                <AbnValidateButton value={draft.abn} />
+              </label>
+              <label className="f" style={{ marginBottom: 0 }}><span>Notes</span>
+                <textarea style={{ minHeight: 70 }} value={draft.notes} onChange={(e) => setD({ notes: e.target.value })}
+                  placeholder="How they like invoices submitted" />
+              </label>
+            </div>
+          </details>
+          {error && <div role="alert" style={{ fontSize: 13, color: "var(--req)", marginBottom: 10, lineHeight: 1.5 }}>{error}</div>}
+          <button type="button" className="btn" onClick={() => {
+            const err = planManagerDraftError(draft);
+            if (err) { setError(err); return; }
+            onReady({ planType: "plan", managerId: "", newManager: { ...draft, email: normaliseEmail(draft.email) } });
+          }}>Link this plan manager</button>
+        </>
+      )}
+
+      {step === "self" && (
+        <>
+          <div className="disp" style={{ fontSize: 22, marginBottom: 8 }}>Self-managed</div>
+          <p style={{ fontSize: 14, color: "var(--tx-2)", lineHeight: 1.55, margin: "0 0 14px" }}>{SELF_MANAGED_EXPLAIN}</p>
+          <button type="button" className="btn" onClick={() => onReady({ planType: "self", managerId: "", newManager: null })}>Continue to participant</button>
+        </>
+      )}
+
+      {step === "agency" && (
+        <>
+          <div className="disp" style={{ fontSize: 22, marginBottom: 8 }}>NDIA-managed</div>
+          <p style={{ fontSize: 14, color: "var(--tx-2)", lineHeight: 1.55, margin: "0 0 14px" }}>{NDIA_MANAGED_EXPLAIN}</p>
+          <button type="button" className="btn" onClick={() => onReady({ planType: "agency", managerId: "", newManager: null })}>Continue to participant</button>
+        </>
+      )}
+    </div>
+  );
+}
+
 /* ---------------- Directory ---------------- */
 
 /* ---------------- Agreements ---------------- */
@@ -7471,10 +7917,23 @@ function ParticipantHistory({ pt, data }) {
 
 function Directory({ data, save, view, setView, openId, clearOpen, canCreate, onBlocked }) {
   const [edit, setEdit] = useState(null);
+  const [wizard, setWizard] = useState(false);
+  const [pendingManager, setPendingManager] = useState(null);
+  const [saveError, setSaveError] = useState("");
+  const [mgrFix, setMgrFix] = useState(false);
+  useEffect(() => {
+    if (view !== "participants") setWizard(false);
+  }, [view]);
   useEffect(() => {
     if (!openId) return;
     const pt = data.participants.find((x) => x.id === openId);
-    if (pt) setEdit({ _k: "participants", rec: { ...pt } });
+    if (pt) {
+      setWizard(false);
+      setPendingManager(null);
+      setSaveError("");
+      setMgrFix(false);
+      setEdit({ _k: "participants", rec: { ...pt } });
+    }
     if (clearOpen) clearOpen();
   }, [openId]);
   const [agBusy, setAgBusy] = useState(false);
@@ -7490,8 +7949,32 @@ function Directory({ data, save, view, setView, openId, clearOpen, canCreate, on
     save({ ...data, [key]: next });
     setEdit(null);
   };
-  const drop = (key, id) => { save({ ...data, [key]: data[key].filter((x) => x.id !== id) }); setEdit(null); };
+  const drop = (key, id) => { save({ ...data, [key]: data[key].filter((x) => x.id !== id) }); setEdit(null); setPendingManager(null); setMgrFix(false); };
   const list = view === "participants" ? data.participants : data.managers;
+  const closeEdit = () => { setEdit(null); setPendingManager(null); setSaveError(""); setMgrFix(false); setWizard(false); };
+
+  if (wizard && view === "participants") {
+    return (
+      <ParticipantPlanIntake
+        managers={data.managers}
+        onCancel={() => setWizard(false)}
+        onReady={(choice) => {
+          const base = (edit && edit._k === "participants" && !edit.rec.id) ? edit.rec : blankP;
+          setPendingManager(choice.newManager || null);
+          setEdit({
+            _k: "participants",
+            rec: {
+              ...base,
+              planType: choice.planType,
+              managerId: choice.planType === "plan" && !choice.newManager ? (choice.managerId || "") : "",
+            },
+          });
+          setSaveError("");
+          setWizard(false);
+        }}
+      />
+    );
+  }
 
   if (edit) {
     const isP = edit._k === "participants";
@@ -7507,25 +7990,52 @@ function Directory({ data, save, view, setView, openId, clearOpen, canCreate, on
       finally { setAgBusy(false); }
     };
     const f = (k) => ({ value: r[k] || "", onChange: (e) => set({ [k]: e.target.value }) });
+    const planBlock = isP ? participantPlanBlock(r, data.managers, r.planType === "plan" ? pendingManager : null) : "";
+    const linkedMgr = isP && r.planType === "plan" ? (pendingManager || managerById(data.managers, r.managerId)) : null;
 
     return (
       <>
         <div className="bandhead" style={{ marginBottom: 16 }}>
           <div className="disp" style={{ fontSize: 27 }}>{r.id ? r.name || "Edit" : isP ? "New participant" : "New plan manager"}</div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button className="btn ghost" onClick={() => setEdit(null)}>Cancel</button>
-            <button className="btn"
+            <button className="btn ghost" style={{ minHeight: 44 }} onClick={closeEdit}>Cancel</button>
+            <button className="btn" style={{ minHeight: 44 }}
               onClick={() => {
                 if (!r.id && !canCreate) { onBlocked(); return; }
-                put(edit._k, isP
-                  ? { ...r, name: toProperName(r.name), ndisNumber: ndisDigits(r.ndisNumber) }
-                  : { ...r, abn: formatAbn(r.abn) });
+                if (!isP) { put(edit._k, { ...r, abn: formatAbn(r.abn) }); return; }
+                const prepared = { ...r, name: toProperName(r.name), ndisNumber: ndisDigits(r.ndisNumber), email: normaliseEmail(r.email) };
+                const result = applyParticipantSave(data, prepared, r.planType === "plan" ? pendingManager : null, { idFactory: uid });
+                if (!result.ok) { setSaveError(result.error); return; }
+                save(result.data);
+                closeEdit();
               }}
-              disabled={!r.name || (isP && (r.nonNdis ? (!(r.defaultDescription || "").trim() || !r.defaultRate) : !r.defaultCode)) || (isP && (r.planType === "plan" ? !r.managerId : !r.terms)) ||
+              disabled={!r.name || (isP && (r.nonNdis ? (!(r.defaultDescription || "").trim() || !r.defaultRate) : !r.defaultCode)) || (isP && (r.planType !== "plan" && !r.terms)) || !!planBlock ||
                 (isP && !r.nonNdis && !isValidNdisNumber(r.ndisNumber)) ||
                 (!isP && (!r.terms || !r.contact?.trim() || !isValidEmail(r.email) || !isValidPhone(r.phone) || !isValidAbn(r.abn)))}>Save</button>
           </div>
         </div>
+        {isP && (saveError || planBlock) && (
+          <div role="alert" style={{ fontSize: 13.5, color: "var(--req)", lineHeight: 1.5, margin: "-6px 0 14px" }}>{saveError || planBlock}</div>
+        )}
+        {r.id && r.planType === "plan" && !linkedMgr && (
+          <div className="callout" role="status" style={{ borderColor: "var(--warn)", marginBottom: 16 }}>
+            This participant is plan-managed and has no plan manager yet. Invoices are sent to their plan manager, so add one when you can. Saving stays off until then.
+            <button type="button" className="btn" style={{ minHeight: 44, marginTop: 10 }} onClick={() => setMgrFix((v) => !v)}>
+              {mgrFix ? "Hide plan manager form" : "Add a plan manager"}
+            </button>
+            {mgrFix && (
+              <div style={{ marginTop: 12 }}>
+                <ParticipantPlanIntake planOnly managers={data.managers} onCancel={() => setMgrFix(false)}
+                  onReady={(choice) => {
+                    setPendingManager(choice.newManager || null);
+                    set({ planType: "plan", managerId: choice.newManager ? "" : (choice.managerId || "") });
+                    setSaveError("");
+                    setMgrFix(false);
+                  }} />
+              </div>
+            )}
+          </div>
+        )}
 
         {isP && r.id && <ParticipantHistory pt={r} data={data} />}
 
@@ -7559,12 +8069,35 @@ function Directory({ data, save, view, setView, openId, clearOpen, canCreate, on
                   </label>
                 </label>
               </div>
+              {!r.id && (
+                <div className="callout" style={{ marginBottom: 16 }}>
+                  <div className="eyebrow" style={{ marginBottom: 6 }}>How their plan is managed</div>
+                  <div style={{ fontWeight: 600, color: "var(--tx)" }}>{planChoiceLabel(r.planType)}</div>
+                  {r.planType === "plan" && (
+                    <div style={{ marginTop: 6 }}>
+                      {pendingManager
+                        ? <>New plan manager: <b style={{ color: "var(--tx)" }}>{pendingManager.name}</b>{pendingManager.email ? <> · {pendingManager.email}</> : null}</>
+                        : <>Plan manager: <b style={{ color: "var(--tx)" }}>{linkedMgr?.name || "Not linked"}</b></>}
+                    </div>
+                  )}
+                  <p style={{ margin: "8px 0 0", fontSize: 13, lineHeight: 1.5 }}>
+                    {r.planType === "self" ? SELF_MANAGED_EXPLAIN : r.planType === "agency" ? NDIA_MANAGED_EXPLAIN : PLAN_MANAGER_EXPLAIN}
+                  </p>
+                  <button type="button" className="btn ghost" style={{ minHeight: 44, marginTop: 10 }} onClick={() => setWizard(true)}>Change</button>
+                </div>
+              )}
               <div className="two">
-                <label className="f"><span>Plan type</span>
-                  <select value={r.planType} onChange={(e) => set({ planType: e.target.value })}>
-                    {PLAN_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                  </select>
-                </label>
+                {r.id && (
+                  <label className="f"><span>Plan type</span>
+                    <select value={r.planType} onChange={(e) => {
+                      const planType = e.target.value;
+                      if (planType !== "plan") setPendingManager(null);
+                      set({ planType, managerId: planType === "plan" ? r.managerId : "" });
+                    }}>
+                      {PLAN_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                    </select>
+                  </label>
+                )}
                 <label className="f"><span>Plan ends</span><AuDateInput value={r.planEnd} onChange={(v) => set({ planEnd: v })} /></label>
               </div>
               <label className="f"><span>Where they are, sets your travel time cap</span>
@@ -7584,12 +8117,17 @@ function Directory({ data, save, view, setView, openId, clearOpen, canCreate, on
                   {r.terms ? <em style={{ fontSize: 11.5, color: "var(--good)", fontStyle: "normal", marginTop: 5, display: "block" }}>{termsHint(r.terms)}</em> : null}
                 </label>
               )}
-              {r.planType === "plan" && (
+              {r.id && r.planType === "plan" && (
                 <label className="f"><span>Plan manager, invoices go here</span>
-                  <select value={r.managerId || ""} onChange={(e) => set({ managerId: e.target.value })}>
-                    <option value="">Not set</option>
+                  <select value={pendingManager ? "" : (r.managerId || "")} onChange={(e) => { setPendingManager(null); set({ managerId: e.target.value }); setSaveError(""); }}>
+                    <option value="">{pendingManager ? `New: ${pendingManager.name}` : "Not set"}</option>
                     {data.managers.map((mg) => <option key={mg.id} value={mg.id}>{mg.name}</option>)}
                   </select>
+                  {pendingManager && (
+                    <em style={{ fontSize: 11.5, color: "var(--good)", fontStyle: "normal", marginTop: 5, display: "block" }}>
+                      {pendingManager.name} will be saved and linked when you save this participant.
+                    </em>
+                  )}
                 </label>
               )}
               {r.nonNdis ? (
@@ -7637,9 +8175,18 @@ function Directory({ data, save, view, setView, openId, clearOpen, canCreate, on
                 </>
               )}
               <div className="two">
-                <label className="f"><span>Their email</span>
-                  <input type="email" value={r.email || ""} onChange={(e) => set({ email: e.target.value })}
-                    onBlur={() => set({ email: normaliseEmail(r.email) })} />
+                <label className={"f" + (!r.id && r.planType === "self" ? " req" : "")}>
+                  <span style={{ color: (!r.id && r.planType === "self" && !isValidEmail(r.email)) ? "var(--req)" : undefined }}>
+                    {!r.id && r.planType === "self" ? "Billing email, required" : "Their email"}
+                  </span>
+                  <input type="email" autoComplete="email" value={r.email || ""} onChange={(e) => set({ email: e.target.value })}
+                    onBlur={() => set({ email: normaliseEmail(r.email) })}
+                    style={!r.id && r.planType === "self" && !isValidEmail(r.email) ? { borderColor: "var(--req)" } : {}} />
+                  {!r.id && r.planType === "self" && (
+                    <em style={{ fontSize: 11.5, color: "var(--tx-3)", fontStyle: "normal", marginTop: 5, display: "block" }}>
+                      Invoices go to this address: the participant or their nominee.
+                    </em>
+                  )}
                 </label>
                 <label className="f"><span>Their phone</span>
                   <input value={r.phone || ""} onChange={(e) => set({ phone: e.target.value })}
@@ -7780,7 +8327,17 @@ function Directory({ data, save, view, setView, openId, clearOpen, canCreate, on
         <div style={{ fontSize: 12.5, color: "var(--tx-3)" }}>
           {list.length} {view === "participants" ? (list.length === 1 ? "participant" : "participants") : (list.length === 1 ? "manager" : "managers")}
         </div>
-        <button className="btn tiny" onClick={() => setEdit({ _k: view, rec: view === "participants" ? blankP : blankM })}>
+        <button className="btn tiny" style={{ minHeight: 44 }} onClick={() => {
+          if (view === "participants") {
+            setEdit(null);
+            setPendingManager(null);
+            setSaveError("");
+            setMgrFix(false);
+            setWizard(true);
+            return;
+          }
+          setEdit({ _k: "managers", rec: blankM });
+        }}>
           Add {view === "participants" ? "participant" : "manager"}
         </button>
       </div>
@@ -7794,7 +8351,7 @@ function Directory({ data, save, view, setView, openId, clearOpen, canCreate, on
       ) : view === "participants" ? list.map((p) => {
         const mg = data.managers.find((x) => x.id === p.managerId);
         return (
-          <div className="row tap" key={p.id} onClick={() => setEdit({ _k: "participants", rec: { ...p } })}>
+          <div className="row tap" key={p.id} onClick={() => { setWizard(false); setPendingManager(null); setSaveError(""); setMgrFix(false); setEdit({ _k: "participants", rec: { ...p } }); }}>
             <span className="dot" style={{ background: "var(--good)" }} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 14, fontWeight: 600 }}>{p.name}</div>
@@ -9732,7 +10289,7 @@ const MANUAL = [
       ],
       [
         "Setup step 5 – Participants",
-        "For each person: name, NDIS number, and how their plan is managed. Plan managed means their manager is billed, so link them. Self managed and NDIA managed are billed directly, so they need their own payment terms. Set the item you usually bill them for, so new invoices open on the right code. The rate beside that item is the published price; change it if yours differs. Tick the service agreement if one is already signed. Set their area, which decides your travel time cap. Setting them up as a private client (not NDIS) is covered under Invoicing."
+        "Adding someone starts by asking how their plan is managed, before the rest of the form. Plan-managed: invoices are sent to their plan manager, so you pick a saved one (search when you have many) or add one first. Name, invoice email and payment terms are required, and the participant cannot be saved until that plan manager is linked. Self-managed: no plan manager. Invoices go to the participant or their nominee, so their billing email is required, and their payment terms are the ones you agreed with them. NDIA-managed (agency-managed): no plan manager. Claims are lodged in the NDIA myplace provider portal. SupportFlow does not email the NDIA. Payment terms on the participant still set the due date on the invoice you keep, and the payment tracker reminds you to check myplace. Then name, NDIS number, the item you usually bill, their area and the service agreement. Editing someone already on file skips these questions. A plan-managed participant with no plan manager shows a reminder, and cannot be saved until one is linked."
       ],
       [
         "Red means it still needs you",
@@ -9914,7 +10471,7 @@ const MANUAL = [
     "q": [
       [
         "Participants and plan managers",
-        "People → Participants lists everyone you support; Add participant opens the same form used in setup, and tapping a person opens their record to edit. People → Plan managers is the same for plan management companies, including their payment terms, which set the due date on every invoice. Tap a plan manager to edit the company, accounts email, phone or payment terms. The list shows how many participants are linked to each one. Emails and phone numbers are checked as you type."
+        "People → Participants lists everyone you support. Add participant first asks how the plan is managed. Plan-managed participants must be linked to a saved plan manager, or you add that plan manager (name, invoice email and payment terms) before they can be saved. Invoices for them are sent to that plan manager. Self-managed participants have no plan manager; invoices go to their billing email, the participant or their nominee. NDIA-managed participants have no plan manager; claims go through the NDIA myplace portal, and SupportFlow does not email the NDIA. Tapping a person opens their record to edit without those questions. If they are plan-managed and have no plan manager, the record asks you to add one and will not save until you do. People → Plan managers lists plan management companies, including payment terms, which set the due date on every invoice sent to them. Tap a plan manager to edit the company, accounts email, phone or payment terms. The list shows how many participants are linked to each one. Emails and phone numbers are checked as you type."
       ],
       [
         "The due date is blank",
