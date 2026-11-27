@@ -212,6 +212,14 @@ Feedback or support communications may contain basic technical information such 
 
 Support and feedback emails may be retained for as long as reasonably necessary to investigate the issue, respond to you and improve the app.
 
+### 5.5 Voice notes
+
+Voice notes is optional. If you hold the microphone on a shift note, that audio clip is sent to OpenAI to be transcribed into text. SupportFlow does not keep the audio or the transcript on its servers. The text is inserted into the note on your device, and it is saved only when you tap Save note.
+
+The request does not include the participant's name, NDIS number, or the rest of their record. What you say in the recording can still include personal information. OpenAI's own terms apply to the audio it receives.
+
+Voice notes is an A$5 monthly add-on, included with Premium. An A$5 top-up adds 120 minutes. The app stores only the minutes used and the dates of that allowance, not the recording.
+
 ## 6. Development assistance
 
 

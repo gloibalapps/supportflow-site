@@ -22,6 +22,9 @@ import crypto from "node:crypto";
 import { supa, recomputeLicence, PRODUCTS, emailSub } from "../lib/licence.mjs";
 import { isTrackerProduct } from "../lib/tracker.mjs";
 import { SMS_CREDITS_PER_PERIOD } from "../lib/sms.mjs";
+import { TOPUP_SECONDS, usageKey } from "../lib/voice-notes.mjs";
+import { grantVoiceTopupMinutes, revokeTopupOnce, voiceSubscriptionEntitled, voiceSubscriptionRow, VOICE_MONTHLY, VOICE_TOPUP, VOICE_KIND } from "../lib/voice-billing.mjs";
+import { openUsageStore, updateUsage } from "../lib/voice-store.mjs";
 
 const TOLERANCE_SECONDS = 300; // reject anything claiming to be older than 5 minutes
 
@@ -357,7 +360,82 @@ async function handleSmsReversal(paymentIntentId, chargeId, reason) {
   for (const r of rows || []) await supa("rpc/tracker_sms_zero", { method: "POST", body: { p_sub: r.google_sub, p_reason: reason, p_ref: r.stripe_invoice_id } });
 }
 
+const voiceSubOf = (s) => {
+  const meta = s?.metadata || {};
+  if (meta.kind !== VOICE_KIND && meta.product !== VOICE_MONTHLY) return "";
+  if (meta.product !== VOICE_MONTHLY) return "";
+  return meta.google_sub || "";
+};
+
+async function upsertVoiceSubscription(sub, stripeSub, deleted) {
+  await supa("voice_subscriptions?on_conflict=stripe_subscription_id", {
+    method: "POST",
+    prefer: "resolution=merge-duplicates,return=minimal",
+    body: voiceSubscriptionRow(sub, stripeSub, deleted),
+  });
+}
+
+async function handleVoiceSubscriptionChange(s, deleted) {
+  const sub = voiceSubOf(s);
+  if (!sub || !s?.id) return;
+  await upsertVoiceSubscription(sub, s, deleted);
+  if (!deleted && voiceSubscriptionEntitled(s.status)) return;
+  if (!deleted && s.status !== "canceled" && s.status !== "unpaid" && s.status !== "incomplete_expired") return;
+}
+
+async function grantVoiceTopupSession(session) {
+  if (session.metadata?.kind !== VOICE_KIND || session.metadata?.product !== VOICE_TOPUP) return;
+  if (session.payment_status !== "paid" && session.payment_status !== "no_payment_required") return;
+  const sub = session.metadata.google_sub || session.client_reference_id;
+  if (!sub || !session.id) return;
+  const existing = await supa(`voice_topups?stripe_session_id=eq.${encodeURIComponent(session.id)}&select=status`);
+  if (existing?.[0]?.status === "paid") return;
+  const store = await openUsageStore();
+  await grantVoiceTopupMinutes(store, sub, session.id, new Date().toISOString().slice(0, 10));
+  const paymentIntent = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id || null;
+  await supa("voice_topups?on_conflict=stripe_session_id", {
+    method: "POST",
+    prefer: "resolution=merge-duplicates,return=minimal",
+    body: {
+      stripe_session_id: session.id,
+      stripe_payment_intent_id: paymentIntent,
+      google_sub: sub,
+      seconds: TOPUP_SECONDS,
+      status: "paid",
+      updated_at: new Date().toISOString(),
+    },
+  });
+}
+
+async function reverseVoiceTopup(paymentIntentId, status) {
+  if (!paymentIntentId) return;
+  const rows = await supa(`voice_topups?stripe_payment_intent_id=eq.${encodeURIComponent(paymentIntentId)}&status=eq.paid&select=stripe_session_id,google_sub`);
+  const store = rows?.length ? await openUsageStore() : null;
+  for (const row of rows || []) {
+    const key = usageKey({ sub: row.google_sub });
+    if (store && key) {
+      await updateUsage(store, key, (raw) => ({ write: true, value: revokeTopupOnce(raw, row.stripe_session_id) }));
+    }
+    await supa(`voice_topups?stripe_session_id=eq.${encodeURIComponent(row.stripe_session_id)}`, {
+      method: "PATCH", prefer: "return=minimal", body: { status, updated_at: new Date().toISOString() },
+    });
+  }
+}
+
 async function handlePaidSession(session) {
+  if (session.metadata?.kind === VOICE_KIND) {
+    if (session.mode === "subscription" && session.metadata.product === VOICE_MONTHLY && session.subscription) {
+      const id = typeof session.subscription === "string" ? session.subscription : session.subscription.id;
+      const s = await stripeGet(`subscriptions/${encodeURIComponent(id)}`);
+      const sub = voiceSubOf(s) || session.metadata.google_sub || session.client_reference_id;
+      if (sub) await upsertVoiceSubscription(sub, s, false);
+      return;
+    }
+    if (session.mode === "payment" && session.metadata.product === VOICE_TOPUP) {
+      await grantVoiceTopupSession(session);
+      return;
+    }
+  }
   if (session.mode === "subscription") {
     // SMS pack: record the subscription; credits wait for invoice.paid.
     if (session.metadata?.kind === "tracker" && session.metadata?.product === "tracker_sms" && session.subscription) {
@@ -474,21 +552,26 @@ export default async (req) => {
         }
         // Any refund of an SMS pack charge removes that period's remaining texts.
         await handleSmsReversal(charge.payment_intent, charge.id, "refunded");
+        await reverseVoiceTopup(charge.payment_intent, "refunded");
         break;
       }
       case "charge.dispute.created":
         await handleLicenceReversal(event.data.object.payment_intent, "disputed");
         await handleSmsReversal(event.data.object.payment_intent, event.data.object.charge, "disputed");
+        await reverseVoiceTopup(event.data.object.payment_intent, "disputed");
         break;
       // Payment tracker SMS pack (subscription).
       case "invoice.paid":
         await handleSmsInvoicePaid(event.data.object);
         break;
+      case "customer.subscription.created":
       case "customer.subscription.updated":
         await handleSmsSubscriptionChange(event.data.object, false);
+        await handleVoiceSubscriptionChange(event.data.object, false);
         break;
       case "customer.subscription.deleted":
         await handleSmsSubscriptionChange(event.data.object, true);
+        await handleVoiceSubscriptionChange(event.data.object, true);
         break;
       case "charge.dispute.closed":
         if (event.data.object.status === "won") await handleLicenceReversal(event.data.object.payment_intent, "paid");
