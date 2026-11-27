@@ -8955,12 +8955,28 @@ function voiceSetTapMode(on) {
 async function voiceHeaders() {
   const headers = { ...licenceHeaders() };
   try {
+    if (!headers["X-SF-Licence"] && LICENCE_CTX.session) headers["X-SF-Licence"] = LICENCE_CTX.session;
     if (!headers["X-SF-Device"]) {
       const id = await licenceDeviceId();
       if (id) headers["X-SF-Device"] = id;
     }
   } catch (e) { }
   return headers;
+}
+async function voiceCheckout(product) {
+  try {
+    const headers = await voiceHeaders();
+    const res = await fetch("/.netlify/functions/transcribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify({ action: "checkout", product, session: LICENCE_CTX.session || "" }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (data && data.url) { window.location.href = data.url; return ""; }
+    return (data && data.message) || "Voice notes checkout isn't available yet.";
+  } catch (e) {
+    return "Voice notes checkout isn't available yet.";
+  }
 }
 function voiceClock(seconds) {
   const s = Math.max(0, Math.ceil(Number(seconds) || 0));
@@ -9008,6 +9024,8 @@ function voiceResultHint(error) {
   if (error === "voice notes not configured" || error === "not-configured") return VOICE_NOT_CONFIGURED;
   if (error === "note-limit") return "This note has used its 2 minutes. Save the note to start another. You can still type.";
   if (error === "out-of-minutes") return "You've used this month's 120 minutes of voice notes. You can still type.";
+  if (error === "voice-notes-required") return "Voice notes is A$5 a month, and it is included in Premium. You can still type.";
+  if (error === "entitlement-unavailable") return "Voice notes couldn't be checked just now. You can still type.";
   if (error === "licence-required") return "Voice notes need an active licence on this device. You can still type the note.";
   if (error === "rate-limited") return "Voice notes are busy. Try again in a moment. Your note is unchanged.";
   if (error === "too-large" || error === "bad-audio") return "That recording couldn't be sent. Your note is unchanged.";
@@ -9059,6 +9077,9 @@ function VoiceNoteMic({ onText, onBusy, epoch, draftId }) {
   const [hint, setHint] = useState("");
   const [sheet, setSheet] = useState(null);
   const [usage, setUsage] = useState(null);
+  const [access, setAccess] = useState("checking");
+  const [checkout, setCheckout] = useState({ voice_notes: false, voice_topup: false });
+  const [buyMsg, setBuyMsg] = useState("");
   const [tapMode, setTapMode] = useState(voiceTapMode);
   const [primed, setPrimed] = useState(() => { try { return sessionStorage.getItem("sf_voice_primed") === "1"; } catch (e) { return false; } });
   const [consented, setConsented] = useState(() => { try { return localStorage.getItem("sf_voice_consent_v1") === "1"; } catch (e) { return false; } });
@@ -9067,11 +9088,13 @@ function VoiceNoteMic({ onText, onBusy, epoch, draftId }) {
   const primedRef = useRef(primed);
   const consentRef = useRef(consented);
   const draftRef = useRef(draftId);
+  const accessRef = useRef(access);
   noteRef.current = noteLeft;
   usageRef.current = usage;
   primedRef.current = primed;
   consentRef.current = consented;
   draftRef.current = draftId;
+  accessRef.current = access;
   phaseRef.current = phase;
 
   useEffect(() => { if (onBusy) onBusy(phase === "recording" || phase === "transcribing"); }, [phase]);
@@ -9105,7 +9128,12 @@ function VoiceNoteMic({ onText, onBusy, epoch, draftId }) {
             setShown(data.usage.noteSecondsLeft);
           }
         }
-        if (data.error === "voice notes not configured" || data.configured === false) setHint(VOICE_NOT_CONFIGURED);
+        setCheckout(data.checkout || { voice_notes: false, voice_topup: false });
+        if (data.error === "voice notes not configured" || data.configured === false) {
+          setHint(VOICE_NOT_CONFIGURED);
+          setAccess("open");
+        } else if (data.entitled === false) setAccess("locked");
+        else if (data.entitled === true) setAccess("open");
         else if (data.error === "licence-required") setHint("Voice notes need an active licence on this device. You can still type the note.");
       } catch (e) {
         if (!cancel) setHint("Voice notes couldn't be checked just now. You can still type the note.");
@@ -9123,13 +9151,15 @@ function VoiceNoteMic({ onText, onBusy, epoch, draftId }) {
   const blocked = () => {
     if (phaseRef.current === "transcribing") return "busy";
     if (phaseRef.current === "recording") return "";
+    if (accessRef.current === "locked") return "locked";
     if (usageRef.current && usageRef.current.out) return "out";
     if (noteRef.current <= 0.4) return "note";
     if (!consentRef.current) return "consent";
     return "";
   };
   const openBlocked = (reason) => {
-    if (reason === "out") setHint("You've used this month's 120 minutes of voice notes. You can still type.");
+    if (reason === "locked") setSheet("unlock");
+    else if (reason === "out") setSheet("topup");
     else if (reason === "note") setHint("This note has used its 2 minutes. Save the note to start another. You can still type.");
     else if (reason === "consent") setSheet("consent");
     else if (reason === "busy") setHint("Finishing the last recording. Your note is unchanged.");
@@ -9159,6 +9189,7 @@ function VoiceNoteMic({ onText, onBusy, epoch, draftId }) {
       const data = await res.json().catch(() => ({}));
       if (data.usage) setUsage(data.usage);
       if (data.text && onText) onText(data.text);
+      if (data.error === "voice-notes-required") setSheet("unlock");
       if (!data.text) setHint(navigator.onLine === false ? "Voice notes need a connection. You can still type." : voiceResultHint(data.error));
     } catch (e) {
       setHint(navigator.onLine === false ? "Voice notes need a connection. You can still type." : "Couldn't transcribe that. Your note is unchanged.");
@@ -9314,12 +9345,19 @@ function VoiceNoteMic({ onText, onBusy, epoch, draftId }) {
     primeMic();
   };
 
+  const buy = async (product) => {
+    setBuyMsg("");
+    try { setBuyMsg(await voiceCheckout(product)); }
+    catch (e) { setBuyMsg("Voice notes checkout isn't available yet."); }
+  };
   const recording = phase === "recording";
   const amber = recording && shown <= 10;
-  const out = !!(usage && usage.out);
+  const locked = access === "locked";
+  const out = !locked && !!(usage && usage.out);
   const low = !recording && !out && usage && usage.low;
   const monthlyLeft = usage ? voiceMins(usage.remainingSeconds) + " min left this month" : "120 min a month";
   const label = recording ? "Recording, " + voiceClock(shown) + " left. Release to stop."
+    : locked ? "Voice notes, locked"
     : out ? "Out of voice minutes"
     : (tapMode ? "Tap to start and stop a voice note" : "Hold to record a voice note");
 
@@ -9332,7 +9370,7 @@ function VoiceNoteMic({ onText, onBusy, epoch, draftId }) {
           className="vn-mic"
           data-on={recording ? 1 : 0}
           data-amber={amber ? 1 : 0}
-          data-out={out ? 1 : 0}
+          data-out={out || locked ? 1 : 0}
           data-busy={phase === "transcribing" ? 1 : 0}
           aria-label={label}
           aria-pressed={recording}
@@ -9356,10 +9394,37 @@ function VoiceNoteMic({ onText, onBusy, epoch, draftId }) {
         <VoiceSheet label="Before you record" onClose={() => setSheet(null)}>
           <div className="disp" style={{ fontSize: 22, marginBottom: 8 }}>Before you record</div>
           <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--tx-2)", margin: "0 0 16px" }}>
-            Recording isn't kept. Only the audio clip is sent to be transcribed, then deleted. No participant name is sent with it. Check the text before saving. Don't record other people without their agreement.
+            Recording isn't kept by SupportFlow. The audio clip is sent to OpenAI to be transcribed, then deleted. No participant name is sent with it. Check the text before saving. Don't record other people without their agreement.
           </p>
           <button className="btn" style={{ width: "100%", minHeight: 48 }} onClick={acceptConsent}>I understand</button>
           <button className="btn ghost" style={{ width: "100%", minHeight: 44, marginTop: 8 }} onClick={() => setSheet(null)}>Not now</button>
+        </VoiceSheet>
+      )}
+      {sheet === "unlock" && (
+        <VoiceSheet label="Voice notes" onClose={() => setSheet(null)}>
+          <div className="eyebrow" style={{ color: "var(--brass)" }}>Voice notes</div>
+          <div className="disp" style={{ fontSize: 22, margin: "6px 0 8px" }}>A$5 a month. Included in Premium.</div>
+          <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--tx-2)", margin: "0 0 16px" }}>
+            Hold the mic to add words to the note. 120 minutes a month on this Google account, and 2 minutes on each note. Nothing is saved until you tap Save note.
+          </p>
+          <button className="btn" style={{ width: "100%", minHeight: 48 }} disabled={!checkout.voice_notes} onClick={() => buy("voice_notes")}>
+            {checkout.voice_notes ? "Add Voice notes — A$5/month" : "Voice notes checkout isn't available yet"}
+          </button>
+          <button className="btn ghost" style={{ width: "100%", minHeight: 44, marginTop: 8 }} onClick={() => setSheet(null)}>Not now</button>
+          {buyMsg && <div style={{ fontSize: 12.5, color: "var(--tx-2)", marginTop: 12, lineHeight: 1.5 }}>{buyMsg}</div>}
+        </VoiceSheet>
+      )}
+      {sheet === "topup" && (
+        <VoiceSheet label="Add voice minutes" onClose={() => setSheet(null)}>
+          <div className="disp" style={{ fontSize: 22, marginBottom: 8 }}>Add 120 minutes for A$5.</div>
+          <p style={{ fontSize: 13.5, lineHeight: 1.55, color: "var(--tx-3)", margin: "0 0 16px" }}>
+            These minutes are used after the monthly 120, and they end when the month starts again. Each note is still limited to 2 minutes.
+          </p>
+          <button className="btn" style={{ width: "100%", minHeight: 48 }} disabled={!checkout.voice_topup} onClick={() => buy("voice_topup")}>
+            {checkout.voice_topup ? "Top up — A$5" : "Voice notes checkout isn't available yet"}
+          </button>
+          <button className="btn ghost" style={{ width: "100%", minHeight: 44, marginTop: 8 }} onClick={() => setSheet(null)}>Not now</button>
+          {buyMsg && <div style={{ fontSize: 12.5, color: "var(--tx-2)", marginTop: 12, lineHeight: 1.5 }}>{buyMsg}</div>}
         </VoiceSheet>
       )}
     </>
@@ -9370,6 +9435,10 @@ function VoiceNotesSettings() {
   const [usage, setUsage] = useState(null);
   const [tap, setTap] = useState(voiceTapMode);
   const [msg, setMsg] = useState("");
+  const [buyMsg, setBuyMsg] = useState("");
+  const [checkout, setCheckout] = useState({ voice_notes: false, voice_topup: false });
+  const [entitled, setEntitled] = useState(false);
+  const [premium, setPremium] = useState(false);
   useEffect(() => {
     let cancel = false;
     (async () => {
@@ -9384,6 +9453,9 @@ function VoiceNotesSettings() {
         const data = await res.json().catch(() => ({}));
         if (cancel) return;
         if (data.usage) setUsage(data.usage);
+        setCheckout(data.checkout || { voice_notes: false, voice_topup: false });
+        setEntitled(data.entitled === true);
+        setPremium(data.premium === true);
         if (data.error === "voice notes not configured" || data.configured === false) setMsg(VOICE_NOT_CONFIGURED);
         else if (data.error === "licence-required") setMsg("Voice notes need an active licence on this device. You can still type a note.");
         else if (!res.ok && !data.usage) setMsg("Couldn't load voice minutes. You can still type a note.");
@@ -9408,7 +9480,21 @@ function VoiceNotesSettings() {
       <div style={{ fontSize: 12, color: "var(--tx-3)", lineHeight: 1.55 }}>
         Off means press and hold the mic, including with the space bar when the mic is focused. On is the same 2 minute countdown, for someone who can't hold the button. Words are added to the note. Nothing is saved until you tap Save note.
       </div>
+      {premium && <div style={{ fontSize: 12.5, color: "var(--tx-2)", marginTop: 12 }}>Premium includes Voice notes.</div>}
+      {!premium && (
+        <button className="btn" style={{ width: "100%", marginTop: 12, minHeight: 48 }} disabled={entitled || !checkout.voice_notes}
+          onClick={async () => { try { setBuyMsg(await voiceCheckout("voice_notes")); } catch (e) { setBuyMsg("Voice notes checkout isn't available yet."); } }}>
+          {entitled ? "Voice notes is active" : checkout.voice_notes ? "Add Voice notes — A$5/month" : "Voice notes checkout isn't available yet"}
+        </button>
+      )}
+      {entitled && (
+        <button className="btn ghost" style={{ width: "100%", marginTop: 8, minHeight: 44 }} disabled={!checkout.voice_topup}
+          onClick={async () => { try { setBuyMsg(await voiceCheckout("voice_topup")); } catch (e) { setBuyMsg("Voice notes checkout isn't available yet."); } }}>
+          {checkout.voice_topup ? "Top up 120 minutes — A$5" : "Voice notes checkout isn't available yet"}
+        </button>
+      )}
       {msg && <div style={{ fontSize: 12.5, color: "var(--warn)", marginTop: 10 }}>{msg}</div>}
+      {buyMsg && <div style={{ fontSize: 12.5, color: "var(--tx-2)", marginTop: 10 }}>{buyMsg}</div>}
     </div>
   );
 }
@@ -10369,7 +10455,7 @@ const MANUAL = [
       ],
       [
         "Voice notes",
-        "On Work → Notes, hold the mic beside What happened. Let go and the words are added at the cursor, or at the end if you had not placed one. What you already typed stays. A short tap does not record. Each note has 2 minutes, and you have 120 minutes a month. The minutes show under the mic. Nothing is saved until you tap Save note. Then use Tidy this up if you want the words sorted into sections. When that button is labelled AI assist, use that instead: it drafts a progress note for you to review, and it still does not save. Save note is the step that keeps it. Recording does not start on its own, including from Add a note for this shift. Only the audio clip is sent. No participant name goes with it."
+        "On Work → Notes, hold the mic beside What happened. Let go and the words are added at the cursor, or at the end if you had not placed one. What you already typed stays. A short tap does not record. Each note has 2 minutes, and the Google account has 120 minutes a month. The minutes show under the mic. Nothing is saved until you tap Save note. Then use Tidy this up if you want the words sorted into sections. When that button is labelled AI assist, use that instead: it drafts a progress note for you to review, and it still does not save. Save note is the step that keeps it. Voice notes is A$5 a month and is included in Premium. A$5 buys another 120 minutes, used after the monthly 120, and those extra minutes end when the month starts again. They do not lift the 2 minute limit on a note. If checkout isn't available yet, the button says so. Recording does not start on its own, including from Add a note for this shift. The audio clip is sent to OpenAI to be transcribed, then deleted. No participant name goes with it."
       ],
       [
         "Sending a note",

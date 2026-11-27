@@ -42,9 +42,13 @@ test("a missing transcription key is a friendly message, not a crash", () => {
   assert.match(mic, /catch \(e\)/);
 });
 
-test("the purchase add-on is not offered in the notes UI", () => {
+test("the A$5 add-on and the 120-minute top-up are offered, and a missing price stays quiet", () => {
   const ui = app.slice(app.indexOf("function VoiceNoteMic"), app.indexOf("function Notes("));
-  assert.doesNotMatch(ui, /A\$5|voice_topup|Add Voice notes|STRIPE_PRICE_VOICE/);
+  assert.match(ui, /Add Voice notes — A\$5\/month/);
+  assert.match(ui, /Add 120 minutes for A\$5/);
+  assert.match(ui, /Voice notes checkout isn't available yet/);
+  assert.match(ui, /sent to OpenAI/);
+  assert.match(ui, /catch \(e\)/);
 });
 
 test("the manual explains hold, limits, AI assist, then Save, and leaves the videos alone", () => {
@@ -52,6 +56,9 @@ test("the manual explains hold, limits, AI assist, then Save, and leaves the vid
   assert.match(section, /Hold the microphone/);
   assert.match(section, /2 minutes/);
   assert.match(section, /120 minutes a month/);
+  assert.match(section, /A\$5 a month/);
+  assert.match(section, /another \*\*120 minutes\*\*/);
+  assert.match(section, /OpenAI/);
   assert.match(section, /AI assist/);
   assert.match(section, /Save note/);
   assert.doesNotMatch(section, /youtube|iframe|watch\?v=/i);

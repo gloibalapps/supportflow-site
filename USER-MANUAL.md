@@ -364,10 +364,18 @@ the whole note on their own.
 Each note has **2 minutes**, shared across every hold before you save. The
 countdown only moves while you are holding, turns amber at **0:10**, and
 stops at **0:00**. Saving the note, or cancelling an edit, starts the 2
-minutes again. You also have **120 minutes a month** on this account. The
-time left on this note, and the minutes left this month, show under the
-mic. At zero for the month, the mic says you are out of voice minutes and
-you can still type.
+minutes again. The Google account has **120 minutes a month**. The time
+left on this note, and the minutes left this month, show under the mic. At
+zero for the month, the mic says you are out of voice minutes and you can
+still type.
+
+Voice notes is **A$5 a month**, and it is included in Premium. You do not
+buy it again if this Google account already has Premium. If the month runs
+out, **A$5** adds another **120 minutes**. Those extra minutes are used
+after the monthly 120, and they end when the month starts again. They do
+not lift the 2 minute limit on a note. If checkout is not set up yet, the
+button says Voice notes checkout isn't available yet, and nothing is
+charged.
 
 While a recording is being written in, the box cannot be edited and Save is
 switched off, along with the draft button beside it.
@@ -381,10 +389,10 @@ is the step that keeps the note.
 After a shift is saved, **Add a note for this shift** opens Notes with that
 participant and date filled in. It does not start recording.
 
-The first time, the app says the recording is not kept. Only the audio clip
-is sent to be transcribed, then deleted. No participant name or NDIS number
-is sent with it. Check the text before you save, and do not record other
-people without their agreement.
+The first time, the app says the recording is not kept by SupportFlow. The
+audio clip is sent to OpenAI to be transcribed, then deleted. No participant
+name or NDIS number is sent with it. Check the text before you save, and do
+not record other people without their agreement.
 
 Voice notes need a connection. If they are not set up on the site yet, the
 screen says voice notes are not set up and your note is unchanged. If the

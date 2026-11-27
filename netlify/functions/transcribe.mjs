@@ -22,9 +22,9 @@ import {
   audioKind,
   billableSeconds,
   canStartClip,
-  checkoutPlaceholder,
   cleanTranscript,
   containerDurationSeconds,
+  durationOverNoteCap,
   localDateFor,
   normalizeUsage,
   publicUsage,
@@ -33,6 +33,7 @@ import {
   refundSeconds,
   DRAFT_RE,
 } from "../lib/voice-notes.mjs";
+import { defaultVoiceEntitlement, handleVoiceCheckout, voiceCheckoutFlags } from "../lib/voice-billing.mjs";
 import { openUsageStore, updateUsage } from "../lib/voice-store.mjs";
 
 export const config = { timeout: 26 };
@@ -122,7 +123,27 @@ function callerKey(req, lic) {
   const sub = (lic && lic.sub) || sessionSub(req);
   const deviceHeader = req.headers.get("x-sf-device") || "";
   const deviceId = isUuid(deviceHeader) ? deviceHeader : "";
-  return usageKey({ sub, deviceId });
+  return { sub, deviceId, key: usageKey({ sub, deviceId }) };
+}
+
+function checkoutSession(req, body, deps) {
+  if (deps.session) return deps.session;
+  try {
+    const token = req.headers.get("x-sf-licence") || (typeof body?.session === "string" ? body.session : "") || "";
+    const session = token ? verifySession(token) : null;
+    if (!session?.sub) return null;
+    const deviceHeader = req.headers.get("x-sf-device") || "";
+    return { sub: session.sub, email: session.email || "", deviceId: isUuid(deviceHeader) ? deviceHeader : "" };
+  } catch {
+    return null;
+  }
+}
+
+async function entitlementFor(sub, deps) {
+  if (!sub) return { ok: false, premium: false, subscription: false };
+  if (deps.entitled) return await deps.entitled(sub);
+  const { supa } = await import("../lib/licence.mjs");
+  return defaultVoiceEntitlement(sub, supa);
 }
 
 export async function handleTranscribe(req, deps = {}) {
@@ -147,39 +168,59 @@ async function handleTranscribeInner(req, deps) {
   if (lic && lic.enforced && !lic.ok && !lic.error) return json({ error: "licence-required" }, 402);
 
   const configured = !!openAiKey(env);
-  const key = callerKey(req, lic);
+  const who = callerKey(req, lic);
+  const key = who.sub ? usageKey({ sub: who.sub }) : who.key;
   const ctype = req.headers.get("content-type") || "";
 
   if (ctype.includes("application/json")) {
     let body = {};
     try { body = await req.json(); } catch { return json({ error: "bad request" }, 400); }
     if (body.action === "checkout") {
-      // Placeholder only. No Stripe call, no price, no minutes granted.
-      return json(checkoutPlaceholder(body.product), 501);
+      const result = await handleVoiceCheckout(body, {
+        env,
+        session: checkoutSession(req, body, deps),
+        entitled: (sub) => entitlementFor(sub, deps),
+        fetchImpl: deps.fetchImpl,
+      });
+      return json(result.body, result.status);
     }
     if (body.action === "status") {
       const draftId = DRAFT_RE.test(body.draftId || "") ? body.draftId : "";
+      const checkout = voiceCheckoutFlags(env);
       let usage = null;
-      if (key) {
+      let ent = { ok: false, premium: false, subscription: false };
+      if (who.sub) {
+        try { ent = await entitlementFor(who.sub, deps); }
+        catch { ent = { ok: false, premium: false, subscription: false, error: true }; }
+      }
+      if (key && ent.ok) {
         try {
           const store = deps.store || await openUsageStore();
           const localDate = localDateFor(new Date(), body.tzOffsetMinutes);
           usage = publicUsage(await readUsage(store, key, localDate), draftId);
         } catch (e) {
           console.error("transcribe status");
-          if (configured) return json({ error: "usage-unavailable", configured: true }, 503);
+          if (configured) return json({ error: "usage-unavailable", configured: true, entitled: ent.ok, premium: !!ent.premium, checkout }, 503);
         }
       }
-      if (!configured) return json({ error: "voice notes not configured", configured: false, usage }, 503);
-      if (!key) return json({ error: "licence-required", configured: true, usage: null }, 400);
-      if (!usage) return json({ error: "usage-unavailable", configured: true }, 503);
-      return json({ configured: true, usage });
+      if (!configured) {
+        return json({ error: "voice notes not configured", configured: false, entitled: ent.ok, premium: !!ent.premium, checkout, usage }, 503);
+      }
+      if (!who.sub) return json({ error: "sign-in-required", configured: true, entitled: false, checkout, usage: null }, 401);
+      if (!ent.ok) return json({ configured: true, entitled: false, premium: false, checkout, usage: null });
+      if (!usage) return json({ error: "usage-unavailable", configured: true, entitled: true, premium: !!ent.premium, checkout }, 503);
+      return json({ configured: true, entitled: true, premium: !!ent.premium, checkout, usage });
     }
     return json({ error: "bad request" }, 400);
   }
 
   if (!configured && !deps.transcribeAudio) return json({ error: "voice notes not configured" }, 503);
-  if (!key) return json({ error: "licence-required" }, 400);
+  if (lic && lic.enforced && !who.sub) return json({ error: "licence-required" }, 402);
+  if (!who.sub) return json({ error: "voice-notes-required" }, 402);
+  let ent;
+  try { ent = await entitlementFor(who.sub, deps); }
+  catch { return json({ error: "entitlement-unavailable" }, 503); }
+  if (!ent.ok) return json({ error: "voice-notes-required" }, 402);
 
   let form;
   try { form = await req.formData(); } catch { return json({ error: "bad-audio" }, 400); }
@@ -201,9 +242,13 @@ async function handleTranscribeInner(req, deps) {
     return json({ error: "usage-unavailable" }, 503);
   }
   const parsed = containerDurationSeconds(bytes);
+  const clientSeconds = Number(form.get("durationMs")) / 1000;
+  if (durationOverNoteCap({ clientSeconds, parsedSeconds: parsed })) {
+    return json({ error: "note-limit", usage: publicUsage(usage, draftId) }, 400);
+  }
   const seconds = billableSeconds({
     bytes: bytes.length,
-    clientSeconds: Number(form.get("durationMs")) / 1000,
+    clientSeconds,
     parsedSeconds: parsed,
   });
   if (!(seconds >= 0.4) || seconds > NOTE_SECONDS) {

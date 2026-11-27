@@ -1,20 +1,16 @@
 // Voice notes allowances and audio checks. No audio, transcript, or Stripe calls.
+// Checkout and entitlement live in voice-billing.mjs.
 //
 // Caps enforced here, then stored by the transcribe function:
 //   * 2 minutes for one unsaved note (a random draft id, not a participant id)
-//   * 120 minutes per user per calendar month
+//   * 120 minutes per Google account per calendar month
+//   * a top-up adds another 120 minutes, used after the monthly allowance,
+//     and those minutes end when the calendar month rolls. The 2-minute
+//     note cap stays.
 //
-// The A$5/month add-on and the A$5 top-up from the earlier voice-notes branch
-// are not for sale. Checkout does not call Stripe and does not grant minutes.
-// paymentGrantsVoice records that earlier rule (Premium / a voice_notes row).
-// The live function does not consult it: voice notes use the same licence
-// check as the other AI functions, plus these time caps.
-//
-// TODO(stripe): prices were never created. Do not call Stripe from here.
-//   STRIPE_PRICE_VOICE_NOTES  A$5 AUD per month, recurring — conflicts with
-//                             current one-off pricing (the only monthly charge
-//                             on main is optional SMS at A$4.99).
-//   STRIPE_PRICE_VOICE_TOPUP  A$5 AUD one-off, +120 minutes until period end.
+// Prices (set by Evan in Netlify, not created here):
+//   STRIPE_PRICE_VOICE_NOTES  A$5.00 AUD per month, recurring
+//   STRIPE_PRICE_VOICE_TOPUP  A$5.00 AUD once, +120 minutes
 
 export const MONTHLY_SECONDS = 120 * 60;
 export const TOPUP_SECONDS = 120 * 60;
@@ -25,13 +21,13 @@ export const LOW_SECONDS = 10 * 60;
 export const DRAFT_RE = /^vn-[a-z0-9-]{8,44}$/i;
 
 export const VOICE_PRODUCTS = Object.freeze({
-  voice_notes: { env: "STRIPE_PRICE_VOICE_NOTES", aud: 5, interval: "month", enabled: false },
-  voice_topup: { env: "STRIPE_PRICE_VOICE_TOPUP", aud: 5, interval: "once", seconds: TOPUP_SECONDS, enabled: false },
+  voice_notes: { env: "STRIPE_PRICE_VOICE_NOTES", aud: 5, interval: "month" },
+  voice_topup: { env: "STRIPE_PRICE_VOICE_TOPUP", aud: 5, interval: "once", seconds: TOPUP_SECONDS },
 });
 
-// Earlier purchase rule. Not used to allow or refuse a transcription.
+// Premium includes Voice notes. A voice_notes subscription is stored separately.
 export function paymentGrantsVoice(rows) {
-  return Array.isArray(rows) && rows.some((row) => row && (row.product === "voice_notes" || row.product === "tracker_full"));
+  return Array.isArray(rows) && rows.some((row) => row && row.product === "tracker_full");
 }
 
 export function periodFor(localDate) {
@@ -86,16 +82,14 @@ export function normalizeUsage(raw, localDate) {
     topupSecondsRemaining: Math.max(0, Number(base.topupSecondsRemaining) || 0),
     drafts: cleanDrafts(base.drafts),
   };
-  if (!next.periodStart || !next.periodEnd || localDate >= next.periodEnd || localDate < next.periodStart) {
+  // Roll forward only. A caller-supplied timezone offset must not rewind the
+  // stored month and zero the minutes already used.
+  if (!next.periodStart || !next.periodEnd) {
     const period = periodFor(localDate);
-    next = {
-      ...next,
-      periodStart: period.periodStart,
-      periodEnd: period.periodEnd,
-      allowanceSecondsUsed: 0,
-      topupSecondsRemaining: 0,
-      drafts: {},
-    };
+    next = { ...next, ...period, allowanceSecondsUsed: 0, topupSecondsRemaining: 0, drafts: {}, topupGrants: [] };
+  } else if (localDate >= next.periodEnd) {
+    const period = periodFor(localDate);
+    next = { ...next, ...period, allowanceSecondsUsed: 0, topupSecondsRemaining: 0, drafts: {}, topupGrants: [] };
   }
   return next;
 }
@@ -291,9 +285,23 @@ export function audioKind(bytes, declaredType) {
     : { ext: "mp4", type: "audio/mp4" };
 }
 
+// True when the container or the client reports a clip longer than one note.
+// A parsed duration wins: a short file is not refused because the client
+// claimed a longer one. An unparsed file is refused when the client duration
+// is already over the cap. Half a second of encoder slack is allowed.
+export function durationOverNoteCap({ clientSeconds, parsedSeconds }) {
+  const limit = NOTE_SECONDS + 0.5;
+  const parsed = Number(parsedSeconds);
+  const client = Number(clientSeconds);
+  if (Number.isFinite(parsed) && parsed > 0) return parsed > limit;
+  return Number.isFinite(client) && client > limit;
+}
+
 // Charge the longer of the container duration, the client duration, and a
 // bitrate floor, capped at one note. A short honest clip is not rounded up
-// to the floor when the client duration is already higher.
+// to the floor when the client duration is already higher. Call
+// durationOverNoteCap first and refuse the clip before this clamp, so a
+// recording longer than one note is not transcribed.
 export function billableSeconds({ bytes, clientSeconds, parsedSeconds }) {
   const client = Number(clientSeconds);
   const parsed = Number(parsedSeconds);
@@ -312,10 +320,3 @@ export function cleanTranscript(text) {
   return trimmed.slice(0, 8000);
 }
 
-export function checkoutPlaceholder(product) {
-  return {
-    error: "not-ready",
-    message: "Voice notes checkout isn't switched on yet.",
-    product: product === "voice_topup" ? "voice_topup" : "voice_notes",
-  };
-}

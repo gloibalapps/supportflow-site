@@ -9,10 +9,10 @@ import {
   audioKind,
   billableSeconds,
   canStartClip,
-  checkoutPlaceholder,
   cleanTranscript,
   consumeSeconds,
   containerDurationSeconds,
+  durationOverNoteCap,
   freshUsage,
   grantTopup,
   localDateFor,
@@ -23,14 +23,25 @@ import {
   remainingSeconds,
   voiceSplice,
 } from "./lib/voice-notes.mjs";
+import {
+  grantTopupOnce,
+  handleVoiceCheckout,
+  revokeTopupOnce,
+  voiceCheckoutForm,
+  voiceSubscriptionEntitled,
+  voiceSubscriptionRow,
+} from "./lib/voice-billing.mjs";
 import { memoryUsageStore } from "./lib/voice-store.mjs";
 import { handleTranscribe } from "./functions/transcribe.mjs";
 
 assert.equal(paymentGrantsVoice([{ product: "tracker" }]), false);
 assert.equal(paymentGrantsVoice([{ product: "tracker_full" }]), true);
-assert.equal(paymentGrantsVoice([{ product: "voice_notes" }]), true);
+assert.equal(paymentGrantsVoice([{ product: "voice_notes" }]), false);
 assert.equal(paymentGrantsVoice([]), false);
-assert.equal(checkoutPlaceholder("voice_topup").message, "Voice notes checkout isn't switched on yet.");
+assert.equal(voiceSubscriptionEntitled("active"), true);
+assert.equal(voiceSubscriptionEntitled("trialing"), true);
+assert.equal(voiceSubscriptionEntitled("past_due"), false);
+assert.equal(voiceSubscriptionEntitled("canceled"), false);
 assert.equal(NOTE_SECONDS, 120);
 assert.equal(MONTHLY_SECONDS, 120 * 60);
 
@@ -58,6 +69,21 @@ assert.equal(rolled.allowanceSecondsUsed, 0);
 assert.equal(rolled.topupSecondsRemaining, 0);
 assert.equal(rolled.periodEnd, "2026-12-01");
 assert.deepEqual(rolled.drafts, {});
+const rewound = normalizeUsage({
+  v: 1,
+  periodStart: "2026-11-01",
+  periodEnd: "2026-12-01",
+  allowanceSecondsUsed: 4000,
+  topupSecondsRemaining: 30,
+  drafts: { "vn-keepused": 20 },
+}, "2026-10-31");
+assert.equal(rewound.periodStart, "2026-11-01");
+assert.equal(rewound.allowanceSecondsUsed, 4000);
+assert.equal(rewound.topupSecondsRemaining, 30);
+assert.equal(durationOverNoteCap({ clientSeconds: 10, parsedSeconds: 180 }), true);
+assert.equal(durationOverNoteCap({ clientSeconds: 180, parsedSeconds: 30 }), false);
+assert.equal(durationOverNoteCap({ clientSeconds: 180, parsedSeconds: null }), true);
+assert.equal(durationOverNoteCap({ clientSeconds: 30, parsedSeconds: 30 }), false);
 
 const sameMonth = normalizeUsage({
   v: 1,
@@ -163,10 +189,12 @@ function jsonRequest(body, host = "supportflow.work", headers = {}) {
 const store = memoryUsageStore();
 let transcribed = 0;
 const say = async () => { transcribed += 1; return "Went to the shops and had a quiet afternoon."; };
+const yes = async () => ({ ok: true, premium: false, subscription: true });
 const base = {
   store,
   env: PROD,
-  checkLicence: async () => ({ enforced: false, ok: false }),
+  checkLicence: async () => ({ enforced: false, ok: true, sub: "user-1" }),
+  entitled: yes,
   transcribeAudio: say,
 };
 
@@ -178,7 +206,7 @@ const base = {
   assert.equal(data.audio, undefined);
   assert.equal(data.usage.allowanceSecondsUsed, 2);
   assert.equal(data.usage.noteSecondsUsed, 2);
-  const saved = await store.get(`dev:${DEVICE}`);
+  const saved = await store.get(`lic:user-1`);
   assert.equal(JSON.stringify(saved.value).includes("shops"), false);
   assert.equal(transcribed, 1);
 }
@@ -192,24 +220,24 @@ const base = {
 }
 
 {
-  const before = await store.get(`dev:${DEVICE}`);
+  const before = await store.get(`lic:user-1`);
   const res = await handleTranscribe(audioRequest(webm(2000)), { ...base, transcribeAudio: async () => "   " });
   const data = await res.json();
   assert.equal(data.error, "empty");
   assert.equal(data.text, "");
-  const after = await store.get(`dev:${DEVICE}`);
+  const after = await store.get(`lic:user-1`);
   assert.equal(after.value.allowanceSecondsUsed, before.value.allowanceSecondsUsed);
   assert.equal(after.value.drafts[DRAFT], before.value.drafts[DRAFT]);
 }
 
 {
-  const before = await store.get(`dev:${DEVICE}`);
+  const before = await store.get(`lic:user-1`);
   const res = await handleTranscribe(audioRequest(webm(2000)), {
     ...base,
     transcribeAudio: async () => { const err = new Error("upstream"); err.code = "upstream"; throw err; },
   });
   assert.equal(res.status, 502);
-  const after = await store.get(`dev:${DEVICE}`);
+  const after = await store.get(`lic:user-1`);
   assert.equal(after.value.allowanceSecondsUsed, before.value.allowanceSecondsUsed);
 }
 
@@ -235,10 +263,10 @@ const base = {
   const today = localDateFor(new Date(), -660);
   const [y, m] = today.split("-").map(Number);
   const periodEnd = `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, "0")}-01`;
-  await store.set(`dev:${DEVICE}`, {
+  await store.set(`lic:user-1`, {
     v: 1, periodStart: today.slice(0, 8) + "01", periodEnd, allowanceSecondsUsed: MONTHLY_SECONDS,
     topupSecondsRemaining: 0, drafts: {},
-  }, (await store.get(`dev:${DEVICE}`)).etag);
+  }, (await store.get(`lic:user-1`)).etag);
   const calls = transcribed;
   const res = await handleTranscribe(audioRequest(webm(2000), { draftId: "vn-monthfull" }), base);
   const data = await res.json();
@@ -248,27 +276,93 @@ const base = {
 }
 
 {
-  const cur = await store.get(`dev:${DEVICE}`);
-  await store.set(`dev:${DEVICE}`, { ...cur.value, allowanceSecondsUsed: 0, drafts: { "vn-notefull": NOTE_SECONDS } }, cur.etag);
+  const cur = await store.get(`lic:user-1`);
+  await store.set(`lic:user-1`, { ...cur.value, allowanceSecondsUsed: 0, drafts: { "vn-notefull": NOTE_SECONDS } }, cur.etag);
   const res = await handleTranscribe(audioRequest(webm(2000), { draftId: "vn-notefull" }), base);
   const data = await res.json();
   assert.equal(res.status, 402);
   assert.equal(data.error, "note-limit");
-  assert.equal(transcribed, (await store.get(`dev:${DEVICE}`)).value.allowanceSecondsUsed === 0 ? transcribed : transcribed);
-  assert.equal((await store.get(`dev:${DEVICE}`)).value.allowanceSecondsUsed, 0);
+  assert.equal(transcribed, (await store.get(`lic:user-1`)).value.allowanceSecondsUsed === 0 ? transcribed : transcribed);
+  assert.equal((await store.get(`lic:user-1`)).value.allowanceSecondsUsed, 0);
 }
 
 {
   const oldFetch = globalThis.fetch;
   let called = 0;
   globalThis.fetch = () => { called += 1; throw new Error("no network"); };
-  const res = await handleTranscribe(jsonRequest({ action: "checkout", product: "voice_notes" }), base);
+  const res = await handleTranscribe(jsonRequest({ action: "checkout", product: "voice_notes" }), {
+    ...base,
+    env: { ...PROD },
+    session: { sub: "user-1", email: "a@example.com" },
+  });
   globalThis.fetch = oldFetch;
   const data = await res.json();
-  assert.equal(res.status, 501);
-  assert.match(data.message, /isn't switched on yet/);
+  assert.equal(res.status, 503);
+  assert.match(data.message, /isn't available yet/);
   assert.equal(called, 0);
-  assert.equal((await store.get(`dev:${DEVICE}`)).value.allowanceSecondsUsed, 0);
+}
+
+{
+  let body = "";
+  const res = await handleVoiceCheckout({ product: "voice_notes" }, {
+    env: { STRIPE_SECRET_KEY: "sk_test", SITE_URL: "https://supportflow.work", STRIPE_PRICE_VOICE_NOTES: "price_voice_month" },
+    session: { sub: "user-1", email: "a@example.com", deviceId: DEVICE },
+    entitled: async () => ({ ok: false, premium: false, subscription: false }),
+    fetchImpl: async (url, init) => {
+      body = init.body;
+      return { ok: true, json: async () => ({ url: "https://checkout.stripe.com/c/pay/cs_test" }) };
+    },
+  });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.url, "https://checkout.stripe.com/c/pay/cs_test");
+  assert.match(body, /price_voice_month/);
+  assert.match(body, /mode=subscription/);
+  assert.match(body, /metadata%5Bkind%5D=voice/);
+  assert.match(body, /metadata%5Bproduct%5D=voice_notes/);
+  assert.match(body, /subscription_data%5Bmetadata%5D%5Bgoogle_sub%5D=user-1/);
+}
+
+{
+  const res = await handleVoiceCheckout({ product: "voice_notes" }, {
+    env: { STRIPE_SECRET_KEY: "sk_test", SITE_URL: "https://supportflow.work", STRIPE_PRICE_VOICE_NOTES: "price_voice_month" },
+    session: { sub: "prem-1" },
+    entitled: async () => ({ ok: true, premium: true, subscription: false }),
+    fetchImpl: async () => { throw new Error("no network"); },
+  });
+  assert.equal(res.status, 409);
+  assert.match(res.body.message, /Premium already includes/);
+}
+
+{
+  let body = "";
+  const res = await handleVoiceCheckout({ product: "voice_topup" }, {
+    env: { STRIPE_SECRET_KEY: "sk_test", SITE_URL: "https://supportflow.work", STRIPE_PRICE_VOICE_TOPUP: "price_voice_topup" },
+    session: { sub: "user-1" },
+    entitled: async () => ({ ok: true, premium: false, subscription: true }),
+    fetchImpl: async (_url, init) => {
+      body = init.body;
+      return { ok: true, json: async () => ({ url: "https://checkout.stripe.com/c/pay/cs_top" }) };
+    },
+  });
+  assert.equal(res.status, 200);
+  assert.match(body, /mode=payment/);
+  assert.match(body, /price_voice_topup/);
+  assert.match(body, /metadata%5Bproduct%5D=voice_topup/);
+}
+
+{
+  const once = grantTopupOnce(freshUsage("2026-11-21"), "2026-11-21", "cs_1");
+  assert.equal(once.granted, true);
+  assert.equal(once.usage.topupSecondsRemaining, 120 * 60);
+  const again = grantTopupOnce(once.usage, "2026-11-21", "cs_1");
+  assert.equal(again.granted, false);
+  assert.equal(again.usage.topupSecondsRemaining, 120 * 60);
+  const revoked = revokeTopupOnce(again.usage, "cs_1");
+  assert.equal(revoked.topupSecondsRemaining, 0);
+  const row = voiceSubscriptionRow("user-1", { id: "sub_1", status: "active", customer: "cus_1", current_period_end: 1790000000, metadata: { product: "voice_notes" } }, false);
+  assert.equal(row.status, "active");
+  assert.equal(row.google_sub, "user-1");
+  assert.equal(voiceCheckoutForm({ product: "voice_notes", price: "price_voice_month", site: "https://supportflow.work", sub: "user-1" }).mode, "subscription");
 }
 
 {
@@ -288,13 +382,14 @@ const base = {
     store: paid,
     env: PROD,
     checkLicence: async () => ({ enforced: true, ok: true, sub: "prem-1" }),
+    entitled: async () => ({ ok: true, premium: true, subscription: false }),
     transcribeAudio: async () => "Noted.",
   });
   const data = await res.json();
   assert.equal(res.status, 200);
   assert.equal(data.text, "Noted.");
   assert.equal((await paid.get("lic:prem-1")).value.allowanceSecondsUsed, 3);
-  assert.equal(await paid.get(`dev:${DEVICE}`), null);
+  assert.equal(await paid.get(`lic:user-1`), null);
 }
 
 {
@@ -318,7 +413,8 @@ const base = {
   assert.equal(res.status, 503);
   assert.equal(data.error, "voice notes not configured");
   assert.equal(data.configured, false);
-  assert.equal(data.usage.allowanceSeconds, MONTHLY_SECONDS);
+  assert.equal(data.usage, null);
+  assert.equal(data.entitled, false);
 }
 
 {
@@ -350,8 +446,8 @@ const base = {
     checkLicence: async () => ({ enforced: false, ok: false }),
     transcribeAudio: say,
   });
-  assert.equal(res.status, 400);
-  assert.equal((await res.json()).error, "licence-required");
+  assert.equal(res.status, 402);
+  assert.equal((await res.json()).error, "voice-notes-required");
 }
 
 {
@@ -359,14 +455,15 @@ const base = {
   const today = localDateFor(new Date(), -660);
   const [y, m] = today.split("-").map(Number);
   const periodEnd = `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, "0")}-01`;
-  await race.set(`dev:${DEVICE}`, {
+  await race.set(`lic:user-1`, {
     v: 1, periodStart: today.slice(0, 8) + "01", periodEnd,
     allowanceSecondsUsed: MONTHLY_SECONDS - 3, topupSecondsRemaining: 0, drafts: {},
   }, null);
   let calls = 0;
   const depsFor = (sayText) => ({
     store: race, env: PROD,
-    checkLicence: async () => ({ enforced: false, ok: false }),
+    checkLicence: async () => ({ enforced: false, ok: true, sub: "user-1" }),
+    entitled: yes,
     transcribeAudio: sayText,
   });
   const first = await handleTranscribe(audioRequest(webm(10000), { durationMs: 10000, draftId: "vn-raceone1" }), depsFor(async () => {
@@ -384,7 +481,7 @@ const base = {
   assert.equal(first.status, 200);
   assert.equal(firstBody.text, "first");
   assert.equal(calls, 1);
-  const saved = await race.get(`dev:${DEVICE}`);
+  const saved = await race.get(`lic:user-1`);
   assert.ok(saved.value.allowanceSecondsUsed >= MONTHLY_SECONDS);
 }
 
@@ -393,7 +490,8 @@ const base = {
   let calls = 0;
   const depsFor = (sayText) => ({
     store: race, env: PROD,
-    checkLicence: async () => ({ enforced: false, ok: false }),
+    checkLicence: async () => ({ enforced: false, ok: true, sub: "user-1" }),
+    entitled: yes,
     transcribeAudio: sayText,
   });
   const first = await handleTranscribe(audioRequest(webm(120000), { durationMs: 120000, draftId: "vn-samenote" }), depsFor(async () => {
@@ -408,19 +506,32 @@ const base = {
   }));
   assert.equal((await first.json()).text, "first");
   assert.equal(calls, 1);
-  assert.equal((await race.get(`dev:${DEVICE}`)).value.drafts["vn-samenote"], 120);
+  assert.equal((await race.get(`lic:user-1`)).value.drafts["vn-samenote"], 120);
 }
 
 const src = fs.readFileSync(new URL("./functions/transcribe.mjs", import.meta.url), "utf8");
-assert.doesNotMatch(src, /api\.stripe\.com|from ["']stripe|sendEmail|resend\.com/i);
+assert.doesNotMatch(src, /from ["']stripe|sendEmail|resend\.com/i);
 assert.match(src, /process\.env\.OPENAI_API_KEY|env\.OPENAI_API_KEY/);
 assert.match(src, /voice notes not configured/);
 assert.match(src, /gpt-transcribe/);
 assert.match(src, /form\.append\("languages\[\]", "en"\)/);
+assert.match(src, /durationOverNoteCap/);
 assert.doesNotMatch(src, /form\.append\([^)]*en-AU/);
 assert.doesNotMatch(src, /console\.(log|error|warn|info)\([^)]*\b(text|bytes|rawText|audio)\b/);
-assert.doesNotMatch(src, /paymentGrantsVoice|voicePreviewOpen|licence_payments/);
+assert.doesNotMatch(src, /voicePreviewOpen/);
 assert.doesNotMatch(src, /form\.get\(["'](?:participant|name|ndis)|body\.(?:participant|name|ndis)/i);
+const hook = fs.readFileSync(new URL("./functions/stripe-webhook.mjs", import.meta.url), "utf8");
+assert.match(hook, /customer\.subscription\.created/);
+assert.match(hook, /customer\.subscription\.updated/);
+assert.match(hook, /customer\.subscription\.deleted/);
+assert.match(hook, /handleVoiceSubscriptionChange/);
+assert.match(hook, /grantVoiceTopupSession/);
+assert.match(hook, /checkout\.session\.completed/);
+const billing = fs.readFileSync(new URL("./lib/voice-billing.mjs", import.meta.url), "utf8");
+assert.match(billing, /STRIPE_PRICE_VOICE_NOTES/);
+assert.match(billing, /STRIPE_PRICE_VOICE_TOPUP/);
+assert.match(billing, /api\.stripe\.com\/v1\/checkout\/sessions/);
+assert.doesNotMatch(billing, /console\.(log|error|warn|info)\([^)]*\b(text|bytes|audio)\b/);
 
 const ui = fs.readFileSync(new URL("../app.jsx", import.meta.url), "utf8");
 assert.match(ui, /function voiceSplice/);
@@ -430,6 +541,7 @@ assert.match(ui, /fd\.append\("tzOffsetMinutes"/);
 assert.match(ui, /fd\.append\("draftId"/);
 assert.doesNotMatch(ui.slice(ui.indexOf("function VoiceNoteMic"), ui.indexOf("function VoiceNotesSettings")), /participantId|ndisNumber|fd\.append\("text"/);
 assert.match(ui, /Voice notes aren't set up on this site yet/);
-assert.doesNotMatch(ui.slice(ui.indexOf("function VoiceNoteMic"), ui.indexOf("function Notes")), /A\$5|voice_topup|Add Voice notes/);
+assert.match(ui, /Add Voice notes — A\$5\/month/);
+assert.match(ui, /Voice notes checkout isn't available yet/);
 
 console.log("voice notes tests pass");
