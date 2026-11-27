@@ -185,8 +185,7 @@ Email addresses and phone numbers are checked as you type. A phone number must b
  a private client this is a free-text description and your own rate instead
 - **Their area**: sets your travel time cap (30 minutes metro and regional
  centres, 60 regional, none remote)
-- **Service agreement**: tick if signed. You can also do this later, and
- generate the document itself, from **People → Service agreements**, see [Service agreements](#15-service-agreements)
+- **Service agreement**: tick **Written service agreement in place** if one is already signed. That step has no signature pad. Signing on screen, and the PDF, are under **People → Service agreements**, see [Service agreements](#15-service-agreements)
 
 When all five are done you land on Home. Anything still missing is listed in the checklist on **Money → Tax**.
 
@@ -845,44 +844,124 @@ Or read these topics:
 - [Signed date, where it is kept, and the 30-day review](#dates-and-details)
 - [Record an incident, registered-provider prompts and the register PDF](#16-incidents)
 
-A written agreement## 15. Service agreements
-
 A written agreement is one of **four conditions** keeping your supports
 GST-free. Miss one and a support may become taxable, you could owe 10% you
 never charged. It's the condition most often skipped.
 
-**Participants → Service agreements** lists everyone you support with their agreement status:
+**People → Service agreements** is where you write one and where people sign it. The screen title is **Service agreements**. The same pads sit in the **Service agreement** section at the bottom of a person's record under **People → Participants**.
 
-| Colour | Meaning |
+There is no send-for-signing step, and no link to email someone so they can sign on their own phone. Signing happens on the phone, tablet or computer that has SupportFlow open. Hand that device to each person. If nobody is on your list yet, the screen says "Add a participant first. An agreement is between you and someone."
+
+### Status on the list
+
+Each person is a card. The app does not use the word Pending.
+
+| What you see | Meaning |
 |---|---|
-| Amber, outlined | No agreement recorded |
-| Green | Signed |
-| Brass | Signed, review due within 30 days |
+| Amber outline, amber dot, **No agreement recorded** | Not recorded as signed. Someone may already have signed their own pad. The card stays like this until both required sides have signed, or until you mark it signed yourself |
+| Green dot, **Signed**, with the date when there is one | Recorded as signed, and the review is not due within 30 days. The outline stays the ordinary colour |
+| Brass outline, brass dot, **Signed**, the date, and **review due** with the review date | Signed, and the review date is today or within the next 30 days |
 
-Warnings at the top name who's missing one and whose review is coming up, so you
-don't have to scan the list.
+Above the cards, an amber note names who has no agreement recorded: **1 participant without an agreement**, or **2 participants without an agreement**, then the names. A brass note, **Review due soon**, names whose review falls within 30 days.
+
+On **People → Participants**, a row with no agreement recorded ends with **no service agreement**, in amber. A signed agreement whose review date is today, already past, or within 30 days ends with **agreement due for review**, also in amber. The dot beside the name on that list does not change for this.
+
+Open the person and tap **View history** for a shorter line: **none on file**, **on file**, **on file** with the review date, or **on file, review overdue** once the review date has passed.
+
+The checklist on **Money → Tax**, while anyone is missing one, says "A written service agreement with each participant. Participants → Service agreements can write one", and it names anyone whose review is due. **Agreements** on that checklist opens this screen.
+
+Under each pad:
+
+- **Not signed yet** means no signature is stored for that person
+- **Signature saved with this agreement**, in green, means it is
+
+Once anyone has a signature, a line above the pads lists only those people. Each entry is the name, or **Unnamed** if the name is blank, the role in brackets, and **signed** with a short date, such as "Riley Williams (Participant), signed 27 Nov". With a signature but no date, it says **signed** and nothing more. People who have not signed are left off that line. Their pad still says **Not signed yet**.
+
+### Who signs
+
+**Signing parties** starts with two people, in this order:
+
+1. **Participant**, name filled from their record
+2. **Sole trader (support worker)**, name filled from your details
+
+The note on the screen says the participant and the sole trader are here to start, and that you can add anyone else who needs to sign, such as a nominee or guardian, a plan manager, a support coordinator or a witness. Each person signs with a finger, a mouse or a trackpad.
+
+**Add a signing party** is a role list, then **Add**. A new person is added at the bottom. The list opens on **Witness**. The roles are Participant, Participant's representative, Sole trader (support worker), Nominee or guardian, Plan manager, Support coordinator, Witness, and Other.
+
+**Other** shows **Role title**, placeholder "Advocate, family member…". That title is what the PDF prints. Leave it blank and the PDF says Other.
+
+The name fills in when the role is **Participant** (their name), **Sole trader (support worker)** (your name), or **Plan manager** (the plan manager linked on their record), and only when the name box is empty. Any other role starts blank, and you type it.
+
+There is no set order. Every pad is on the screen together. One person can sign today and another next week. You cannot drag the cards into a different order. **Remove** asks "Delete this signing party? This can't be undone." Removing someone does not offer **Redo**. If you remove everyone, the screen says **No signing parties yet**, and it stays empty. It does not put the participant and the sole trader back.
+
+The card counts as signed from the pads only when both of these are true:
+
+- someone whose role is **Participant** or **Participant's representative** has a signature saved, and
+- someone whose role is **Sole trader (support worker)** has a signature saved
+
+One of each is enough. A second participant, or a second sole trader, does not also have to sign. A **Nominee or guardian**, **Plan manager**, **Support coordinator**, **Witness** or **Other** does not stand in for either side. If the only signatures are a nominee and you, the card stays **No agreement recorded**, and those pads still say **Signature saved with this agreement**.
+
+**Mark as signed**, or the **Signed agreement in place** tick on the person's record, records it as signed without those two signatures. During first-time setup the tick is worded **Written service agreement in place**, and that step has no pads. A mark made with the button or the tick stays signed if you later clear a signature. A signed status that appeared only because both required people had signed is cleared if you clear or remove one of those signatures, or change a role so that one of the two sides no longer has a signature. The agreement date is cleared with it.
+
+When the second required person signs, and the agreement did not already have a date, the date recorded is the earlier of the dates on the participant (or their representative) and the sole trader. If only one of those dates is filled in, that date is used. If neither is, it uses today. A date you had already set is left as it is.
+
+There is no **Mark as unsigned** on the agreements screen. To take an explicit mark off, open the person and untick **Signed agreement in place**, then **Save**. That does not wipe the drawings. The card can then say **No agreement recorded** while the pads still say **Signature saved with this agreement**. The next change to a signing party looks at the pads again, and if both required signatures are still there the card goes back to **Signed**.
+
+### Signing on the pad
+
+Each person has **Role**, **Name**, **Date signed**, and a white pad.
+
+Draw with a finger, a mouse or a trackpad. Only the left mouse button draws. The page does not scroll while a finger is down on the pad. The signature is saved when you lift.
+
+The first stroke fills **Date signed** with today when that box was empty. Later strokes leave the date alone. Type a different date as DD/MM/YYYY, or use the calendar beside the field. Clearing the box clears the date. A date with no drawing still reads **Not signed yet**. The signature is what counts, not the date.
+
+**Undo** takes off the last stroke. It stays greyed out when there is nothing to take off. If that stroke was the only one, the signature and the date are cleared. **Redo** puts back the last **Undo** or **Clear**, including the date, and stays greyed out until there is something to restore. A new stroke forgets what **Redo** was holding. **Clear** wipes the drawing, the stored signature and the date. It stays greyed out when the pad is already empty.
+
+On **People → Service agreements**, the note under the list says signatures are stored with this agreement on this device, and they are included when you download the PDF. Each change on that screen is saved straight away. There is no separate Save there.
+
+On a person already in **People → Participants**, the note says signatures are stored with this agreement on this device as soon as you sign. **Cancel** on that screen does not remove a signature you just drew. Other edits on the form, such as a phone number, are still only kept when you tap **Save**.
+
+On a new person who is not saved yet, the note says signatures are kept when you save this participant. **Cancel** throws those pads away. **Download service agreement** on that form still works before **Save**, as long as their name is filled in.
+
+The signatures are part of that person's record on this device, so they are included in the encrypted backup with the rest of their agreement.
 
 ### Two buttons per person
 
-**Generate one** builds a PDF from what you've already entered, both parties,
-ABN, NDIS number, plan management, rates, travel, payment terms, plus clauses
-on cancellations, responsibilities, ending the agreement, GST and complaints,
-with signature blocks at the end.
+**Download** builds the PDF from what you've already entered and saves it through the browser. While it runs, the button reads **Downloading…**. When it finishes, the screen says "Downloaded. Keep it somewhere safe — it contains participant details." If it can't build the file, it says "Couldn't build the PDF. Check your connection and try again." The first download has to fetch the PDF tool, so that message is what you get when you are offline before it has loaded once.
 
-**Mark as signed** records it without leaving the screen, and fills today's date
-if you haven't set one.
+You can download before anyone has signed. An empty pad becomes a blank line on the PDF.
+
+**Mark as signed** shows only while the card says **No agreement recorded**. It records the agreement as signed without a signature, and fills today's date on the agreement if it has no date yet. It does not draw anything on the pads, and it does not fill each person's **Date signed**. The button then changes to **Dates and details**. The same change happens on its own when both required sides have signed.
+
+On the person's record the download button is **Download service agreement**, the same wording whether or not it is signed. It is greyed out until their name is filled in.
+
+### The agreement PDF
+
+SupportFlow does not open the PDF inside the app. There is no **Share** button and no email. **Download** saves a file whose name starts with `service-agreement-` and then the person's name in lower case, with spaces and other punctuation turned into hyphens, such as `service-agreement-riley-williams.pdf`. With no name, the file is `service-agreement-participant.pdf`. Printing it, or emailing it from your own mail app, is something you do with that file afterwards. The app does not do it for you.
+
+The document is titled **Service agreement**, with the line "NDIS supports provided by a sole trader". It then has:
+
+- **Support worker**: your name, and your ABN, phone and email where you've entered them
+- **Participant**: their name, and their NDIS number, plan management (Plan managed, Self managed, or NDIA / agency managed), phone and address where those are on the record
+- **Invoices are sent to**: the plan manager's name and email, and the payment terms, when the person is plan managed and a plan manager is linked. Self managed and NDIA managed agreements do not have this block
+- **Emergency contact**: name, relationship and phone, when a name or a phone is on the record
+- **Agreed supports and rates**: the support you usually bill them for, the rate, and the item code. If none is set, this line says "To be agreed". Travel is the kilometre rate from your settings and the travel item code. A line says further supports can be added in writing
+- Eight numbered clauses: The supports, Rates and invoicing, Travel, Changes and cancellations, Responsibilities, Ending this agreement, Goods and services tax, and Concerns and complaints. The wording uses your name and the participant's name
+- **Signed**: one block per signing party, in the same order as on the screen. The role, then the signature, or a blank line if they have not signed, then their name (a dash if the name is blank), then **Date signed** with the date written out, such as 27 November 2026, or a blank if there is no date
+
+A note at the bottom says the document was generated from records held in SupportFlow as a starting point, that it is not legal advice, and that you should have it checked and adjust anything that does not match what you have actually agreed.
+
+The agreements screen ends with: "Generated agreements are a starting point built from your records, not legal advice. Read one through before it gets signed." The person's record says: "Builds a PDF from the details on this record, a starting point, not legal advice. Read it before you use it."
 
 ### Dates and details
 
-**Dates and details** opens the participant's full record, where you set the
-**date signed**, a **review date**, and **where the signed copy is kept**. Those
-same fields also sit at the bottom of any participant's record in **Participants → Participants**.
+**Dates and details** shows only once the agreement is recorded as signed. It opens that person's record. In the **Service agreement** section, once **Signed agreement in place** is ticked, you set **Date signed**, **Review by**, and **Where the signed copy is kept**. The signing pads are on that same section whether or not the tick is on.
 
-A review falling within 30 days shows brass here and appears by name on the
-checklist on Money → Tax.
+If the agreement is signed and you've written where the copy is kept, the card on **People → Service agreements** shows **Kept:** and that note.
 
-It's a starting point, not legal advice. Have it looked over before the first
-signing.
+A review date of today or within 30 days shows brass on this screen, **agreement due for review** on **People → Participants**, and the person's name on the checklist on **Money → Tax**.
+
+It's a starting point, not legal advice. Have it looked over before you rely on it.
 
 ---
 
@@ -1149,8 +1228,7 @@ invoice first. Deliberate: you can't delete work you've billed.
 **Setup keeps nagging.** The checklist on Money → Tax names exactly what's missing, and
 has a button straight to whatever needs doing.
 
-**Can't find service agreements.** They have their own screen, **People → Service agreements**. The same fields also live at the bottom of each participant's
-record.
+**Can't find service agreements.** They have their own screen, **People → Service agreements**. Each person signs there. The same pads, and the **Signed agreement in place** tick, also sit in the **Service agreement** section at the bottom of each participant's record.
 
 **A private client's invoice shows an NDIS code, not their description.**
 Check "Not an NDIS participant, private client" is actually ticked on their
@@ -1175,6 +1253,8 @@ records needs a licence. Already bought one on another device? Use
 **ABN**: Australian Business Number. Says you work for yourself.
 
 **Sole trader**: you are the business. Your own tax file number, no company.
+
+**Signing party**: a person who signs a service agreement on the screen. The list starts with the participant and you. See [Service agreements](#15-service-agreements).
 
 **Plan manager**: company handling a participant's NDIS money and paying your
 invoices.
