@@ -43,6 +43,10 @@ Do not enter participant names, NDIS numbers, health information or other person
 
 Claimable is intended to provide general information only. It does not provide personal taxation, accounting, financial or legal advice, and its output should not be treated as a substitute for checking current official guidance or obtaining professional advice where appropriate.
 
+## 4a. AI assist for shift notes
+
+AI assist is an optional feature on Work → Notes. Nothing is sent until you tap AI assist. The note screen tells you, before you tap, that the note text is sent to an external AI API (Anthropic) to draft a progress note, with names and contact details removed where the app can see them. Other records are not sent. The draft is not saved until you save the note. You can save a note without using AI assist. The draft is a writing aid, not NDIS, clinical or legal advice.
+
 ## 5. Tax and financial information
 
 Any tax calculations, estimates, GST information, deduction information or financial figures provided by SupportFlow are provided as administrative tools and general information.
@@ -119,7 +123,7 @@ Information and records that you create or enter remain yours or subject to the 
 
 ## 12. Third-party services
 
-SupportFlow may rely on third-party infrastructure or processing services.
+SupportFlow may rely on third-party infrastructure or processing services. Claimable and AI assist for shift notes send the text described in those sections to an external AI API. AI assist does that only after the note screen has told you.
 
 
 Third-party services operate under their own terms and privacy practices.
@@ -127,7 +131,7 @@ Third-party services operate under their own terms and privacy practices.
 ## 13. Development assistance
 
 
-That development-time assistance is separate from Claimable's runtime API use.
+That development-time assistance is separate from Claimable's runtime API use and from AI assist for shift notes.
 
 
 

@@ -58,6 +58,7 @@ Claimable is designed not to read or automatically include participant records s
 
 **Do not enter participant names, NDIS numbers, health information or other personal information into Claimable.**
 
+AI assist on Work → Notes is optional. Nothing is sent until you tap AI assist, and the note screen says so before you tap. It sends the note text, with names, NDIS numbers, phone numbers, email addresses and street addresses removed where the app can see them, through the SupportFlow server to Anthropic's Claude API to draft a progress note. It does not send the participant record, the date, or your identity as separate fields. SupportFlow does not store the note or the draft. You can save a note without using AI assist.
 
 ## Development assistance
 
@@ -83,7 +84,7 @@ Your locally stored participant records are not intentionally uploaded to Netlif
 
 ## Sharing information
 
-Information can leave your device when **you choose to export, back up, email or share it**, or when you intentionally submit a question through Claimable.
+Information can leave your device when **you choose to export, back up, email or share it**, when you intentionally submit a question through Claimable, or when you tap AI assist on a shift note.
 
 Once you send information to another person or service, its security may also depend on the recipient and service you selected.
 

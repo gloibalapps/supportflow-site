@@ -91,12 +91,13 @@ bump, installed testers keep the cached old version.
 ## Switching on the AI features
 
 Two features use a language model: the **deduction checker** (Summary →
-Claimable), which searches the ATO and cites the pages it used, and the
-**note tidier** in shift notes.
+Claimable), which searches the ATO and cites the pages it used, and **AI assist**
+on shift notes, which drafts a progress note for the worker to accept or discard.
 
-They call `netlify/functions/assist.mjs`, a small server-side function. The API
-key lives there as an environment variable and never reaches the browser — if
-it sat in the app, anyone could open the page and spend your credit.
+The deduction checker calls `netlify/functions/assist.mjs`. AI assist calls
+`netlify/functions/notes-ai-assist.mjs`. The API key lives in those functions
+as an environment variable and never reaches the browser — if it sat in the
+app, anyone could open the page and spend your credit.
 
 ### Setting it up
 
@@ -108,7 +109,9 @@ it sat in the app, anyone could open the page and spend your credit.
    deploy won't pick it up.
 4. Open the app → Summary → Claimable, and ask something like "steel cap boots".
 
-Optionally set `ASSIST_MODEL` to change the model. It defaults to
+Optionally set `ANTHROPIC_MODEL` to change the model for both features. It defaults to
+`claude-haiku-4-5-20251001`. The SupportFlow Assistant can use `ASSISTANT_MODEL`
+instead, and falls back to `ANTHROPIC_MODEL`.
 
 ### If it doesn't work
 
@@ -121,7 +124,7 @@ Optionally set `ASSIST_MODEL` to change the model. It defaults to
 ### Cost and abuse
 
 Each deduction check is one model call plus a web search, so a few cents at
-most. The note tidier is cheaper.
+most. AI assist on a shift note is a single rewrite, without web search.
 
 **The endpoint is public.** The function limits requests to POST, caps the
 prompt length, and rejects cross-origin calls, which stops casual misuse — but
@@ -132,8 +135,9 @@ working, with both AI features cleanly switched off.
 ### Turning them off
 
 Empty the `endpoint` string in the `AI` block near the top of `app.jsx` (and
-re-inline it into `app.html`). Both features hide themselves — the Claimable tab
-shows ATO links instead, and the tidy button disappears.
+re-inline it into `app.html`) to hide the deduction checker. The Claimable tab
+shows ATO links instead. AI assist stays on the notes screen and says it isn't
+configured when `ANTHROPIC_API_KEY` is missing.
 
 
 ## Early Access tester activity

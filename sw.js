@@ -1,6 +1,6 @@
 /* SupportFlow™ — service worker
    Bump CACHE when you deploy, or testers will keep the old build. */
-const CACHE = 'supportflow-v72-tutorial-once';
+const CACHE = 'supportflow-v73-notes-ai';
 
 // Everything needed to open the app with no network at all.
 const CORE = [

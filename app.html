@@ -404,6 +404,14 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
   display:inline-flex;align-items:center;justify-content:center}
 .btn.x:hover{color:var(--warn);background:none;border:0}
 
+.ai-note-grid.has-review{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+.ai-review{border:1px solid rgba(200,145,58,.5);background:var(--bg-2);border-radius:12px;padding:14px 14px 12px}
+.ai-review h3{margin:0 0 6px;font-family:'Fraunces',Georgia,serif;font-size:16px;font-weight:500;color:var(--tx)}
+.ai-review .ai-help{margin:0 0 10px;font-size:12.5px;line-height:1.55;color:var(--tx-2)}
+.ai-assist-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ai-hint{font-size:12.5px;line-height:1.55;color:var(--tx-3);margin:8px 0 0}
+.ai-touch:focus-visible,.ai-review textarea:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+
 .callout{background:var(--bg-3);border-left:2px solid var(--brass);border-radius:0 10px 10px 0;padding:13px 16px;font-size:12.5px;color:var(--tx-2);line-height:1.55}
 .tutorial{background:var(--bg-2);border:1px solid var(--line);border-radius:12px;padding:14px 14px 12px;margin:0 0 14px;scroll-margin-top:78px}
 .tutorial ul{margin:8px 0 0;padding-left:18px}
@@ -440,6 +448,8 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none}
   .bignum{font-size:40px}
   .mob{width:100%}
   .mobnav{min-width:0}
+  .ai-note-grid.has-review{grid-template-columns:1fr}
+  .ai-touch{min-height:44px;padding:12px 16px}
 }
 /* Home + section shortcut hubs. These are navigation only; existing feature screens stay unchanged.
    The app header, hub heading/intro and bottom nav stay fixed; only shortcut cards scroll. */
@@ -492,12 +502,11 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none}
 `;
 
 /* ---------------- AI configuration ---------------- */
-// Two optional features use a language model: the deduction checker and the
-// shift-note tidier. Point these at whichever provider you use. Leave endpoint
-// empty and both features hide themselves — everything else works unchanged.
+// The deduction checker calls netlify/functions/assist.mjs. Shift-note AI assist
+// calls netlify/functions/notes-ai-assist.mjs. Both keep the API key on the
+// server. Empty the endpoint to hide the deduction checker. AI assist stays
+// on the notes screen and says so if the key is not configured.
 const AI = {
-  // Served by netlify/functions/assist.js, which holds the API key server-side.
-  // Empty this string to switch both AI features off cleanly.
   endpoint: "/.netlify/functions/assist",
   model: "",             // chosen by the function, not the browser
   enabled: function () { return !!this.endpoint; },
@@ -506,7 +515,7 @@ const AI = {
 // Daily caps. Two purposes: stop a runaway loop costing real money, and stop a
 // stranger who finds the URL spending the API budget. Client-side is the polite
 // layer; the function enforces its own limit as well.
-const AI_CAPS = { check: 15, tidy: 30, assistant: 20 };
+const AI_CAPS = { check: 15, notes: 30, assistant: 20 };
 
 // Simple, honest config switch -- no feature-flag infrastructure exists in
 // this app, so this is that infrastructure: one constant, one place to
@@ -8890,99 +8899,216 @@ function Trips({ data, save, m, fy, canCreate, onBlocked, prefill, onSaved }) {
   );
 }
 
+/* @@NOTES_AI_START */
+// Shared rules for shift-note AI assist. build-app.mjs copies this file into
+// app.jsx (export keywords stripped) so the review actions the worker sees
+// are the same functions the tests call. The system prompt stays here too;
+// the browser does not send it. The Netlify function owns the model call.
+
+const NOTES_AI_MIN = 40;
+const NOTES_AI_MAX = 8000;
+// Same default the deduction checker already uses. Override with ANTHROPIC_MODEL.
+const NOTES_AI_MODEL_DEFAULT = "claude-haiku-4-5-20251001";
+
+const NOTES_AI_SYSTEM_PROMPT = `You rewrite a support worker's rough shift notes into one objective, person-centred, professional NDIS progress note in Australian English.
+
+Rules:
+- Use only facts that are in the notes. Do not invent details, times, durations, locations, medications, dosages, diagnoses, appointments, names, or outcomes.
+- If a usual part of a progress note is missing, flag it with a short bracketed prompt such as [add what support was provided] or [add how this relates to the participant's goals]. Never fill that gap yourself.
+- A progress note usually covers what support was provided, how the participant took part, any link to their goals, observations, and follow-up. Include a part only when the notes support it, and add a bracketed prompt when it does not.
+- Keep any incident clearly stated, in plain factual language. Do not soften it, omit it, or add drama.
+- Write in past tense and plain language. Refer to the person as "the participant" and the worker as "the support worker" unless the notes already use other wording you are keeping.
+- No diagnosis, clinical judgement, blame, or advice.
+- Output plain text only. No markdown, no title, no preamble, and no sign-off.
+- Do not repeat contact details, identification numbers, dates of birth, or street addresses. If one was removed, leave it out.`;
+
+const STREET = "Street|St|Road|Rd|Avenue|Ave|Drive|Dr|Court|Ct|Place|Pl|Crescent|Cres|Lane|Ln|Way|Parade|Pde|Terrace|Tce|Boulevard|Blvd|Highway|Hwy";
+
+// Best-effort removal of obvious identifiers that were typed into the note.
+// Names the app already holds are stripped separately, before this runs.
+function redactNoteText(text) {
+  let out = String(text || "");
+  out = out.replace(/[\w.+-]+@[\w-]+\.[a-z.-]+/gi, "[contact removed]");
+  out = out.replace(/\b(?:\+?61[ -]?|0)[2-478](?:[ -]?\d){8}\b/g, "[phone removed]");
+  out = out.replace(/\b(?:d\.?o\.?b\.?|date of birth|born on)\s*[:\-]?\s*\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{2,4}\b/gi, "[date of birth removed]");
+  out = out.replace(new RegExp("\\b(?:ndis(?:\\s*(?:number|no\\.?|#))?|abn)\\s*[:#]?\\s*(?:\\d[ \\-]?){8,11}\\d\\b", "gi"), "[identifier removed]");
+  out = out.replace(/\b\d{9}\b/g, "[identifier removed]");
+  out = out.replace(/\b\d{11}\b/g, "[identifier removed]");
+  out = out.replace(new RegExp(
+    "\\b\\d{1,5}(?:\\/\\d{1,5})?\\s+[A-Z][A-Za-z']+(?:\\s+[A-Z][A-Za-z']+){0,4}\\s+(?:" + STREET + ")\\b(?:,?\\s+[A-Z][A-Za-z]+(?:\\s+[A-Z][A-Za-z]+){0,3})?(?:,?\\s+(?:NSW|VIC|QLD|SA|WA|TAS|NT|ACT)\\s+\\d{4})?",
+    "g"
+  ), "[address removed]");
+  return out;
+}
+
+function pushPhrase(pairs, value, replacement) {
+  const v = String(value || "").replace(/\s+/g, " ").trim();
+  if (v.length < 3) return;
+  pairs.push([v, replacement]);
+  const bits = v.split(" ").filter((b) => b.length >= 3);
+  if (bits.length > 1) {
+    for (const bit of bits) pairs.push([bit, replacement]);
+  }
+}
+
+// known fields are used only on the device to strip text. They are not sent.
+function scrubNoteForAssist(text, known = {}) {
+  const pairs = [];
+  for (const n of known.participantNames || []) pushPhrase(pairs, n, "the participant");
+  for (const n of known.workerNames || []) pushPhrase(pairs, n, "the support worker");
+  for (const n of known.otherNames || []) pushPhrase(pairs, n, "someone else");
+  for (const n of known.identifiers || []) pushPhrase(pairs, n, "");
+  pairs.sort((a, b) => b[0].length - a[0].length);
+  let out = String(text || "");
+  const seen = new Set();
+  for (const [value, replacement] of pairs) {
+    const key = value.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const esc = value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const edged = /^[\w]/.test(value) && /[\w]$/.test(value);
+    out = out.replace(new RegExp((edged ? "\\b" : "") + esc + (edged ? "\\b" : ""), "gi"), replacement);
+  }
+  out = redactNoteText(out);
+  return out.replace(/[ \t]{2,}/g, " ").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+// The only JSON the browser is allowed to post.
+function notesAssistRequestBody(text) {
+  return { text: String(text || "") };
+}
+
+function noteAssistBlockReason(text) {
+  const t = String(text || "").trim();
+  if (!t) return "empty";
+  if (t.length < NOTES_AI_MIN) return "short";
+  if (t.length > NOTES_AI_MAX) return "long";
+  return "";
+}
+
+// Accept copies the (possibly edited) suggestion into the editor. It does not save.
+function acceptNoteSuggestion(editorText, suggestionText) {
+  return { editorText: String(suggestionText ?? ""), reviewOpen: false, saved: false };
+}
+
+// Discard leaves the editor exactly as it was. It does not save.
+function discardNoteSuggestion(editorText) {
+  return { editorText: String(editorText ?? ""), reviewOpen: false, saved: false };
+}
+/* @@NOTES_AI_END */
+
 function Notes({ data, save, prefill, onPrefillConsumed }) {
-  // One box to speak the shift in your own words, then Tidy this up sorts
-  // it into the five sections NDIS's own record-keeping guidance points to
-  // (what was done, how the participant took part, how it ties to their
-  // goals, what was observed, what's next) -- filling in whichever of the
-  // five your words actually covered, and clearly flagging any that came
-  // back empty. Nothing is enforced: save works with gaps showing, or
-  // without ever tidying at all. Assembled into one block of text on save
-  // (same `body` shape as before), so nothing downstream -- email, share,
-  // print, older notes already saved -- needs to change at all.
+  // One box for the shift, in the worker's own words. AI assist drafts a
+  // progress note in a review panel. Accept replaces the text in this box
+  // only. Nothing is written to the saved note until Save note.
   const blank = () => ({
-    date: today(), participantId: "", shared: false,
-    rough: "", tidied: false,
-    supportProvided: "", participantInvolvement: "", progress: "", observations: "", followUp: "",
+    date: today(), participantId: "", shared: false, rough: "",
   });
-  const FIELDS = [
-    ["supportProvided", "Support provided"],
-    ["participantInvolvement", "Participant involvement"],
-    ["progress", "Progress toward goals"],
-    ["observations", "Observations"],
-    ["followUp", "Follow-up"],
-  ];
-  const HEADINGS = FIELDS.map(([, label]) => label);
-
-  const assembleBody = (x) => FIELDS
-    .map(([key, label]) => x[key] && x[key].trim() ? `${label}: ${x[key].trim()}` : null)
-    .filter(Boolean).join("\n\n");
-
-  const hasContent = (x) => x.tidied ? FIELDS.some(([key]) => x[key] && x[key].trim()) : !!x.rough.trim();
-
-  // A lazy initializer, so this only runs once, at mount, picking up
-  // whichever prefill was current the moment this screen was opened.
-  // Notes remounts fresh every time Work switches to this tab, so a new
-  // prefill from "add a note" after logging travel is always seen correctly.
-  const [f, setF] = useState(() => prefill ? { ...blank(), ...prefill } : blank());
-  // Consumed once, immediately, so a later unrelated visit to this tab
-  // doesn't silently reapply a participant from an old shift.
+  const [f, setF] = useState(() => prefill ? { ...blank(), ...prefill, rough: (prefill.rough || prefill.body || "") } : blank());
   useEffect(() => { if (prefill && onPrefillConsumed) onPrefillConsumed(); }, []);
   const [busy, setBusy] = useState(false);
   const [filter, setFilter] = useState("all");
   const [sendFor, setSendFor] = useState(null);
-  const [tidyErr, setTidyErr] = useState("");
+  const [assistErr, setAssistErr] = useState("");
+  const [review, setReview] = useState(null);
   const [idOn, setIdOn] = useState(true);
   const [editingId, setEditingId] = useState(null);
+  const assistBtnRef = useRef(null);
+  const suggestionRef = useRef(null);
+  const reviewWasOpen = useRef(false);
   const canShare = typeof navigator !== "undefined" && !!navigator.share;
+  const block = noteAssistBlockReason(f.rough);
+
+  useEffect(() => {
+    if (review && !reviewWasOpen.current) {
+      reviewWasOpen.current = true;
+      const el = suggestionRef.current;
+      if (el && el.focus) el.focus();
+    } else if (!review && reviewWasOpen.current) {
+      reviewWasOpen.current = false;
+      if (assistBtnRef.current && assistBtnRef.current.focus) assistBtnRef.current.focus();
+    }
+  }, [review]);
 
   const startEdit = (n) => {
     setEditingId(n.id);
-    // Opens exactly like a new note would -- the old text in the one box,
-    // untidied. Tidy it or save it as-is, same choice either way, no
-    // special-casing needed for a note written before this existed.
-    setF({ ...blank(), date: n.date, participantId: n.participantId || "", shared: n.shared || false,
-      rough: n.body || "" });
-    setTidyErr("");
+    setF({ ...blank(), date: n.date, participantId: n.participantId || "", shared: n.shared || false, rough: n.body || "" });
+    setAssistErr("");
+    setReview(null);
     setSendFor(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const cancelEdit = () => { setEditingId(null); setF(blank()); setTidyErr(""); };
+  const cancelEdit = () => { setEditingId(null); setF(blank()); setAssistErr(""); setReview(null); };
 
-  const tidy = async () => {
-    const source = f.tidied ? assembleBody(f) : f.rough;
-    if (!source.trim()) return;
-    setBusy(true); setTidyErr("");
+  const askAssist = async () => {
+    if (noteAssistBlockReason(f.rough) || busy) return;
+    setBusy(true);
+    setAssistErr("");
     try {
-      const { text: out } = await askModel(
-        `You are helping an Australian NDIS support worker write a case note. Sort the rough notes below into a clear, factual, professional note. Objective and observational only, no diagnosis or clinical judgement. Plain language, past tense, third person for the participant. Return the result using exactly these five headings, each on its own line followed by a colon, skip a heading entirely if there's genuinely nothing in the rough notes to say for it, don't invent content for a heading that isn't there: ${HEADINGS.join(", ")}.\n\nRough notes:\n${source}`
-      );
-      if (out) {
-        const next = { ...f, tidied: true };
-        FIELDS.forEach(([key, label]) => {
-          const re = new RegExp(`${label}:\\s*([\\s\\S]*?)(?=\\n(?:${HEADINGS.join("|")}):|$)`, "i");
-          const m = out.match(re);
-          next[key] = (m && m[1].trim()) ? m[1].trim() : "";
-        });
-        setF(next);
-      }
+      if (SF_DEMO_ACTIVE) throw new Error("AI features are switched off in demo mode. Start setup for real to use them. Your note is unchanged.");
+      if (aiLeft("notes") <= 0) throw new Error("daily-cap");
+      const pt = data.participants.find((x) => x.id === f.participantId) || null;
+      const mgr = pt ? data.managers.find((x) => x.id === pt.managerId) : null;
+      const text = scrubNoteForAssist(f.rough, {
+        participantNames: pt && pt.name ? [pt.name] : [],
+        workerNames: data.profile && data.profile.name ? [data.profile.name] : [],
+        otherNames: [mgr && mgr.name, mgr && mgr.contact].filter(Boolean),
+        identifiers: [
+          pt && pt.ndisNumber, pt && pt.email, pt && pt.phone, pt && pt.address,
+          mgr && mgr.email, mgr && mgr.phone, mgr && mgr.address,
+          data.profile && data.profile.email, data.profile && data.profile.phone, data.profile && data.profile.abn,
+        ].filter(Boolean),
+      });
+      const res = await fetch("/.netlify/functions/notes-ai-assist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...licenceHeaders() },
+        body: JSON.stringify(notesAssistRequestBody(text)),
+      });
+      let payload = {};
+      try { payload = await res.json(); } catch (e) { payload = {}; }
+      if (res.status === 503) throw new Error("AI assist isn't configured yet. Your note is unchanged.");
+      if (res.status === 402) throw new Error("This device needs an active SupportFlow licence. Open Settings and check in. Your note is unchanged.");
+      if (res.status === 429) throw new Error("busy");
+      if (res.status === 413 || payload.error === "too-long") throw new Error("That note is too long for AI assist. Your note is unchanged.");
+      if (payload.error === "too-short") throw new Error("There isn't enough left to rewrite after removing identifiers. Your note is unchanged.");
+      if (!res.ok) throw new Error("failed");
+      const suggestion = typeof payload.text === "string" ? payload.text.trim() : "";
+      if (!suggestion) throw new Error("failed");
+      aiBump("notes");
+      setReview({ text: suggestion });
     } catch (e) {
-      if (e && e.message === "daily-cap") setTidyErr(`That's today's ${AI_CAPS.tidy} tidy-ups. Your note is saved as written.`);
-      else {
-        console.error(e);
-        const msg = e && e.message;
-        setTidyErr(msg === "busy" ? "The tidy-up service is busy. Try again in a moment. Your note is unchanged."
-          : msg && msg !== "not-configured" && !/^Lookup failed/.test(msg) ? msg
-          : "Couldn't tidy that just now. Your note is unchanged.");
-      }
+      const msg = e && e.message;
+      setAssistErr(msg === "daily-cap" ? `That's today's ${AI_CAPS.notes} AI assists. Your note is unchanged.`
+        : msg === "busy" ? "AI assist is busy. Try again in a moment. Your note is unchanged."
+        : msg && msg !== "failed" ? msg
+        : "Couldn't draft a suggestion just now. Your note is unchanged.");
     }
     setBusy(false);
   };
 
+  const acceptReview = () => {
+    if (!review) return;
+    const next = acceptNoteSuggestion(f.rough, review.text);
+    setF({ ...f, rough: next.editorText });
+    setReview(null);
+    setAssistErr("");
+  };
+
+  const discardReview = () => {
+    if (!review) return;
+    const next = discardNoteSuggestion(f.rough);
+    setF({ ...f, rough: next.editorText });
+    setReview(null);
+  };
+
+  const onReviewKey = (e) => {
+    if (e.key === "Escape") { e.preventDefault(); discardReview(); }
+  };
+
   const add = () => {
-    const body = f.tidied ? assembleBody(f) : f.rough.trim();
-    if (!body.trim()) return;
+    const body = f.rough.trim();
+    if (!body) return;
     const record = { date: f.date, participantId: f.participantId, shared: f.shared, body };
     if (editingId) {
       save({ ...data, notes: data.notes.map((x) => x.id === editingId ? { ...x, ...record } : x) });
@@ -8991,7 +9117,8 @@ function Notes({ data, save, prefill, onPrefillConsumed }) {
       save({ ...data, notes: [...data.notes, { ...record, id: uid() }] });
     }
     setF(blank());
-    setTidyErr("");
+    setAssistErr("");
+    setReview(null);
   };
 
   const rows = data.notes.filter((n) => filter === "all" || (filter === "shared" ? n.shared : !n.shared));
@@ -9071,29 +9198,30 @@ function Notes({ data, save, prefill, onPrefillConsumed }) {
             </select>
           </label>
         </div>
-        {!f.tidied ? (
+        <div className={"ai-note-grid" + (review ? " has-review" : "")}>
           <label className="f"><span>What happened</span>
-            <textarea style={{ minHeight: 130 }} value={f.rough} onChange={(e) => setF({ ...f, rough: e.target.value })}
-              placeholder="Talk about the shift in your own words, however it comes out. Tidy this up sorts it into the right sections for you." />
+            <textarea style={{ minHeight: 160 }} value={f.rough} aria-label="What happened"
+              onChange={(e) => setF({ ...f, rough: e.target.value })}
+              placeholder="Write the shift in your own words. AI assist can suggest a progress note for you to review." />
           </label>
-        ) : (
-          <>
-            <div style={{ fontSize: 11.5, color: "var(--tx-3)", lineHeight: 1.6, marginBottom: 12 }}>
-              Sorted into the five NDIS-aligned sections. A section marked <b style={{ color: "var(--warn)" }}>missing</b> just
-              means nothing in what you said covered it, fill it in yourself or leave it and save as-is, your call.
+          {review && (
+            <div className="ai-review" role="region" aria-labelledby="ai-suggest-title" onKeyDown={onReviewKey}>
+              <h3 id="ai-suggest-title">Suggested progress note</h3>
+              <p className="ai-help" id="ai-suggest-help">
+                This is a draft only. What happened stays as you wrote it until you accept. Accept does not save the note. Edit the suggestion here, then accept or discard it. Press Escape to discard.
+              </p>
+              <label className="f" htmlFor="ai-suggestion"><span>Edit the suggestion</span>
+                <textarea id="ai-suggestion" ref={suggestionRef} style={{ minHeight: 160 }} value={review.text}
+                  aria-describedby="ai-suggest-help"
+                  onChange={(e) => setReview({ text: e.target.value })} />
+              </label>
+              <div className="ai-assist-actions">
+                <button type="button" className="btn ai-touch" onClick={acceptReview}>Accept</button>
+                <button type="button" className="btn ghost ai-touch" onClick={discardReview}>Discard</button>
+              </div>
             </div>
-            {FIELDS.map(([key, label]) => {
-              const empty = !f[key] || !f[key].trim();
-              return (
-                <label className="f" key={key}>
-                  <span style={{ color: empty ? "var(--warn)" : undefined }}>{label}{empty ? " — missing" : ""}</span>
-                  <textarea style={{ minHeight: 64, borderColor: empty ? "var(--warn)" : undefined }}
-                    value={f[key]} onChange={(e) => setF({ ...f, [key]: e.target.value })} />
-                </label>
-              );
-            })}
-          </>
-        )}
+          )}
+        </div>
         <label className="check" style={{ marginBottom: 8 }}>
           <input type="checkbox" checked={f.shared} onChange={(e) => setF({ ...f, shared: e.target.checked })} />
           <span>Written to be shared, suitable for the participant, family or plan manager to read</span>
@@ -9101,14 +9229,21 @@ function Notes({ data, save, prefill, onPrefillConsumed }) {
         <div style={{ fontSize: 11.5, color: "var(--tx-3)", lineHeight: 1.65, marginBottom: 16 }}>
           This is about how you've written it, not where it goes. Nothing is sent by ticking it. Notes stay on this device until you send one yourself.
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          {AI.enabled() && (
-            <button className="btn ghost" onClick={tidy} disabled={busy || !hasContent(f)}>{busy ? "Writing…" : "Tidy this up"}</button>
-          )}
-          <button className="btn" onClick={add} disabled={!hasContent(f)}>{editingId ? "Save changes" : "Save note"}</button>
-          {editingId && <button className="btn ghost" onClick={cancelEdit}>Cancel</button>}
+        <div className="ai-assist-actions">
+          <button type="button" ref={assistBtnRef} className="btn ghost ai-touch" onClick={askAssist}
+            disabled={busy || !!block} aria-busy={busy ? "true" : "false"} aria-describedby="ai-assist-hint">
+            {busy ? "Writing a suggestion…" : "AI assist"}
+          </button>
+          <button className="btn ai-touch" onClick={add} disabled={!f.rough.trim()}>{editingId ? "Save changes" : "Save note"}</button>
+          {editingId && <button className="btn ghost ai-touch" onClick={cancelEdit}>Cancel</button>}
         </div>
-        {tidyErr && <div style={{ fontSize: 12, color: "var(--warn)", marginTop: 10 }}>{tidyErr}</div>}
+        <div id="ai-assist-hint" className="ai-hint" role="status" aria-live="polite">
+          {busy ? "Writing a suggestion. Your note is unchanged."
+            : block === "long" ? "This note is too long for AI assist. Shorten it, or save it as written."
+            : block ? "Write a little more about the shift before using AI assist."
+            : "Tapping AI assist sends this note text, with names and contact details removed where the app can see them, to Anthropic to draft a progress note. Nothing else from the record is sent. Your note does not change until you accept, and it does not save."}
+        </div>
+        {assistErr && <div role="alert" style={{ fontSize: 12.5, color: "var(--warn)", marginTop: 10 }}>{assistErr}</div>}
       </div>
 
       <div className="tabnav" style={{ marginTop: 20 }}>
@@ -9712,7 +9847,7 @@ const MANUAL = [
       ],
       [
         "The first thing you see",
-        "A welcome screen, once, explaining the app in three lines. You can start guided setup, or try the app with demo data first: a made-up business, nothing in it is real, and starting setup for real replaces it. Guided setup is five numbered steps: PIN, Backup, Details, Managers, Participants. The row of numbers stays pinned to the top as you scroll, so you always see which step you are on. All five must be finished before normal use."
+        "A welcome screen, once, explaining the app in three lines. You can start guided setup, or try the app with demo data first: a made-up business, nothing in it is real, and starting setup for real replaces it. AI assist and the deduction checker are switched off in demo mode and say so. Guided setup is five numbered steps: PIN, Backup, Details, Managers, Participants. The row of numbers stays pinned to the top as you scroll, so you always see which step you are on. All five must be finished before normal use."
       ],
       [
         "Setup step 1 – PIN",
@@ -9782,7 +9917,7 @@ const MANUAL = [
       ],
       [
         "Shift notes",
-        "Work → Notes. Write a note against a participant and mark it private or shareable. That mark is about how you have written it, plain and factual for someone else to read, or your own private observations. Ticking it does not send anything."
+        "Work → Notes. Write the shift in your own words. When there is enough to work with, tap AI assist. It drafts a professional NDIS progress note from those words and shows it beside what you wrote. Edit the suggestion if you want, then Accept or Discard. Accept replaces the text in the box and still does not save. Discard leaves your words as they are. Nothing is saved until you tap Save note, and the note is never overwritten on its own. If AI assist isn't configured yet, the button stays and tells you so, and your note is unchanged. The button is switched off when the box is empty or only a few words. Mark the finished note private or shareable. That mark is about how you have written it. Ticking it does not send anything. AI assist is switched off in demo mode and says so."
       ],
       [
         "Sending a note",
@@ -10038,7 +10173,7 @@ const MANUAL = [
       ],
       [
         "Daily limit on checks",
-        "The checker allows 15 questions a day, and the note tidier 30. That is far more than a normal day of work and exists to stop the cost running away, each check reads live pages from the ATO, which is not free. Anything you have already asked opens instantly and does not count against the limit, and it resets the next day."
+        "The checker allows 15 questions a day, and AI assist allows 30 progress-note drafts. That is far more than a normal day of work and exists to stop the cost running away. A deduction check reads live pages from the ATO, which is not free. Anything you have already asked the checker opens instantly and does not count against that limit. Both limits reset the next day. AI assist does not use your free invoice credits."
       ],
       [
         "Checking things yourself",
@@ -10080,6 +10215,8 @@ const PRIVACY_SECTIONS = [
    "SupportFlow is hosted on Netlify. Delivering the app to your device involves Netlify processing ordinary technical request information, such as IP address, browser and device details, and which pages or resources were requested. That's separate from the records you store inside the app. SupportFlow does not intentionally send participant names, NDIS numbers, shift notes or other stored records to Netlify simply because the app is hosted there."],
   ["The deduction checker (Claim check)",
    "When you type a claim-check question, that question is sent to the service used to process the request and check relevant ATO material. Do not include participant names, NDIS numbers, health information or other participant details. Claim check is for general tax guidance and is not a participant-record feature."],
+  ["AI assist for shift notes",
+   "AI assist is optional. Nothing is sent until you tap AI assist, and the note screen says so before you tap. It sends the note text, after removing names, NDIS numbers, phone numbers, email addresses and street addresses it can see on the selected participant, their plan manager and your record. It does not send those records as separate fields, the date, or your identity. The text goes through the SupportFlow server to Anthropic's Claude API to draft a progress note. Anthropic's handling of API data applies. The draft stays on this device until you save the note. You can save without using AI assist. If it is not configured, no request is sent."],
   ["Backups",
    "Encrypted on your device with AES-256 and a passphrase you choose, before the file goes anywhere you decide, your own cloud storage, an email, or a local download. The developer never receives a copy and cannot decrypt it. You are also given a recovery code when you set the passphrase; it is generated on your device, shown once, and not stored by the developer. If you lose both the passphrase and the recovery code, nobody can recover the backup, including the developer."],
   ["Shift notes and records you choose to share",
@@ -10154,7 +10291,7 @@ const DATASEC_SECTIONS = [
   ["Hosting",
    "SupportFlow is hosted on Netlify. Your device communicates with Netlify to load and run the app, and Netlify may process normal technical web-hosting information as part of that. Your locally stored participant records are not intentionally uploaded to Netlify simply because the app is hosted there."],
   ["When information can leave your device",
-   "When you choose to export, back up, email or share it, or when you intentionally submit a question through Claim check. Once information leaves your device to another person or service, its security also depends on that recipient. Always check who you're sending to, and share only what's reasonably necessary."],
+   "When you choose to export, back up, email or share it, when you intentionally submit a question through Claim check, or when you tap AI assist on a shift note. AI assist sends the note text, with names and contact details removed where the app can see them, to Anthropic to draft a progress note. The note screen says this before you tap. Once information leaves your device to another person or service, its security also depends on that recipient. Always check who you're sending to, and share only what's reasonably necessary."],
   ["If your device is lost or stolen",
    "Lock or remotely secure it if possible, consider remote erasure where appropriate, change relevant passwords, consider what participant information may have been accessible, and assess whether you have notification or reporting obligations."],
   ["Reporting a security concern",
@@ -10166,7 +10303,7 @@ function DataSecurity() {
     <>
       <div className="panel">
         <div className="eyebrow" style={{ marginBottom: 8 }}>Data &amp; security</div>
-        <div style={{ fontSize: 12, color: "var(--tx-3)", fontWeight: 500 }}>Last updated 18 August 2026</div>
+        <div style={{ fontSize: 12, color: "var(--tx-3)", fontWeight: 500 }}>Last updated 27 November 2026</div>
       </div>
       <LegalAccordion sections={DATASEC_SECTIONS} />
     </>
@@ -10186,6 +10323,7 @@ const PRIVSEC_SECTIONS = [
   </>],
   ["Information shared with other services", <>
     <p><strong>SupportFlow Assistant:</strong> sends the question you type and generic app/help context needed to answer it. It is designed not to send participant or business records.</p>
+    <p><strong>AI assist for shift notes:</strong> optional. Before you tap it, the note screen says that the note text is sent to Anthropic to draft a progress note, with names and contact details removed where the app can see them. Other records are not sent. The draft stays on this device until you save.</p>
   </>],
   ["Your privacy", <>
     <p>The full Privacy Policy explains what SupportFlow handles, where information is stored, third-party services and your privacy choices.</p>
