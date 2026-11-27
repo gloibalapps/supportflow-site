@@ -312,6 +312,9 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 .btn.ghost{background:none;color:var(--tx-2);border-color:var(--line)}
 .btn.ghost:hover:not(:disabled){color:var(--tx);border-color:var(--brass);background:none}
 .btn.tiny{padding:6px 12px;font-size:12px;border-radius:8px}
+.sigpad{width:100%;height:148px;touch-action:none;background:#fff;border-radius:10px;border:1px dashed var(--line);display:block;cursor:crosshair}
+.sigactions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.sigfile{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .btn.x{background:none;border:0;color:var(--warn);padding:6px 7px;font-size:15px;
   display:inline-flex;align-items:center;justify-content:center}
 .btn.x:hover{color:var(--warn);background:none;border:0}
@@ -6965,7 +6968,7 @@ function Onboarding({ data, save, close, help, openPrivacy, startStep }) {
                 </>
               )}
               <label className="check" style={{ marginBottom: 14 }}>
-                <input type="checkbox" checked={!!pf.agreement} onChange={(e) => setPf({ ...pf, agreement: e.target.checked })} />
+                <input type="checkbox" checked={!!pf.agreement} onChange={(e) => setPf({ ...pf, agreement: e.target.checked, agreementSignedSource: e.target.checked ? "explicit" : "" })} />
                 <span>Written service agreement in place</span>
               </label>
               <div className="two" style={{ marginBottom: 0 }}>
@@ -7227,6 +7230,328 @@ function Claimable({ data, save, seed }) {
 
 /* ---------------- Directory ---------------- */
 
+/* ---------------- agreement signatures ---------------- */
+function withAgreementParties(participant, parties) {
+  return { ...participant, ...agreementStatusFromParties(participant, parties, today()) };
+}
+
+function drawSignatureStrokes(canvas, strokes) {
+  const rect = canvas.getBoundingClientRect();
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  const cssW = rect.width || canvas.clientWidth || 300;
+  const cssH = rect.height || canvas.clientHeight || 148;
+  const w = Math.max(1, Math.round(cssW * dpr));
+  const h = Math.max(1, Math.round(cssH * dpr));
+  if (canvas.width !== w || canvas.height !== h) {
+    canvas.width = w;
+    canvas.height = h;
+  }
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.lineWidth = Math.max(2, 2.4 * dpr);
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = "#1A1B18";
+  (strokes || []).forEach((pts) => {
+    if (!pts || !pts.length) return;
+    ctx.beginPath();
+    pts.forEach((p, i) => {
+      const x = p[0] * canvas.width;
+      const y = p[1] * canvas.height;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    if (pts.length === 1) ctx.lineTo(pts[0][0] * canvas.width + dpr, pts[0][1] * canvas.height);
+    ctx.stroke();
+  });
+}
+
+let signatureImageToken = 0;
+function drawUploadedSignature(canvas, src) {
+  const token = ++signatureImageToken;
+  const img = new Image();
+  img.onload = () => {
+    if (token !== signatureImageToken) return;
+    const rect = canvas.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const cssW = rect.width || canvas.clientWidth || 300;
+    const cssH = rect.height || canvas.clientHeight || 148;
+    const w = Math.max(1, Math.round(cssW * dpr));
+    const h = Math.max(1, Math.round(cssH * dpr));
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
+    }
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const scale = Math.min(canvas.width / img.width, canvas.height / img.height);
+    const dw = img.width * scale;
+    const dh = img.height * scale;
+    ctx.drawImage(img, (canvas.width - dw) / 2, (canvas.height - dh) / 2, dw, dh);
+  };
+  img.src = src;
+}
+
+function compressSignatureFile(file) {
+  return new Promise((resolve, reject) => {
+    const type = (file && file.type) || "";
+    const name = (file && file.name) || "";
+    if (!/image\/(png|jpeg|jpg|pjpeg|webp)/i.test(type) && !/\.(png|jpe?g|webp)$/i.test(name)) {
+      reject(new Error("Use a PNG or JPG photo."));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Couldn't read that image."));
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        let box = signatureFit(img.naturalWidth || img.width, img.naturalHeight || img.height);
+        let quality = 0.72;
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        let url = "";
+        for (let attempt = 0; attempt < 6; attempt++) {
+          canvas.width = box.width;
+          canvas.height = box.height;
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, box.width, box.height);
+          ctx.drawImage(img, 0, 0, box.width, box.height);
+          url = canvas.toDataURL("image/jpeg", quality);
+          if (isSignatureImage(url) && url.length <= SIGNATURE_UPLOAD_MAX_CHARS) {
+            resolve(url);
+            return;
+          }
+          quality = Math.max(0.4, quality - 0.1);
+          box = {
+            width: Math.max(80, Math.round(box.width * 0.75)),
+            height: Math.max(40, Math.round(box.height * 0.75)),
+          };
+        }
+        if (isSignatureImage(url)) resolve(url);
+        else reject(new Error("That image is too large to store."));
+      };
+      img.onerror = () => reject(new Error("Couldn't read that image. Use a PNG or JPG."));
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function SignaturePad({ party, label, onChange }) {
+  const canvasRef = useRef(null);
+  const fileRef = useRef(null);
+  const partyRef = useRef(party);
+  partyRef.current = party;
+  const drawing = useRef(null);
+  const [fileErr, setFileErr] = useState("");
+
+  const redraw = (strokes, active) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    if (active && active.length) {
+      drawSignatureStrokes(canvas, [...(strokes || []), active]);
+      return;
+    }
+    if (strokes && strokes.length) {
+      drawSignatureStrokes(canvas, strokes);
+      return;
+    }
+    const image = partyRef.current && partyRef.current.signature;
+    if (image) drawUploadedSignature(canvas, image);
+    else drawSignatureStrokes(canvas, []);
+  };
+
+  useEffect(() => {
+    redraw(party.strokes || [], drawing.current);
+  }, [party.signature, party.strokes]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const block = (e) => { if (e.cancelable) e.preventDefault(); };
+    canvas.addEventListener("touchstart", block, { passive: false });
+    canvas.addEventListener("touchmove", block, { passive: false });
+    let ro;
+    if (typeof ResizeObserver !== "undefined") {
+      ro = new ResizeObserver(() => redraw(partyRef.current.strokes || [], drawing.current));
+      ro.observe(canvas);
+    }
+    return () => {
+      canvas.removeEventListener("touchstart", block);
+      canvas.removeEventListener("touchmove", block);
+      if (ro) ro.disconnect();
+    };
+  }, []);
+
+  const pointOf = (e) => {
+    const r = canvasRef.current.getBoundingClientRect();
+    const w = r.width || 1;
+    const h = r.height || 1;
+    const x = Math.min(1, Math.max(0, (e.clientX - r.left) / w));
+    const y = Math.min(1, Math.max(0, (e.clientY - r.top) / h));
+    return [Math.round(x * 10000) / 10000, Math.round(y * 10000) / 10000];
+  };
+
+  const down = (e) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    e.preventDefault();
+    try { canvasRef.current.setPointerCapture(e.pointerId); } catch (_) {}
+    canvasRef.current.dataset.lastPointer = e.pointerType || "mouse";
+    drawing.current = [pointOf(e)];
+    redraw(partyRef.current.strokes || [], drawing.current);
+  };
+  const move = (e) => {
+    if (!drawing.current) return;
+    e.preventDefault();
+    drawing.current.push(pointOf(e));
+    redraw(partyRef.current.strokes || [], drawing.current);
+  };
+  const up = (e) => {
+    if (!drawing.current) return;
+    if (e && e.preventDefault) e.preventDefault();
+    const stroke = drawing.current;
+    drawing.current = null;
+    if (!stroke.length) return;
+    const current = partyRef.current;
+    redraw([...(current.strokes || []), stroke], null);
+    const png = canvasRef.current.toDataURL("image/png");
+    onChange(commitStroke(current, stroke, png, today()));
+  };
+
+  const undo = () => {
+    const dropped = dropLastStroke(partyRef.current);
+    if (!dropped.changed) return;
+    redraw(dropped.party.strokes, null);
+    const png = dropped.party.strokes.length ? canvasRef.current.toDataURL("image/png") : "";
+    onChange({ ...dropped.party, signature: png });
+  };
+
+  const onFile = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    setFileErr("");
+    try {
+      const url = await compressSignatureFile(file);
+      onChange(importSignature(partyRef.current, url, today()));
+    } catch (err) {
+      setFileErr(err && err.message ? err.message : "Couldn't use that image.");
+    }
+  };
+
+  const ink = !!(party.signature || (party.strokes && party.strokes.length));
+  const uploaded = !!(party.signature && !(party.strokes && party.strokes.length));
+  return (
+    <div>
+      <canvas
+        ref={canvasRef}
+        className="sigpad"
+        role="img"
+        aria-label={label}
+        onPointerDown={down}
+        onPointerMove={move}
+        onPointerUp={up}
+        onPointerCancel={up}
+      />
+      <div className="sigactions">
+        <button type="button" className="btn ghost tiny" onClick={undo} disabled={!(party.strokes && party.strokes.length)}>Undo</button>
+        <button type="button" className="btn ghost tiny" onClick={() => onChange(redoParty(partyRef.current))} disabled={!party.redo}>Redo</button>
+        <button type="button" className="btn ghost tiny" onClick={() => { setFileErr(""); onChange(clearParty(partyRef.current)); }} disabled={!ink}>Clear</button>
+        <button type="button" className="btn ghost tiny" onClick={() => fileRef.current && fileRef.current.click()}>{uploaded ? "Replace image" : "Upload signature"}</button>
+        <input
+          ref={fileRef}
+          className="sigfile"
+          type="file"
+          accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp"
+          aria-label={`Upload a signature image, ${label}`}
+          onChange={onFile}
+        />
+      </div>
+      {fileErr ? <div style={{ fontSize: 12, color: "var(--warn)", marginTop: 6 }}>{fileErr}</div> : null}
+    </div>
+  );
+}
+
+function AgreementSigners({ participant, profile, managers, parties, onChange, storedNote }) {
+  const [addRole, setAddRole] = useState("witness");
+  const update = (next) => onChange(partiesForSave(next));
+  const signed = (parties || []).filter((p) => p.signature);
+  return (
+    <div>
+      <div className="eyebrow" style={{ marginBottom: 8 }}>Signing parties</div>
+      <div style={{ fontSize: 12.5, color: "var(--tx-2)", lineHeight: 1.6, marginBottom: 10 }}>
+        The participant and the sole trader are here to start. Add anyone else who needs to sign,
+        such as a nominee or guardian, a plan manager, a support coordinator or a witness.
+        Each person signs with a finger, a mouse or a trackpad, or uploads a PNG or JPG of their signature.
+      </div>
+      {signed.length > 0 && (
+        <div style={{ fontSize: 12.5, color: "var(--tx-2)", lineHeight: 1.55, marginBottom: 10 }}>
+          {signed.map((p) => `${p.name || "Unnamed"} (${agreementRoleLabel(p)})${p.signedAt ? `, signed ${fmtDate(p.signedAt)}` : ", signed"}`).join(" · ")}
+        </div>
+      )}
+      {(parties || []).map((party) => (
+        <div key={party.id} data-party-id={party.id} data-party-role={party.role} style={{ border: "1px solid var(--line)", borderRadius: 10, padding: "12px 12px 10px", marginBottom: 10, background: "var(--bg)" }}>
+          <div className="two">
+            <label className="f"><span>Role</span>
+              <select aria-label={`Role for ${party.name || agreementRoleLabel(party)}`} value={party.role} onChange={(e) => {
+                const role = e.target.value;
+                const patch = { role };
+                if (!(party.name || "").trim()) patch.name = suggestedPartyName(role, participant, profile, managers);
+                update(replaceParty(parties, party.id, patchParty(party, patch)));
+              }}>
+                {AGREEMENT_ROLES.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
+              </select>
+            </label>
+            <label className="f"><span>Name</span>
+              <input aria-label={`Name for ${agreementRoleLabel(party)}`} value={party.name || ""} onChange={(e) => update(replaceParty(parties, party.id, patchParty(party, { name: e.target.value })))} />
+            </label>
+          </div>
+          {party.role === "other" && (
+            <label className="f"><span>Role title</span>
+              <input aria-label="Custom role title" value={party.customRole || ""} placeholder="Advocate, family member…"
+                onChange={(e) => update(replaceParty(parties, party.id, patchParty(party, { role: "other", customRole: e.target.value })))} />
+            </label>
+          )}
+          <label className="f"><span>Date signed</span>
+            <AuDateInput value={party.signedAt} onChange={(v) => update(replaceParty(parties, party.id, patchParty(party, { signedAt: v })))} />
+          </label>
+          <SignaturePad
+            party={party}
+            label={`Signature for ${agreementRoleLabel(party)}${party.name ? ", " + party.name : ""}`}
+            onChange={(next) => update(replaceParty(parties, party.id, next))}
+          />
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginTop: 8, alignItems: "center" }}>
+            <span style={{ fontSize: 11.5, color: party.signature ? "var(--good)" : "var(--tx-3)" }}>
+              {party.signature ? "Signature saved with this agreement" : "Not signed yet"}
+            </span>
+            <button type="button" className="btn ghost tiny" onClick={() => confirmAndRun("this signing party", () => update(removeParty(parties, party.id)))}>Remove</button>
+          </div>
+        </div>
+      ))}
+      {(parties || []).length === 0 && (
+        <div style={{ fontSize: 12.5, color: "var(--tx-3)", marginBottom: 10 }}>No signing parties yet.</div>
+      )}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+        <label className="f" style={{ marginBottom: 0, flex: "1 1 200px" }}><span>Add a signing party</span>
+          <select aria-label="Role to add" value={addRole} onChange={(e) => setAddRole(e.target.value)}>
+            {AGREEMENT_ROLES.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
+          </select>
+        </label>
+        <button type="button" className="btn tiny" onClick={() => update(addParty(parties, blankParty({
+          id: "party-" + uid(),
+          role: addRole,
+          name: suggestedPartyName(addRole, participant, profile, managers),
+        })))}>Add</button>
+      </div>
+      {storedNote ? <div style={{ fontSize: 11.5, color: "var(--tx-3)", lineHeight: 1.55, marginTop: 8 }}>{storedNote}</div> : null}
+    </div>
+  );
+}
+
 /* ---------------- Agreements ---------------- */
 // Service agreements had been living at the bottom of the participant form,
 // where nobody found them. They carry GST-free status, so they get their own place.
@@ -7248,8 +7573,18 @@ function Agreements({ data, save, open }) {
   const mark = (pt, on) => save({
     ...data,
     participants: data.participants.map((x) => (x.id === pt.id
-      ? { ...x, agreement: on, agreementDate: on && !x.agreementDate ? today() : x.agreementDate }
+      ? {
+          ...x,
+          agreement: on,
+          agreementDate: on && !x.agreementDate ? today() : x.agreementDate,
+          agreementSignedSource: on ? "explicit" : "",
+        }
       : x)),
+  });
+
+  const persistParties = (pt, parties) => save({
+    ...data,
+    participants: data.participants.map((x) => (x.id === pt.id ? withAgreementParties(x, parties) : x)),
   });
 
   const missing = data.participants.filter((x) => !x.agreement);
@@ -7301,7 +7636,16 @@ function Agreements({ data, save, open }) {
               <div style={{ fontSize: 12, color: "var(--tx-3)", marginBottom: 12 }}>Kept: {pt.agreementWhere}</div>
             )}
 
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <AgreementSigners
+              participant={pt}
+              profile={data.profile}
+              managers={data.managers}
+              parties={resolveAgreementParties(pt, data.profile)}
+              onChange={(parties) => persistParties(pt, parties)}
+              storedNote="Signatures are stored with this agreement on this device, and they are included when you download the PDF."
+            />
+
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
               <button className="btn tiny" onClick={() => make(pt)} disabled={busy === pt.id}>
                 {busy === pt.id ? "Downloading…" : "Download"}
               </button>
@@ -7383,6 +7727,8 @@ function ParticipantHistory({ pt, data }) {
 
 function Directory({ data, save, view, setView, openId, clearOpen, canCreate, onBlocked }) {
   const [edit, setEdit] = useState(null);
+  const agreementPartiesRef = useRef({ id: null, parties: null });
+  const agreementEditKey = useRef("");
   useEffect(() => {
     if (!openId) return;
     const pt = data.participants.find((x) => x.id === openId);
@@ -7405,9 +7751,19 @@ function Directory({ data, save, view, setView, openId, clearOpen, canCreate, on
   const drop = (key, id) => { save({ ...data, [key]: data[key].filter((x) => x.id !== id) }); setEdit(null); };
   const list = view === "participants" ? data.participants : data.managers;
 
+  if (!edit && agreementEditKey.current) {
+    agreementEditKey.current = "";
+    agreementPartiesRef.current = { id: null, parties: null };
+  }
+
   if (edit) {
     const isP = edit._k === "participants";
     const r = edit.rec;
+    const editKey = (edit._k || "") + ":" + (r.id || "new");
+    if (agreementEditKey.current !== editKey) {
+      agreementEditKey.current = editKey;
+      agreementPartiesRef.current = { id: null, parties: null };
+    }
     const set = (patch) => setEdit({ ...edit, rec: { ...r, ...patch } });
     const makeAgreement = async () => {
       setAgErr(""); setAgHint(""); setAgBusy(true);
@@ -7429,9 +7785,14 @@ function Directory({ data, save, view, setView, openId, clearOpen, canCreate, on
             <button className="btn"
               onClick={() => {
                 if (!r.id && !canCreate) { onBlocked(); return; }
-                put(edit._k, isP
+                const buf = agreementPartiesRef.current;
+                const base = isP
                   ? { ...r, name: toProperName(r.name), ndisNumber: ndisDigits(r.ndisNumber) }
-                  : { ...r, abn: formatAbn(r.abn) });
+                  : { ...r, abn: formatAbn(r.abn) };
+                const rec = isP && buf && buf.id === (r.id || "") && buf.parties
+                  ? withAgreementParties(base, buf.parties)
+                  : base;
+                put(edit._k, rec);
               }}
               disabled={!r.name || (isP && (r.nonNdis ? (!(r.defaultDescription || "").trim() || !r.defaultRate) : !r.defaultCode)) || (isP && (r.planType === "plan" ? !r.managerId : !r.terms)) ||
                 (isP && !r.nonNdis && !isValidNdisNumber(r.ndisNumber)) ||
@@ -7586,7 +7947,7 @@ function Directory({ data, save, view, setView, openId, clearOpen, canCreate, on
                     : "Without one your supports may not qualify as GST-free, which can leave you owing 10% you never charged."}
                 </div>
                 <label className="check" style={{ marginBottom: 12 }}>
-                  <input type="checkbox" checked={!!r.agreement} onChange={(e) => set({ agreement: e.target.checked })} />
+                  <input type="checkbox" checked={!!r.agreement} onChange={(e) => set({ agreement: e.target.checked, agreementSignedSource: e.target.checked ? "explicit" : "" })} />
                   <span>Signed agreement in place</span>
                 </label>
                 {r.agreement && (
@@ -7607,6 +7968,23 @@ function Directory({ data, save, view, setView, openId, clearOpen, canCreate, on
                 {agHint && <div style={{ fontSize: 12, color: "var(--good)", marginTop: 9, lineHeight: 1.55 }}>{agHint}</div>}
                 <div style={{ fontSize: 11.5, color: "var(--tx-3)", lineHeight: 1.6, marginTop: 10 }}>
                   Builds a PDF from the details on this record, a starting point, not legal advice. Read it before you use it.
+                </div>
+                <div style={{ marginTop: 14 }}>
+                  <AgreementSigners
+                    participant={r}
+                    profile={data.profile}
+                    managers={data.managers}
+                    parties={resolveAgreementParties(r, data.profile)}
+                    onChange={(parties) => {
+                      const next = withAgreementParties(r, parties);
+                      agreementPartiesRef.current = { id: r.id || "", parties: next.agreementParties };
+                      set({ agreementParties: next.agreementParties, agreement: next.agreement, agreementDate: next.agreementDate, agreementSignedSource: next.agreementSignedSource });
+                      if (r.id) save({ ...data, participants: data.participants.map((x) => x.id === r.id ? withAgreementParties(x, parties) : x) });
+                    }}
+                    storedNote={r.id
+                      ? "Signatures are stored with this agreement on this device as soon as you sign."
+                      : "Signatures are kept when you save this participant."}
+                  />
                 </div>
               </div>
               <label className="f" style={{ marginBottom: 0 }}><span>Support notes</span>
@@ -9239,6 +9617,298 @@ function cancellationCheck(scheduled, cancelledOn) {
   };
 }
 
+/* @@AGREEMENT_SIG_START */
+// Signing parties on a service agreement.
+// build-app.mjs inlines this file into app.jsx between the
+// @@AGREEMENT_SIG markers, with the export keywords removed.
+// Any number of parties. A missing list means the participant and the
+// sole trader, and has not been saved yet. An array, including an empty
+// one, is what was saved.
+
+const AGREEMENT_ROLES = [
+  { id: "participant", label: "Participant" },
+  { id: "representative", label: "Participant's representative" },
+  { id: "worker", label: "Sole trader (support worker)" },
+  { id: "nominee", label: "Nominee or guardian" },
+  { id: "planManager", label: "Plan manager" },
+  { id: "coordinator", label: "Support coordinator" },
+  { id: "witness", label: "Witness" },
+  { id: "other", label: "Other" },
+];
+
+const ROLE_IDS = new Set(AGREEMENT_ROLES.map((r) => r.id));
+const MAX_SIG_CHARS = 500000;
+const MAX_STROKES = 80;
+const MAX_POINTS = 2000;
+
+function agreementRoleLabel(party) {
+  if (!party) return "";
+  if (party.role === "other") {
+    const custom = String(party.customRole || "").trim();
+    return custom || "Other";
+  }
+  const hit = AGREEMENT_ROLES.find((r) => r.id === party.role);
+  return hit ? hit.label : "Signatory";
+}
+
+function clamp01(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return 0;
+  return Math.round(Math.min(1, Math.max(0, x)) * 10000) / 10000;
+}
+
+function normaliseStrokes(strokes) {
+  if (!Array.isArray(strokes)) return [];
+  const out = [];
+  for (const stroke of strokes.slice(0, MAX_STROKES)) {
+    if (!Array.isArray(stroke)) continue;
+    const pts = [];
+    for (const p of stroke.slice(0, MAX_POINTS)) {
+      if (Array.isArray(p)) pts.push([clamp01(p[0]), clamp01(p[1])]);
+      else if (p && typeof p === "object") pts.push([clamp01(p.x), clamp01(p.y)]);
+    }
+    if (pts.length) out.push(pts);
+  }
+  return out;
+}
+
+const SIGNATURE_IMAGE_MAX = { width: 640, height: 220 };
+// A stored upload should stay well under this so several parties fit in localStorage.
+const SIGNATURE_UPLOAD_MAX_CHARS = 80000;
+
+function isSignatureImage(value) {
+  if (typeof value !== "string" || value.length > MAX_SIG_CHARS) return false;
+  const png = value.startsWith("data:image/png");
+  const jpeg = value.startsWith("data:image/jpeg");
+  if (!png && !jpeg) return false;
+  const prefix = png ? "data:image/png" : "data:image/jpeg";
+  return value.length > prefix.length + 1;
+}
+
+function signatureImageFormat(value) {
+  if (!isSignatureImage(value)) return "";
+  return value.startsWith("data:image/png") ? "PNG" : "JPEG";
+}
+
+// Fit a photo inside the signature box without enlarging a small image.
+function signatureFit(srcW, srcH, maxW = SIGNATURE_IMAGE_MAX.width, maxH = SIGNATURE_IMAGE_MAX.height) {
+  const w = Number(srcW);
+  const h = Number(srcH);
+  const boxW = Math.max(1, Number(maxW) || SIGNATURE_IMAGE_MAX.width);
+  const boxH = Math.max(1, Number(maxH) || SIGNATURE_IMAGE_MAX.height);
+  if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return { width: boxW, height: boxH };
+  const scale = Math.min(1, boxW / w, boxH / h);
+  return { width: Math.max(1, Math.round(w * scale)), height: Math.max(1, Math.round(h * scale)) };
+}
+
+function blankParty({ id, role, name, customRole } = {}) {
+  return {
+    id: id || "",
+    role: ROLE_IDS.has(role) ? role : "other",
+    customRole: role === "other" ? String(customRole || "") : "",
+    name: name || "",
+    signature: "",
+    strokes: [],
+    signedAt: "",
+    redo: null,
+  };
+}
+
+function sanitiseRedo(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const signature = isSignatureImage(raw.signature) ? raw.signature : "";
+  const strokes = normaliseStrokes(raw.strokes);
+  if (!signature && !strokes.length) return null;
+  return {
+    signature,
+    strokes,
+    signedAt: typeof raw.signedAt === "string" ? raw.signedAt.slice(0, 10) : "",
+  };
+}
+
+function sanitiseParty(raw, index) {
+  const src = raw && typeof raw === "object" ? raw : {};
+  const role = ROLE_IDS.has(src.role) ? src.role : "other";
+  const id = typeof src.id === "string" && src.id.trim() ? src.id.trim().slice(0, 40) : `party-${index}`;
+  return {
+    id,
+    role,
+    customRole: role === "other" ? String(src.customRole || "").trim().slice(0, 80) : "",
+    name: String(src.name || "").slice(0, 120),
+    signature: isSignatureImage(src.signature) ? src.signature : "",
+    strokes: normaliseStrokes(src.strokes),
+    signedAt: typeof src.signedAt === "string" ? src.signedAt.slice(0, 10) : "",
+    redo: sanitiseRedo(src.redo),
+  };
+}
+
+function defaultAgreementParties(participant, profile) {
+  const pt = participant || {};
+  const prof = profile || {};
+  return [
+    blankParty({ id: "party-participant", role: "participant", name: pt.name || "" }),
+    blankParty({ id: "party-worker", role: "worker", name: prof.name || "" }),
+  ];
+}
+
+// Missing list → the two defaults, not yet stored.
+// A saved array is returned as stored, including when every party was removed.
+function resolveAgreementParties(participant, profile) {
+  const stored = participant && participant.agreementParties;
+  if (!Array.isArray(stored)) return defaultAgreementParties(participant, profile);
+  const seen = new Set();
+  return stored.map((raw, i) => {
+    const party = sanitiseParty(raw, i);
+    if (seen.has(party.id)) party.id = `${party.id}-${i}`.slice(0, 40);
+    seen.add(party.id);
+    return party;
+  });
+}
+
+function partiesForSave(parties) {
+  return resolveAgreementParties({ agreementParties: Array.isArray(parties) ? parties : [] }, {});
+}
+
+function suggestedPartyName(role, participant, profile, managers) {
+  const pt = participant || {};
+  const prof = profile || {};
+  if (role === "participant") return pt.name || "";
+  if (role === "worker") return prof.name || "";
+  if (role === "planManager") {
+    const list = Array.isArray(managers) ? managers : [];
+    const linked = list.find((m) => m && m.id && m.id === pt.managerId);
+    return (linked && linked.name) || "";
+  }
+  return "";
+}
+
+// An uploaded photo replaces whatever was signed before. Strokes are cleared
+// because the picture is the signature. Redo can bring the previous one back.
+function importSignature(party, dataUrl, signedAt) {
+  const p = sanitiseParty(party, 0);
+  if (!isSignatureImage(dataUrl)) return p;
+  const had = !!(p.signature || (p.strokes && p.strokes.length));
+  return {
+    ...p,
+    strokes: [],
+    signature: dataUrl,
+    signedAt: p.signedAt || (typeof signedAt === "string" ? signedAt.slice(0, 10) : ""),
+    redo: had ? { signature: p.signature, strokes: p.strokes, signedAt: p.signedAt } : null,
+  };
+}
+
+function commitStroke(party, stroke, png, signedAt) {
+  const p = sanitiseParty(party, 0);
+  const added = normaliseStrokes([stroke]);
+  if (!added.length) return p;
+  const strokes = normaliseStrokes([...p.strokes, ...added]);
+  return {
+    ...p,
+    strokes,
+    signature: isSignatureImage(png) ? png : p.signature,
+    signedAt: p.signedAt || (typeof signedAt === "string" ? signedAt.slice(0, 10) : ""),
+    redo: null,
+  };
+}
+
+function dropLastStroke(party) {
+  const p = sanitiseParty(party, 0);
+  if (!p.strokes.length) return { changed: false, party: p };
+  const strokes = p.strokes.slice(0, -1);
+  return {
+    changed: true,
+    party: {
+      ...p,
+      strokes,
+      signature: "",
+      signedAt: strokes.length ? p.signedAt : "",
+      redo: { signature: p.signature, strokes: p.strokes, signedAt: p.signedAt },
+    },
+  };
+}
+
+function clearParty(party) {
+  const p = sanitiseParty(party, 0);
+  if (!p.signature && !p.strokes.length) return p;
+  return {
+    ...p,
+    signature: "",
+    strokes: [],
+    signedAt: "",
+    redo: { signature: p.signature, strokes: p.strokes, signedAt: p.signedAt },
+  };
+}
+
+function redoParty(party) {
+  const p = sanitiseParty(party, 0);
+  if (!p.redo) return p;
+  return {
+    ...p,
+    signature: p.redo.signature,
+    strokes: p.redo.strokes,
+    signedAt: p.redo.signedAt || "",
+    redo: null,
+  };
+}
+
+function patchParty(party, patch) {
+  const src = patch && typeof patch === "object" ? patch : {};
+  return sanitiseParty({ ...party, ...src, id: party && party.id, redo: src.redo === undefined ? party && party.redo : src.redo }, 0);
+}
+
+function replaceParty(parties, id, next) {
+  return (Array.isArray(parties) ? parties : []).map((p) => (p.id === id ? sanitiseParty(next, 0) : sanitiseParty(p, 0)));
+}
+
+function removeParty(parties, id) {
+  return (Array.isArray(parties) ? parties : []).filter((p) => p.id !== id).map((p, i) => sanitiseParty(p, i));
+}
+
+function addParty(parties, draft) {
+  const list = Array.isArray(parties) ? parties : [];
+  return [...list.map((p, i) => sanitiseParty(p, i)), sanitiseParty(draft, list.length)];
+}
+
+// The agreement counts as signed from signatures only when both sides have
+// signed: the participant or their representative, and the sole trader.
+// A witness, plan manager, coordinator or other party does not do that alone.
+function requiredPartiesSigned(parties) {
+  const list = Array.isArray(parties) ? parties : [];
+  const participantSide = list.some((p) => (p.role === "participant" || p.role === "representative") && isSignatureImage(p.signature));
+  const worker = list.some((p) => p.role === "worker" && isSignatureImage(p.signature));
+  return participantSide && worker;
+}
+
+// agreementSignedSource "explicit" is the checkbox or Mark as signed.
+// "parties" means the flag was set because the participant and worker had both signed.
+// Removing a required signature clears a parties-sourced flag and leaves an explicit one.
+function agreementStatusFromParties(participant, parties, todayIso) {
+  const clean = partiesForSave(parties);
+  const current = participant && typeof participant === "object" ? participant : {};
+  const complete = requiredPartiesSigned(clean);
+  const dates = clean
+    .filter((p) => isSignatureImage(p.signature) && (p.role === "participant" || p.role === "representative" || p.role === "worker"))
+    .map((p) => p.signedAt)
+    .filter(Boolean)
+    .sort();
+  let agreement = !!current.agreement;
+  let agreementDate = typeof current.agreementDate === "string" ? current.agreementDate : "";
+  let agreementSignedSource = current.agreementSignedSource === "explicit" || current.agreementSignedSource === "parties"
+    ? current.agreementSignedSource
+    : "";
+  if (complete) {
+    agreement = true;
+    if (!agreementDate) agreementDate = dates[0] || (typeof todayIso === "string" ? todayIso : "");
+    if (agreementSignedSource !== "explicit") agreementSignedSource = "parties";
+  } else if (agreementSignedSource === "parties") {
+    agreement = false;
+    agreementDate = "";
+    agreementSignedSource = "";
+  }
+  return { agreementParties: clean, agreement, agreementDate, agreementSignedSource };
+}
+/* @@AGREEMENT_SIG_END */
+
 /* ---------------- service agreement ---------------- */
 // The app already holds everything a basic agreement needs, so it writes the
 // document rather than asking the user to find one. The barrier to having an
@@ -9336,20 +10006,40 @@ async function makeAgreementPDF(pt, profile, r) {
     doc.text(wrapped, L, y); y += wrapped.length * 4.3 + 6;
   });
 
-  // signatures
-  page(52);
+  // signatures — one block per signing party, image plus name and date
+  const sigParties = resolveAgreementParties(pt, profile);
+  page(36);
   y += 4;
   doc.setDrawColor(224, 220, 211).line(L, y, R, y); y += 10;
   doc.setFontSize(8).setTextColor(150, 150, 142);
-  doc.text("SIGNED", L, y); y += 10;
-  [["Support worker", profile.name], ["Participant or representative", pt.name]].forEach(([role, nm]) => {
-    doc.setDrawColor(180, 180, 172).line(L, y, L + 70, y);
-    doc.line(L + 90, y, L + 130, y);
-    y += 4.5;
-    doc.setFontSize(8).setTextColor(130, 130, 122);
-    doc.text(`${role}, ${nm || ""}`, L, y);
-    doc.text("Date", L + 90, y);
-    y += 13;
+  doc.text("SIGNED", L, y); y += 8;
+  sigParties.forEach((party) => {
+    const roleName = agreementRoleLabel(party);
+    const who = doc.splitTextToSize(party.name || "—", 78);
+    page(Math.max(40, who.length * 4 + 36));
+    doc.setFont("helvetica", "bold").setFontSize(8).setTextColor(150, 150, 142);
+    doc.text(String(roleName).toUpperCase(), L, y); y += 5;
+    const sigFormat = signatureImageFormat(party.signature);
+    if (sigFormat) {
+      try {
+        doc.addImage(party.signature, sigFormat, L, y, 62, 22, undefined, "FAST");
+        y += 24;
+      } catch (e) {
+        doc.setDrawColor(180, 180, 172).line(L, y + 14, L + 70, y + 14);
+        y += 18;
+      }
+    } else {
+      doc.setDrawColor(180, 180, 172).line(L, y + 14, L + 70, y + 14);
+      y += 18;
+    }
+    doc.setFont("helvetica", "normal").setFontSize(8.5).setTextColor(60, 60, 56);
+    doc.text(who, L, y);
+    const signedOn = party.signedAt
+      ? new Date(party.signedAt + "T00:00:00").toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" })
+      : "";
+    doc.setTextColor(90, 90, 84);
+    doc.text(signedOn ? `Date signed  ${signedOn}` : "Date signed  ________________", L + 90, y);
+    y += Math.max(who.length * 4.2, 5) + 8;
   });
 
   doc.setFontSize(7.5).setTextColor(160, 160, 152);
@@ -9842,7 +10532,7 @@ const MANUAL = [
       ],
       [
         "Letting the app write one",
-        "People → Agreements lists everyone with their agreement status, and Generate one writes the PDF. The PDF is built from what you have already entered, both parties, ABN, NDIS number, plan management, rates, travel and payment terms, plus clauses on cancellations, responsibilities, ending the agreement, GST and complaints, with signature blocks. It is a starting point, not legal advice, so have it looked over before the first one is signed."
+        "People → Agreements lists everyone with their agreement status. Each agreement starts with the participant and the sole trader, and you can add other signing parties such as a nominee, plan manager, support coordinator or witness. Each person signs on screen with a finger, mouse or trackpad, or uploads a PNG or JPG of a signature they already have. Download writes the PDF from what you have already entered, including those signatures with the signer's name and the date signed, plus ABN, NDIS number, plan management, rates, travel, payment terms, and clauses on cancellations, responsibilities, ending the agreement, GST and complaints. It is a starting point, not legal advice, so have it looked over before the first one is signed."
       ],
       [
         "Recording and reviewing",

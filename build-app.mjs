@@ -4,7 +4,9 @@
 //     without its `export` keywords (app.jsx is a classic in-browser script).
 //  2. Copies accountant-pack.js into app.jsx between the @@ACCOUNTANT_PACK
 //     markers, the same way. That file is the only list of PDF fields.
-//  3. Re-inlines app.jsx into app.html's <script id="appsrc"> block
+//  3. Copies agreement-signatures.js into app.jsx between the
+//     @@AGREEMENT_SIG markers, the same way.
+//  4. Re-inlines app.jsx into app.html's <script id="appsrc"> block
 //     (README: "paste app.jsx back into that block").
 // Then syntax-check with: node build-app.mjs --check  (needs @babel/core + @babel/preset-react resolvable)
 import fs from "node:fs";
@@ -20,6 +22,11 @@ const p0 = src.indexOf(PACK_START), p1 = src.indexOf(PACK_END);
 if (p0 < 0 || p1 < p0) throw new Error("accountant pack markers not found in app.jsx");
 const pack = fs.readFileSync("accountant-pack.js", "utf8").replace(/^export\s+/gm, "").trim();
 src = src.slice(0, p0 + PACK_START.length) + "\n" + pack + "\n" + src.slice(p1);
+const SIG_START = "/* @@AGREEMENT_SIG_START */", SIG_END = "/* @@AGREEMENT_SIG_END */";
+const s0 = src.indexOf(SIG_START), s1 = src.indexOf(SIG_END);
+if (s0 < 0 || s1 < s0) throw new Error("agreement signature markers not found in app.jsx");
+const sigs = fs.readFileSync("agreement-signatures.js", "utf8").replace(/^export\s+/gm, "").trim();
+src = src.slice(0, s0 + SIG_START.length) + "\n" + sigs + "\n" + src.slice(s1);
 fs.writeFileSync("app.jsx", src);
 
 const html = fs.readFileSync("app.html", "utf8");
