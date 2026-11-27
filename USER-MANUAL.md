@@ -349,6 +349,53 @@ automatically once the trip is ticked for an invoice.
 required structure to think about while you're writing it, just talk about
 what happened.
 
+### Voice notes
+
+Hold the microphone beside **What happened**. Let go to stop. A short tap
+does not record: keep holding. The first time, the phone asks for the
+microphone, and you hold again.
+
+The words are added at the cursor, or at the end of the note if you had not
+placed one. Anything already in the box stays. Voice notes do not replace
+the whole note on their own.
+
+**Nothing is saved until you tap Save note.**
+
+Each note has **2 minutes**, shared across every hold before you save. The
+countdown only moves while you are holding, turns amber at **0:10**, and
+stops at **0:00**. Saving the note, or cancelling an edit, starts the 2
+minutes again. You also have **120 minutes a month** on this account. The
+time left on this note, and the minutes left this month, show under the
+mic. At zero for the month, the mic says you are out of voice minutes and
+you can still type.
+
+While a recording is being written in, the box cannot be edited and Save is
+switched off, along with the draft button beside it.
+
+The order of work is: hold the mic and talk, then **AI assist**, then **Save
+note**. AI assist drafts a progress note from the words now in the box. It
+does not save. On this version of the app that draft button may still be
+labelled **Tidy this up** until AI assist replaces it. Either way, Save note
+is the step that keeps the note.
+
+After a shift is saved, **Add a note for this shift** opens Notes with that
+participant and date filled in. It does not start recording.
+
+The first time, the app says the recording is not kept. Only the audio clip
+is sent to be transcribed, then deleted. No participant name or NDIS number
+is sent with it. Check the text before you save, and do not record other
+people without their agreement.
+
+Voice notes need a connection. If they are not set up on the site yet, the
+screen says voice notes are not set up and your note is unchanged. If the
+microphone is blocked, use the lock icon in the address bar (or Settings,
+then Safari, then Microphone on iPhone), allow it, and hold again.
+
+In **Settings**, **Voice notes** shows minutes used and minutes left this
+month, and **Tap to start and stop** (the same 2 minute countdown, for
+someone who cannot hold the button). With the mic focused, hold the space
+bar to record.
+
 ### Tidy this up
 
 Once you've written something, tap **Tidy this up**. This only appears if the
