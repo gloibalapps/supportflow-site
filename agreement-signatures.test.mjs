@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import {
   AGREEMENT_ROLES, agreementRoleLabel, defaultAgreementParties, resolveAgreementParties,
   commitStroke, clearParty, redoParty, dropLastStroke, addParty, removeParty, blankParty,
-  suggestedPartyName, partiesForSave, patchParty,
+  suggestedPartyName, partiesForSave, patchParty, requiredPartiesSigned, agreementStatusFromParties,
 } from "./agreement-signatures.js";
 
 const PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
@@ -78,4 +78,41 @@ test("a non-image signature is dropped rather than stored", () => {
   assert.equal(party.signature, "");
   assert.equal(party.strokes.length, 1);
   assert.equal(party.signedAt, "2026-11-27");
+});
+
+function signed(role, name) {
+  return commitStroke(blankParty({ id: role, role, name }), STROKE, PNG, "2026-11-27");
+}
+
+test("the agreement is signed only when the participant and the sole trader have both signed", () => {
+  const witnessOnly = [signed("witness", "Jane Lee")];
+  const participantOnly = [signed("participant", "Riley Williams"), blankParty({ id: "party-worker", role: "worker", name: "Sam Taylor" })];
+  const workerOnly = [blankParty({ id: "party-participant", role: "participant", name: "Riley" }), signed("worker", "Sam Taylor"), signed("coordinator", "Casey Nguyen")];
+  const both = [signed("participant", "Riley Williams"), signed("worker", "Sam Taylor"), signed("witness", "Jane Lee")];
+  const representative = [signed("representative", "Pat Rees"), signed("worker", "Sam Taylor")];
+
+  assert.equal(requiredPartiesSigned(witnessOnly), false);
+  assert.equal(requiredPartiesSigned(participantOnly), false);
+  assert.equal(requiredPartiesSigned(workerOnly), false);
+  assert.equal(requiredPartiesSigned(both), true);
+  assert.equal(requiredPartiesSigned(representative), true);
+
+  assert.equal(agreementStatusFromParties({ agreement: false }, witnessOnly, "2026-11-27").agreement, false);
+  assert.equal(agreementStatusFromParties({ agreement: false }, participantOnly, "2026-11-27").agreement, false);
+  assert.equal(agreementStatusFromParties({ agreement: false }, workerOnly, "2026-11-27").agreement, false);
+
+  const complete = agreementStatusFromParties({ agreement: false }, both, "2026-11-27");
+  assert.equal(complete.agreement, true);
+  assert.equal(complete.agreementDate, "2026-11-27");
+  assert.equal(complete.agreementSignedSource, "parties");
+
+  const cleared = agreementStatusFromParties(complete, [both[0], clearParty(both[1]), both[2]], "2026-11-27");
+  assert.equal(cleared.agreement, false);
+  assert.equal(cleared.agreementDate, "");
+  assert.equal(cleared.agreementSignedSource, "");
+
+  const explicit = agreementStatusFromParties({ agreement: true, agreementDate: "2026-01-02", agreementSignedSource: "explicit" }, witnessOnly, "2026-11-27");
+  assert.equal(explicit.agreement, true);
+  assert.equal(explicit.agreementDate, "2026-01-02");
+  assert.equal(explicit.agreementSignedSource, "explicit");
 });

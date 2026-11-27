@@ -208,3 +208,42 @@ export function addParty(parties, draft) {
   const list = Array.isArray(parties) ? parties : [];
   return [...list.map((p, i) => sanitiseParty(p, i)), sanitiseParty(draft, list.length)];
 }
+
+// The agreement counts as signed from signatures only when both sides have
+// signed: the participant or their representative, and the sole trader.
+// A witness, plan manager, coordinator or other party does not do that alone.
+export function requiredPartiesSigned(parties) {
+  const list = Array.isArray(parties) ? parties : [];
+  const participantSide = list.some((p) => (p.role === "participant" || p.role === "representative") && isSignatureImage(p.signature));
+  const worker = list.some((p) => p.role === "worker" && isSignatureImage(p.signature));
+  return participantSide && worker;
+}
+
+// agreementSignedSource "explicit" is the checkbox or Mark as signed.
+// "parties" means the flag was set because the participant and worker had both signed.
+// Removing a required signature clears a parties-sourced flag and leaves an explicit one.
+export function agreementStatusFromParties(participant, parties, todayIso) {
+  const clean = partiesForSave(parties);
+  const current = participant && typeof participant === "object" ? participant : {};
+  const complete = requiredPartiesSigned(clean);
+  const dates = clean
+    .filter((p) => isSignatureImage(p.signature) && (p.role === "participant" || p.role === "representative" || p.role === "worker"))
+    .map((p) => p.signedAt)
+    .filter(Boolean)
+    .sort();
+  let agreement = !!current.agreement;
+  let agreementDate = typeof current.agreementDate === "string" ? current.agreementDate : "";
+  let agreementSignedSource = current.agreementSignedSource === "explicit" || current.agreementSignedSource === "parties"
+    ? current.agreementSignedSource
+    : "";
+  if (complete) {
+    agreement = true;
+    if (!agreementDate) agreementDate = dates[0] || (typeof todayIso === "string" ? todayIso : "");
+    if (agreementSignedSource !== "explicit") agreementSignedSource = "parties";
+  } else if (agreementSignedSource === "parties") {
+    agreement = false;
+    agreementDate = "";
+    agreementSignedSource = "";
+  }
+  return { agreementParties: clean, agreement, agreementDate, agreementSignedSource };
+}

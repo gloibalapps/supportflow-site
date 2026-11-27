@@ -1,6 +1,6 @@
 /* SupportFlow™ — service worker
    Bump CACHE when you deploy, or testers will keep the old build. */
-const CACHE = 'supportflow-v73-agreement-sign';
+const CACHE = 'supportflow-v74-agreement-sign';
 
 // Everything needed to open the app with no network at all.
 const CORE = [

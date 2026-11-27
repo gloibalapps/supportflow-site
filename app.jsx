@@ -6967,7 +6967,7 @@ function Onboarding({ data, save, close, help, openPrivacy, startStep }) {
                 </>
               )}
               <label className="check" style={{ marginBottom: 14 }}>
-                <input type="checkbox" checked={!!pf.agreement} onChange={(e) => setPf({ ...pf, agreement: e.target.checked })} />
+                <input type="checkbox" checked={!!pf.agreement} onChange={(e) => setPf({ ...pf, agreement: e.target.checked, agreementSignedSource: e.target.checked ? "explicit" : "" })} />
                 <span>Written service agreement in place</span>
               </label>
               <div className="two" style={{ marginBottom: 0 }}>
@@ -7231,15 +7231,7 @@ function Claimable({ data, save, seed }) {
 
 /* ---------------- agreement signatures ---------------- */
 function withAgreementParties(participant, parties) {
-  const clean = partiesForSave(parties);
-  const signed = clean.some((p) => p.signature);
-  const dates = clean.map((p) => p.signedAt).filter(Boolean).sort();
-  return {
-    ...participant,
-    agreementParties: clean,
-    agreement: !!(participant.agreement || signed),
-    agreementDate: participant.agreementDate || (signed ? (dates[0] || today()) : (participant.agreementDate || "")),
-  };
+  return { ...participant, ...agreementStatusFromParties(participant, parties, today()) };
 }
 
 function drawSignatureStrokes(canvas, strokes) {
@@ -7472,7 +7464,12 @@ function Agreements({ data, save, open }) {
   const mark = (pt, on) => save({
     ...data,
     participants: data.participants.map((x) => (x.id === pt.id
-      ? { ...x, agreement: on, agreementDate: on && !x.agreementDate ? today() : x.agreementDate }
+      ? {
+          ...x,
+          agreement: on,
+          agreementDate: on && !x.agreementDate ? today() : x.agreementDate,
+          agreementSignedSource: on ? "explicit" : "",
+        }
       : x)),
   });
 
@@ -7841,7 +7838,7 @@ function Directory({ data, save, view, setView, openId, clearOpen, canCreate, on
                     : "Without one your supports may not qualify as GST-free, which can leave you owing 10% you never charged."}
                 </div>
                 <label className="check" style={{ marginBottom: 12 }}>
-                  <input type="checkbox" checked={!!r.agreement} onChange={(e) => set({ agreement: e.target.checked })} />
+                  <input type="checkbox" checked={!!r.agreement} onChange={(e) => set({ agreement: e.target.checked, agreementSignedSource: e.target.checked ? "explicit" : "" })} />
                   <span>Signed agreement in place</span>
                 </label>
                 {r.agreement && (
@@ -7872,7 +7869,7 @@ function Directory({ data, save, view, setView, openId, clearOpen, canCreate, on
                     onChange={(parties) => {
                       const next = withAgreementParties(r, parties);
                       agreementPartiesRef.current = { id: r.id || "", parties: next.agreementParties };
-                      set({ agreementParties: next.agreementParties, agreement: next.agreement, agreementDate: next.agreementDate });
+                      set({ agreementParties: next.agreementParties, agreement: next.agreement, agreementDate: next.agreementDate, agreementSignedSource: next.agreementSignedSource });
                       if (r.id) save({ ...data, participants: data.participants.map((x) => x.id === r.id ? withAgreementParties(x, parties) : x) });
                     }}
                     storedNote={r.id
@@ -9721,6 +9718,45 @@ function removeParty(parties, id) {
 function addParty(parties, draft) {
   const list = Array.isArray(parties) ? parties : [];
   return [...list.map((p, i) => sanitiseParty(p, i)), sanitiseParty(draft, list.length)];
+}
+
+// The agreement counts as signed from signatures only when both sides have
+// signed: the participant or their representative, and the sole trader.
+// A witness, plan manager, coordinator or other party does not do that alone.
+function requiredPartiesSigned(parties) {
+  const list = Array.isArray(parties) ? parties : [];
+  const participantSide = list.some((p) => (p.role === "participant" || p.role === "representative") && isSignatureImage(p.signature));
+  const worker = list.some((p) => p.role === "worker" && isSignatureImage(p.signature));
+  return participantSide && worker;
+}
+
+// agreementSignedSource "explicit" is the checkbox or Mark as signed.
+// "parties" means the flag was set because the participant and worker had both signed.
+// Removing a required signature clears a parties-sourced flag and leaves an explicit one.
+function agreementStatusFromParties(participant, parties, todayIso) {
+  const clean = partiesForSave(parties);
+  const current = participant && typeof participant === "object" ? participant : {};
+  const complete = requiredPartiesSigned(clean);
+  const dates = clean
+    .filter((p) => isSignatureImage(p.signature) && (p.role === "participant" || p.role === "representative" || p.role === "worker"))
+    .map((p) => p.signedAt)
+    .filter(Boolean)
+    .sort();
+  let agreement = !!current.agreement;
+  let agreementDate = typeof current.agreementDate === "string" ? current.agreementDate : "";
+  let agreementSignedSource = current.agreementSignedSource === "explicit" || current.agreementSignedSource === "parties"
+    ? current.agreementSignedSource
+    : "";
+  if (complete) {
+    agreement = true;
+    if (!agreementDate) agreementDate = dates[0] || (typeof todayIso === "string" ? todayIso : "");
+    if (agreementSignedSource !== "explicit") agreementSignedSource = "parties";
+  } else if (agreementSignedSource === "parties") {
+    agreement = false;
+    agreementDate = "";
+    agreementSignedSource = "";
+  }
+  return { agreementParties: clean, agreement, agreementDate, agreementSignedSource };
 }
 /* @@AGREEMENT_SIG_END */
 
