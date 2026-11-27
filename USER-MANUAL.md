@@ -859,16 +859,16 @@ Each person is a card. The app does not use the word Pending.
 | What you see | Meaning |
 |---|---|
 | Amber outline, amber dot, **No agreement recorded** | Not recorded as signed. Someone may already have signed their own pad. The card stays like this until both required sides have signed, or until you mark it signed yourself |
-| Green dot, **Signed**, with the date when there is one | Recorded as signed, and the review is not due within 30 days. The outline stays the ordinary colour |
-| Brass outline, brass dot, **Signed**, the date, and **review due** with the review date | Signed, and the review date is today or within the next 30 days |
+| Green dot, **Signed**, with the date when there is one | Recorded as signed. There is no review date, or the review date is more than 30 days away. The outline stays the ordinary colour |
+| Brass outline, brass dot, **Signed**, the date, and **review due** with the review date | Signed, and the review date is already past, today, or within the next 30 days. The line still says **review due** when the date has passed |
 
-Above the cards, an amber note names who has no agreement recorded: **1 participant without an agreement**, or **2 participants without an agreement**, then the names. A brass note, **Review due soon**, names whose review falls within 30 days.
+Above the cards, an amber note names who has no agreement recorded: **1 participant without an agreement**, or **2 participants without an agreement**, then the names. A brass note, **Review due soon**, names anyone whose review date is already past, today, or within the next 30 days. The heading stays **Review due soon** when the date has passed.
 
 On **People → Participants**, a row with no agreement recorded ends with **no service agreement**, in amber. A signed agreement whose review date is today, already past, or within 30 days ends with **agreement due for review**, also in amber. The dot beside the name on that list does not change for this.
 
 Open the person and tap **View history** for a shorter line: **none on file**, **on file**, **on file** with the review date, or **on file, review overdue** once the review date has passed.
 
-The checklist on **Money → Tax**, while anyone is missing one, says "A written service agreement with each participant. Participants → Service agreements can write one", and it names anyone whose review is due. **Agreements** on that checklist opens this screen.
+The checklist on **Money → Tax**, while anyone is missing one, says "A written service agreement with each participant. Participants → Service agreements can write one". It also names anyone whose review date is already past, today, or within the next 30 days. **Agreements** on that checklist opens this screen.
 
 Under each pad:
 
@@ -959,7 +959,7 @@ The agreements screen ends with: "Generated agreements are a starting point buil
 
 If the agreement is signed and you've written where the copy is kept, the card on **People → Service agreements** shows **Kept:** and that note.
 
-A review date of today or within 30 days shows brass on this screen, **agreement due for review** on **People → Participants**, and the person's name on the checklist on **Money → Tax**.
+A review date that is already past, today, or within the next 30 days shows brass on this screen, **agreement due for review** on **People → Participants**, and the person's name on the checklist on **Money → Tax**. **View history** is the place that says **review overdue** once the date has passed. The agreements screen keeps the brass **review due** line.
 
 It's a starting point, not legal advice. Have it looked over before you rely on it.
 
