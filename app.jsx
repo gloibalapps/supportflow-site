@@ -9153,7 +9153,7 @@ function Notes({ data, save, prefill, onPrefillConsumed }) {
           {busy ? "Writing a suggestion. Your note is unchanged."
             : block === "long" ? "This note is too long for AI assist. Shorten it, or save it as written."
             : block ? "Write a little more about the shift before using AI assist."
-            : "AI assist drafts a progress note for you to review. It does not change your note until you accept, and it does not save."}
+            : "Tapping AI assist sends this note text, with names and contact details removed where the app can see them, to Anthropic to draft a progress note. Nothing else from the record is sent. Your note does not change until you accept, and it does not save."}
         </div>
         {assistErr && <div role="alert" style={{ fontSize: 12.5, color: "var(--warn)", marginTop: 10 }}>{assistErr}</div>}
       </div>
@@ -10127,6 +10127,8 @@ const PRIVACY_SECTIONS = [
    "SupportFlow is hosted on Netlify. Delivering the app to your device involves Netlify processing ordinary technical request information, such as IP address, browser and device details, and which pages or resources were requested. That's separate from the records you store inside the app. SupportFlow does not intentionally send participant names, NDIS numbers, shift notes or other stored records to Netlify simply because the app is hosted there."],
   ["The deduction checker (Claim check)",
    "When you type a claim-check question, that question is sent to the service used to process the request and check relevant ATO material. Do not include participant names, NDIS numbers, health information or other participant details. Claim check is for general tax guidance and is not a participant-record feature."],
+  ["AI assist for shift notes",
+   "AI assist is optional. Nothing is sent until you tap AI assist, and the note screen says so before you tap. It sends the note text, after removing names, NDIS numbers, phone numbers, email addresses and street addresses it can see on the selected participant, their plan manager and your record. It does not send those records as separate fields, the date, or your identity. The text goes through the SupportFlow server to Anthropic's Claude API to draft a progress note. Anthropic's handling of API data applies. The draft stays on this device until you save the note. You can save without using AI assist. If it is not configured, no request is sent."],
   ["Backups",
    "Encrypted on your device with AES-256 and a passphrase you choose, before the file goes anywhere you decide, your own cloud storage, an email, or a local download. The developer never receives a copy and cannot decrypt it. You are also given a recovery code when you set the passphrase; it is generated on your device, shown once, and not stored by the developer. If you lose both the passphrase and the recovery code, nobody can recover the backup, including the developer."],
   ["Shift notes and records you choose to share",
@@ -10201,7 +10203,7 @@ const DATASEC_SECTIONS = [
   ["Hosting",
    "SupportFlow is hosted on Netlify. Your device communicates with Netlify to load and run the app, and Netlify may process normal technical web-hosting information as part of that. Your locally stored participant records are not intentionally uploaded to Netlify simply because the app is hosted there."],
   ["When information can leave your device",
-   "When you choose to export, back up, email or share it, or when you intentionally submit a question through Claim check. Once information leaves your device to another person or service, its security also depends on that recipient. Always check who you're sending to, and share only what's reasonably necessary."],
+   "When you choose to export, back up, email or share it, when you intentionally submit a question through Claim check, or when you tap AI assist on a shift note. AI assist sends the note text, with names and contact details removed where the app can see them, to Anthropic to draft a progress note. The note screen says this before you tap. Once information leaves your device to another person or service, its security also depends on that recipient. Always check who you're sending to, and share only what's reasonably necessary."],
   ["If your device is lost or stolen",
    "Lock or remotely secure it if possible, consider remote erasure where appropriate, change relevant passwords, consider what participant information may have been accessible, and assess whether you have notification or reporting obligations."],
   ["Reporting a security concern",
@@ -10213,7 +10215,7 @@ function DataSecurity() {
     <>
       <div className="panel">
         <div className="eyebrow" style={{ marginBottom: 8 }}>Data &amp; security</div>
-        <div style={{ fontSize: 12, color: "var(--tx-3)", fontWeight: 500 }}>Last updated 18 August 2026</div>
+        <div style={{ fontSize: 12, color: "var(--tx-3)", fontWeight: 500 }}>Last updated 27 November 2026</div>
       </div>
       <LegalAccordion sections={DATASEC_SECTIONS} />
     </>
@@ -10233,6 +10235,7 @@ const PRIVSEC_SECTIONS = [
   </>],
   ["Information shared with other services", <>
     <p><strong>SupportFlow Assistant:</strong> sends the question you type and generic app/help context needed to answer it. It is designed not to send participant or business records.</p>
+    <p><strong>AI assist for shift notes:</strong> optional. Before you tap it, the note screen says that the note text is sent to Anthropic to draft a progress note, with names and contact details removed where the app can see them. Other records are not sent. The draft stays on this device until you save.</p>
   </>],
   ["Your privacy", <>
     <p>The full Privacy Policy explains what SupportFlow handles, where information is stored, third-party services and your privacy choices.</p>

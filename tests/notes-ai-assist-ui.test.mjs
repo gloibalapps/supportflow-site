@@ -52,7 +52,8 @@ test("the notes screen offers AI assist and not Tidy this up", () => {
   assert.match(notes, /AI assist/);
   assert.match(notes, />Accept</);
   assert.match(notes, />Discard</);
-  assert.match(notes, /AI assist isn't configured yet/);
+  assert.match(notes, /to Anthropic to draft a progress note/);
+  assert.match(notes, /Nothing else from the record is sent/);
   assert.doesNotMatch(notes, /Tidy this up/);
   const html = read("app.html");
   assert.match(notesSlice(html), /AI assist/);

@@ -378,9 +378,11 @@ AI assist isn't configured yet, and your note is unchanged. The same is true in
 demo mode: the button stays, and it tells you AI features are switched off
 there.
 
-Only the note text is sent, with names, NDIS numbers, phone numbers, email
-addresses and street addresses removed where the app can see them. The
-participant you selected, the date, and your name stay on this device.
+The note screen says this before you tap **AI assist**: only the note text is
+sent, with names, NDIS numbers, phone numbers, email addresses and street
+addresses removed where the app can see them, to Anthropic to draft the note.
+The participant you selected, the date, and your name stay on this device.
+Nothing is sent until you tap the button.
 
 A useful progress note still says what happened, how the participant took
 part, how it connects to their goals, what you observed, and what happens

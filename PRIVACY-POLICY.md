@@ -1,6 +1,6 @@
 # Privacy Policy: SupportFlow™
 
-*Last updated: 18 August 2026*
+*Last updated: 27 November 2026*
 
 ## The short version
 
@@ -9,7 +9,7 @@ Your SupportFlow records stay on your device by default. There is no SupportFlow
 SupportFlow™ is hosted using Netlify. When you access the app, Netlify may process ordinary technical information required to deliver and secure the app, such as your IP address, browser or device information and web requests. Your participant records are not intentionally sent to Netlify as part of storing or managing them in SupportFlow.
 
 
-Other optional actions, such as creating a backup, sharing a shift note or contacting support, can also cause information to leave your device. These are explained below and occur when you choose to use them.
+Other optional actions, such as creating a backup, sharing a shift note, using AI assist on a shift note, or contacting support, can also cause information to leave your device. These are explained below and occur when you choose to use them.
 
 This short version is an overview. The full policy below explains how information is handled.
 
@@ -170,6 +170,22 @@ Claimable is designed not to read participant records or automatically construct
 
 
 If Claimable is unavailable or disabled in a particular build, no Claimable API request is sent.
+
+### 5.1a AI assist for shift notes
+
+AI assist on **Work → Notes** is optional. It drafts a progress note from the words already in the note box. Nothing is sent until you tap **AI assist**, and the note screen tells you that before you tap.
+
+**What AI assist sends:**
+
+- The note text, after the app removes names, NDIS numbers, phone numbers, email addresses and street addresses it can see on the selected participant, their plan manager, and your own record
+- The server removes obvious emails, phone numbers, identification numbers, labelled dates of birth and street addresses again
+
+**What AI assist does not send:**
+
+- The participant record, NDIS number, date of birth or address as separate fields
+- Your identity, the date on the note, or other records stored in the app
+
+The text goes through the SupportFlow server to Anthropic's Claude API so it can draft the note. Anthropic's handling of API data applies to that text. SupportFlow does not store the note or the draft. The draft stays on your device until you choose to save the note. You can save a note without using AI assist. If AI assist is not configured, no request is sent.
 
 ### 5.2 Backups
 

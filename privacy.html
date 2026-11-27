@@ -120,11 +120,11 @@
   </div>
   <div class="wrap">
 <h1>Privacy Policy: SupportFlow™</h1>
-<p class="italic">Last updated: 2 November 2026</p>
+<p class="italic">Last updated: 27 November 2026</p>
 <h2>The short version</h2>
 <p>Your SupportFlow records stay on your device by default. There is no SupportFlow user account and no central database operated by the developer that stores your participant records, shift notes, invoices or other work records.</p>
 <p>SupportFlow™ is hosted using Netlify. When you access the app, Netlify may process ordinary technical information required to deliver and secure the app, such as your IP address, browser or device information and web requests. Your participant records are not intentionally sent to Netlify as part of storing or managing them in SupportFlow.</p>
-<p>Other optional actions, such as creating a backup, sharing a shift note or contacting support, can also cause information to leave your device. These are explained below and occur when you choose to use them.</p>
+<p>Other optional actions, such as creating a backup, sharing a shift note, using AI assist on a shift note, or contacting support, can also cause information to leave your device. These are explained below and occur when you choose to use them.</p>
 <p>This short version is an overview. The full policy below explains how information is handled.</p>
 <hr>
 <h2>1. Who this policy covers</h2>
@@ -255,6 +255,19 @@
 <h3>5.1a SupportFlow Assistant</h3>
 <p>The SupportFlow Assistant (the <strong>?</strong> button in the header) is an optional help chat. It explains how to use the app and can take you to a screen. When you send a question it sends: the question you type, the name of the screen you are on, short extracts from the built-in manual, and your last few messages in that chat. These go via the SupportFlow server to an external AI service (Anthropic's Claude API) to generate an answer.</p>
 <p>The Assistant does not read your participant records, invoices or notes. If a question looks like it contains personal details such as an NDIS number, the app warns you before anything is sent. <strong>Do not enter participant names, NDIS numbers, health information or other personal information into the Assistant.</strong></p>
+<h3>5.1b AI assist for shift notes</h3>
+<p>AI assist on <strong>Work → Notes</strong> is optional. It drafts a progress note from the words already in the note box. Nothing is sent until you tap <strong>AI assist</strong>, and the note screen tells you that before you tap.</p>
+<p><strong>What AI assist sends:</strong></p>
+<ul>
+<li>The note text, after the app removes names, NDIS numbers, phone numbers, email addresses and street addresses it can see on the selected participant, their plan manager, and your own record</li>
+<li>The server removes obvious emails, phone numbers, identification numbers, labelled dates of birth and street addresses again</li>
+</ul>
+<p><strong>What AI assist does not send:</strong></p>
+<ul>
+<li>The participant record, NDIS number, date of birth or address as separate fields</li>
+<li>Your identity, the date on the note, or other records stored in the app</li>
+</ul>
+<p>The text goes through the SupportFlow server to Anthropic's Claude API so it can draft the note. Anthropic's handling of API data applies to that text. SupportFlow does not store the note or the draft. The draft stays on your device until you choose to save the note. You can save a note without using AI assist. If AI assist is not configured, no request is sent.</p>
 <h3>5.2 Backups</h3>
 <p>When you create a SupportFlow backup, the backup file is encrypted on your device using AES-256 and a passphrase you choose before the encrypted backup file is exported.</p>
 <p>You decide what happens to that file. For example, you may:</p>
@@ -281,7 +294,7 @@
 <p>Support and feedback emails may be retained for as long as reasonably necessary to investigate the issue, respond to you and improve the app.</p>
 <h2>6. Development assistance</h2>
 <p>SupportFlow was built with assistance from AI-powered tools, including large-language model coding and writing assistants. These tools were used to help write, review and refine code, interface text and documentation.</p>
-<p>That development-time use is entirely separate from Claimable's runtime API feature.</p>
+<p>That development-time use is entirely separate from the optional AI features described in section 5: Claimable, the SupportFlow Assistant, and AI assist for shift notes.</p>
 <p>No real participant records, real support-worker business records or production user data were used in building or testing SupportFlow. All development and testing relied on fictional, synthetic or anonymised data only.</p>
 <p>Development assistance tools retain data in accordance with their own privacy policies. No special arrangement with those providers grants SupportFlow access to data submitted through their general interfaces.</p>
 <h2>7. What SupportFlow does not do</h2>
