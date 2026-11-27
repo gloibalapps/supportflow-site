@@ -4,7 +4,7 @@ const MODEL = process.env.ASSISTANT_MODEL || process.env.ANTHROPIC_MODEL || "cla
 
 // Server-side proxy for the SupportFlow Assistant -- help-and-navigation
 // only, deliberately kept separate from assist.mjs (Claimable's deduction
-// checker and note tidying). Different system prompt, different
+// checker) and notes-ai-assist.mjs (shift notes). Different system prompt, different
 // boundaries, different rate limit, so a change to one can never quietly
 // affect the other.
 //

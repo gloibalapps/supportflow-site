@@ -2,7 +2,8 @@ import { checkRequestLicence } from "../lib/licence.mjs";
 const API = "https://api.anthropic.com/v1/messages";
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001";
 
-// Server-side proxy for the app's two AI features.
+// Server-side proxy for the deduction checker (Claimable).
+// Shift-note AI assist is netlify/functions/notes-ai-assist.mjs.
 //
 // The API key lives here, in a Netlify environment variable, and never reaches
 // the browser. The app calls /.netlify/functions/assist with a prompt; this

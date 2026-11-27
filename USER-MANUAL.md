@@ -122,7 +122,7 @@ Guided setup is **five numbered steps, in this order**: PIN, Backup, Details, Ma
 
 - A banner across the top says **Demo mode — sample data** and has a **Start setup for real** button.
 - Nothing in demo mode is real, and none of it is kept once you start your own setup: starting setup replaces the demo records.
-- Features that use the AI assistant (Tidy this up, the deduction checker and similar) are switched off in demo mode and say so. Invoices raised in demo mode don't use any of your free invoice credits.
+- AI assist and the deduction checker are switched off in demo mode and say so. Invoices raised in demo mode don't use any of your free invoice credits.
 
 ---
 
@@ -349,42 +349,43 @@ automatically once the trip is ticked for an invoice.
 required structure to think about while you're writing it, just talk about
 what happened.
 
-### Tidy this up
+### AI assist
 
-Once you've written something, tap **Tidy this up**. This only appears if the
-AI assist feature is switched on for your copy of the app — without it, save
-straight from the one box, untidied, works exactly the same otherwise. It
-sorts what you said into the five sections NDIS's own record-keeping guidance
-points to for a support worker's case notes:
+Once you've written more than a few words, tap **AI assist**. It turns those
+rough shift notes into a professional NDIS progress-note draft, in plain
+Australian English. The draft appears next to your original on a wide screen,
+and below it on a phone, so you can read both.
 
-- **Support provided** — what you actually did
-- **Participant involvement** — what they did, said or chose, not just "supported participant"
-- **Progress toward goals** — how the session connects to what they're working toward
-- **Observations** — factual, relevant, nothing beyond what you saw
-- **Follow-up** — anything that needs to happen next time
+**Nothing is overwritten, and nothing is saved, until you say so.**
 
-**Whichever of the five your words actually covered gets filled in.** If you
-didn't say anything that fits one of them, that section is left blank and
-labelled **missing** in orange, rather than invented or silently dropped.
+- **Edit** the suggestion in its own box if you want to change a word.
+- **Accept** copies that suggestion into **What happened**. The note is still
+  unsaved. Tap **Save note** when you want to keep it.
+- **Discard** (or press Escape) throws the suggestion away. **What happened**
+  stays exactly as you wrote it.
 
-**What you do with a missing section is entirely your call.** Tap into it and
-add a line yourself, or leave it and save the note exactly as it is. Nothing
-about saving is blocked by a gap. The five-section structure is what NDIA's
-guidance points to as best practice, not a rule this app enforces — you decide,
-note by note, whether a gap needs filling or whether what you've already said
-is enough.
+If something important was not in your notes, the draft leaves a bracketed
+prompt such as [add how this relates to the participant's goals] instead of
+inventing it. It does not add times, medications, or outcomes that you did not
+write. An incident stays clearly stated.
 
-**You can save without ever tidying at all.** A note saved straight from the
-one box, untidied, is saved as plain text exactly as written. Tidying is there
-to help sort it into the stronger structure, not a required step.
+The button is switched off when the box is empty or only a few words. You can
+save without using AI assist at all. A note saved straight from the one box is
+stored as plain text, exactly as written.
 
-**Why the five-section structure matters, if you do use it.** The NDIS
-Commission's own guidance is that case notes should describe what happened,
-connect it to the participant's goals, and be complete enough to stand up on
-their own. A note that just says *"took her shopping, went fine"* doesn't do
-that. A structured note is the difference between something useful if a
-payment assurance review ever asks to see your records, and something that
-isn't.
+**If AI assist isn't configured yet**, the button still shows. Tapping it says
+AI assist isn't configured yet, and your note is unchanged. The same is true in
+demo mode: the button stays, and it tells you AI features are switched off
+there.
+
+Only the note text is sent, with names, NDIS numbers, phone numbers, email
+addresses and street addresses removed where the app can see them. The
+participant you selected, the date, and your name stay on this device.
+
+A useful progress note still says what happened, how the participant took
+part, how it connects to their goals, what you observed, and what happens
+next. AI assist only drafts that from what you already wrote. You decide what
+is enough before you save.
 
 > **Minimum requirements, and where each one already lives**
 >
@@ -405,8 +406,8 @@ isn't.
 > details are already being kept correctly elsewhere in the app.
 
 **Editing an older note** opens exactly the same way a new note does — the
-whole thing back in the one box, untidied. Tidy it again from there or save it
-as it is, no special handling needed either way.
+whole thing back in the one box. Use AI assist again from there, or save it
+as it is.
 
 Mark the finished note:
 
@@ -435,7 +436,7 @@ first.
 ### What gets sent
 
 The note goes out as plain text: the date, the participant, your name, and what
-you wrote, the five headings included as you filled them in.
+you saved in the note.
 
 There's a tick box for **whether to include their full name and NDIS number**:
 
@@ -759,7 +760,8 @@ narrow and easy to get wrong.
 
 ### There's a daily limit
 
-**15 checks a day**, and 30 note tidies. Far more than a normal day of work.
+**15 checks a day**, and 30 AI assist drafts. Far more than a normal day of work.
+AI assist does not use your free invoice credits.
 
 Each check reads live pages from the ATO, which isn't free, so the limit stops
 the cost running away. **Anything you've already asked opens instantly and

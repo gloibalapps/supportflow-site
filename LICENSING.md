@@ -126,7 +126,7 @@ id and lasts **7 days**, so a worker on a shift with no signal is not locked
 out. If the server is unreachable or errors (5xx), the app falls back to the
 lease. A copied, edited or expired lease fails the signature/date check. The
 server stays the source of truth: AI features (`assist`,
-`supportflow-assistant`) return 402 without an active licensed device once the
+`supportflow-assistant`, `notes-ai-assist`) return 402 without an active licensed device once the
 switch is on, and `charge-invoice` only waives credits for a licensed device.
 
 **Basic, one device (A$79).** A second device sees the current device (label, last
@@ -180,7 +180,7 @@ update licence_devices set revoked_at = now(), revoked_reason = 'owner'
 | `netlify/lib/licence.mjs` | Shared server logic (switch, Google token check, leases, device rules) |
 | `netlify/functions/licence.mjs` | Licence API: config, sign-in, heartbeat, move/replace, remove, sign-out, checkout |
 | `netlify/functions/stripe-webhook.mjs` | Adds licence purchases, refunds and disputes |
-| `netlify/functions/charge-invoice.mjs`, `assist.mjs`, `supportflow-assistant.mjs` | Server-side licence checks |
+| `netlify/functions/charge-invoice.mjs`, `assist.mjs`, `supportflow-assistant.mjs`, `notes-ai-assist.mjs` | Server-side licence checks |
 | `app.jsx` / `app.html` | Client: device id, heartbeat, lease check, locked/buy/move screens, Settings → Licence & devices |
 
 ## Email-granted licences (`email:<address>` rows)

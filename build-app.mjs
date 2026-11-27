@@ -4,7 +4,9 @@
 //     without its `export` keywords (app.jsx is a classic in-browser script).
 //  2. Copies accountant-pack.js into app.jsx between the @@ACCOUNTANT_PACK
 //     markers, the same way. That file is the only list of PDF fields.
-//  3. Re-inlines app.jsx into app.html's <script id="appsrc"> block
+//  3. Copies netlify/lib/notes-ai.mjs into app.jsx between the @@NOTES_AI
+//     markers, the same way, so Accept and Discard use the tested helpers.
+//  4. Re-inlines app.jsx into app.html's <script id="appsrc"> block
 //     (README: "paste app.jsx back into that block").
 // Then syntax-check with: node build-app.mjs --check  (needs @babel/core + @babel/preset-react resolvable)
 import fs from "node:fs";
@@ -20,6 +22,11 @@ const p0 = src.indexOf(PACK_START), p1 = src.indexOf(PACK_END);
 if (p0 < 0 || p1 < p0) throw new Error("accountant pack markers not found in app.jsx");
 const pack = fs.readFileSync("accountant-pack.js", "utf8").replace(/^export\s+/gm, "").trim();
 src = src.slice(0, p0 + PACK_START.length) + "\n" + pack + "\n" + src.slice(p1);
+const AI_START = "/* @@NOTES_AI_START */", AI_END = "/* @@NOTES_AI_END */";
+const ai0 = src.indexOf(AI_START), ai1 = src.indexOf(AI_END);
+if (ai0 < 0 || ai1 < ai0) throw new Error("notes ai markers not found in app.jsx");
+const notesAi = fs.readFileSync("netlify/lib/notes-ai.mjs", "utf8").replace(/^export\s+/gm, "").trim();
+src = src.slice(0, ai0 + AI_START.length) + "\n" + notesAi + "\n" + src.slice(ai1);
 fs.writeFileSync("app.jsx", src);
 
 const html = fs.readFileSync("app.html", "utf8");
