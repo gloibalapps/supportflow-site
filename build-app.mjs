@@ -6,7 +6,8 @@
 //     markers, the same way. That file is the only list of PDF fields.
 //  3. Copies agreement-signatures.js into app.jsx between the
 //     @@AGREEMENT_SIG markers, the same way.
-//  4. Re-inlines app.jsx into app.html's <script id="appsrc"> block
+//  4. Copies invoice-overdue-rules.js between the @@INVOICE_RULES markers.
+//  5. Re-inlines app.jsx into app.html's <script id="appsrc"> block
 //     (README: "paste app.jsx back into that block").
 // Then syntax-check with: node build-app.mjs --check  (needs @babel/core + @babel/preset-react resolvable)
 import fs from "node:fs";
@@ -27,6 +28,11 @@ const s0 = src.indexOf(SIG_START), s1 = src.indexOf(SIG_END);
 if (s0 < 0 || s1 < s0) throw new Error("agreement signature markers not found in app.jsx");
 const sigs = fs.readFileSync("agreement-signatures.js", "utf8").replace(/^export\s+/gm, "").trim();
 src = src.slice(0, s0 + SIG_START.length) + "\n" + sigs + "\n" + src.slice(s1);
+const INV_START = "/* @@INVOICE_RULES_START */", INV_END = "/* @@INVOICE_RULES_END */";
+const i0 = src.indexOf(INV_START), i1 = src.indexOf(INV_END);
+if (i0 < 0 || i1 < i0) throw new Error("invoice rules markers not found in app.jsx");
+const invoiceRules = fs.readFileSync("invoice-overdue-rules.js", "utf8").replace(/^export\s+/gm, "").trim();
+src = src.slice(0, i0 + INV_START.length) + "\n" + invoiceRules + "\n" + src.slice(i1);
 fs.writeFileSync("app.jsx", src);
 
 const html = fs.readFileSync("app.html", "utf8");

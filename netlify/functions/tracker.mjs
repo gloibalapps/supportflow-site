@@ -19,7 +19,7 @@
 // when TRACKER_AUTOSEND_ENABLED=true.
 import crypto from "node:crypto";
 import { json, supa, supaConfigured, signSession, verifySession, verifyGoogleIdToken, isUuid } from "../lib/licence.mjs";
-import { TRACKER_PRODUCTS, trackerPriceId, isTrackerProduct, isRetiredTrackerProduct, trackerOffer, trackerUnlock, trackerDeviceOk, autosendEnabled, seal, emailHash } from "../lib/tracker.mjs";
+import { TRACKER_PRODUCTS, trackerPriceId, isTrackerProduct, isRetiredTrackerProduct, trackerOffer, trackerUnlock, trackerDeviceOk, autosendEnabled, autosendDryRun, seal, emailHash } from "../lib/tracker.mjs";
 import { premiumCheckoutSelection, premiumPublic } from "../lib/premium.mjs";
 import { TRACKER_STATES } from "../../payment-tracker-rules.js";
 import { normaliseAuMobile, maskPhone, rawSend, smsEnabled, smsDryRun } from "../lib/sms.mjs";
@@ -147,7 +147,7 @@ async function sync(session, body) {
   const byId = Object.fromEntries(rows.map((r) => [r.id, r]));
   const status = {};
   for (const r of (body.records || []).slice(0, 500)) { const row = byId[recordId(session.sub, String(r?.id))]; if (row) status[r.id] = { stageSent: row.last_stage_sent, sentAt: row.last_sent_at, stop: row.stop_reason }; }
-  return json({ ok: true, autosendServer: autosendEnabled(), status });
+  return json({ ok: true, autosendServer: autosendEnabled(), autosendDryRun: autosendDryRun(), status });
 }
 
 async function forget(session) {
@@ -216,6 +216,7 @@ export default async (req) => {
         premium: premiumPublic(),
         clientId: process.env.GOOGLE_CLIENT_ID || "",
         autosendServer: autosendEnabled(),
+        autosendDryRun: autosendDryRun(),
         vapidPublicKey: process.env.VAPID_PUBLIC_KEY || "",
         ready: supaConfigured() && !!process.env.LICENCE_SECRET,
       });
@@ -244,7 +245,7 @@ export default async (req) => {
     const unlock = paid && seat ? paid : null;
     if (action === "status") {
       const p = (await supa(`tracker_prefs?google_sub=eq.${q(session.sub)}&select=enabled,state,notify_push,notify_email`))?.[0] || null;
-      return json({ sms: await smsStatus(session.sub), unlocked: !!unlock, paid: !!paid, devices: paid?.devices || 0, deviceLimit: !!paid && !seat, product: paid?.product || null, prefs: p, autosendServer: autosendEnabled() });
+      return json({ sms: await smsStatus(session.sub), unlocked: !!unlock, paid: !!paid, devices: paid?.devices || 0, deviceLimit: !!paid && !seat, product: paid?.product || null, prefs: p, autosendServer: autosendEnabled(), autosendDryRun: autosendDryRun() });
     }
     if (!unlock) return json({ error: paid ? "Your overdue invoice payment tracker is in use on another device. An extra (second) device is a separate A$29 add-on." : "Overdue invoice payment tracker isn't unlocked on this Google account.", locked: true, deviceLimit: !!paid }, 402);
 

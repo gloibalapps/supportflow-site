@@ -1820,12 +1820,12 @@ const shiftHours = (sh) => {
 
 // The due date is never guessed — it comes from the payment terms recorded
 // against whoever actually pays: the plan manager, or the participant themselves.
-const dueFrom = (date, pt, data) => {
-  if (!pt || !date) return "";
+const payerTermsDays = (pt, data) => {
+  if (!pt) return "";
   const self = pt.planType !== "plan";
-  const t = self ? pt.terms : ((data.managers || []).find((m) => m.id === pt.managerId) || {}).terms;
-  return t ? addDays(date, t) : "";
+  return self ? (pt.terms || "") : (((data.managers || []).find((m) => m.id === pt.managerId) || {}).terms || "");
 };
+const dueFrom = (date, pt, data) => ovDueFromTerms(date, payerTermsDays(pt, data));
 
 // Local calendar arithmetic. toISOString() converts to UTC, which shifts a
 // local midnight back a day in Australia (UTC+9:30 to +11).
@@ -2039,13 +2039,154 @@ function trackerNdiaDraft(payerType, vars) {
 
 // Alias — today() is now local too, but kept for tracker code clarity.
 const localToday = today;
-// ONE definition of overdue, used everywhere (app-flow-review #3): sent,
-// not paid, and past its due date. Drafts are never overdue or "owed".
-const isOverdue = (i) => i.status === "sent" && !!i.due && i.due < localToday();
-const hasAmountPaid = (i) => i.amountPaid != null && i.amountPaid !== "" && !isNaN(Number(i.amountPaid));
-const invAmountPaid = (i) => (i.status === "paid" ? (hasAmountPaid(i) ? Number(i.amountPaid) : invTotal(i)) : 0);
-const isPartPaid = (i) => i.status === "paid" && hasAmountPaid(i) && Number(i.amountPaid) + 0.005 < invTotal(i);
-const invStatusKey = (i) => (i.status === "draft" ? "draft" : i.status === "paid" ? (isPartPaid(i) ? "part" : "paid") : isOverdue(i) ? "overdue" : "sent");
+/* @@INVOICE_RULES_START */
+// Invoice overdue, part-payment, due-date and share rules.
+// ONE source of truth: imported by tests and inlined into app.jsx by
+// build-app.mjs between the @@INVOICE_RULES markers. Dates are YYYY-MM-DD
+// in the worker's local calendar (Australia/Adelaide for SupportFlow).
+// Keep it dependency-free plain JS.
+
+function ovInvoiceTotal(inv) {
+  return (inv?.lines || []).reduce((s, l) => s + Number(l.qty || 0) * Number(l.rate || 0), 0);
+}
+
+function ovHasAmountPaid(inv) {
+  return !!inv && inv.amountPaid != null && inv.amountPaid !== "" && !isNaN(Number(inv.amountPaid));
+}
+
+// Cash received. A paid invoice with no amount recorded counts as paid in full.
+// A sent invoice only counts money when an amount was actually entered.
+function ovAmountReceived(inv) {
+  if (!inv || inv.status === "draft") return 0;
+  if (ovHasAmountPaid(inv)) return Number(inv.amountPaid);
+  if (inv.status === "paid") return ovInvoiceTotal(inv);
+  return 0;
+}
+
+function round2(n) {
+  return Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+}
+
+function ovBalanceDue(inv) {
+  if (!inv || inv.status === "draft") return 0;
+  const bal = ovInvoiceTotal(inv) - ovAmountReceived(inv);
+  return bal > 0.005 ? round2(bal) : 0;
+}
+
+function ovIsFullyPaid(inv) {
+  return !!inv && inv.status === "paid" && ovBalanceDue(inv) <= 0.005;
+}
+
+// Still owed: sent and not settled, or marked paid while a balance remains.
+function ovIsAwaiting(inv) {
+  if (!inv || inv.status === "draft") return false;
+  if (inv.status === "sent") return ovBalanceDue(inv) > 0.005 || !ovHasAmountPaid(inv);
+  if (inv.status === "paid") return ovBalanceDue(inv) > 0.005;
+  return false;
+}
+
+function ovIsPartPaid(inv) {
+  if (!ovIsAwaiting(inv) || !ovHasAmountPaid(inv)) return false;
+  return Number(inv.amountPaid) > 0.005 && ovBalanceDue(inv) > 0.005;
+}
+
+function ovIsOverdue(inv, asOf) {
+  return ovIsAwaiting(inv) && !!inv.due && String(inv.due).slice(0, 10) < String(asOf || "").slice(0, 10);
+}
+
+function ovStatusKey(inv, asOf) {
+  if (!inv || inv.status === "draft") return "draft";
+  if (ovIsFullyPaid(inv)) return "paid";
+  if (ovIsOverdue(inv, asOf)) return "overdue";
+  if (ovIsPartPaid(inv)) return "part";
+  if (ovIsAwaiting(inv)) return "sent";
+  return inv.status === "paid" ? "paid" : "draft";
+}
+
+// "sent" is the Waiting filter: unpaid and not yet overdue.
+// "owing" is waiting and overdue together (the Home Outstanding set).
+function ovInFilter(inv, key, asOf) {
+  if (key === "all") return true;
+  if (key === "owing") return ovIsAwaiting(inv);
+  if (key === "paid") return ovIsFullyPaid(inv);
+  if (key === "sent") return ovIsAwaiting(inv) && !ovIsOverdue(inv, asOf);
+  if (key === "overdue") return ovIsOverdue(inv, asOf);
+  if (key === "draft") return !inv || inv.status === "draft";
+  return ovStatusKey(inv, asOf) === key;
+}
+
+function ovOutstanding(invoices) {
+  return round2((invoices || []).filter(ovIsAwaiting).reduce((n, i) => n + ovBalanceDue(i), 0));
+}
+
+function ovPad2(n) { return String(n).padStart(2, "0"); }
+
+// Local calendar arithmetic. Do not use toISOString(): UTC shifts an
+// Australian midnight back a day.
+function ovAddDays(iso, n) {
+  const x = new Date(String(iso).slice(0, 10) + "T00:00:00");
+  if (isNaN(x.getTime())) return "";
+  x.setDate(x.getDate() + Number(n || 0));
+  return `${x.getFullYear()}-${ovPad2(x.getMonth() + 1)}-${ovPad2(x.getDate())}`;
+}
+
+function ovDueFromTerms(issued, termsDays) {
+  if (!issued) return "";
+  if (termsDays == null || String(termsDays).trim() === "" || isNaN(Number(termsDays))) return "";
+  return ovAddDays(issued, Number(termsDays));
+}
+
+function ovDueIsManual(inv, termsDays) {
+  if (!inv) return false;
+  if (inv.dueManual === true) return true;
+  if (inv.dueManual === false) return false;
+  if (!inv.due) return false;
+  const calculated = ovDueFromTerms(inv.date, termsDays);
+  if (!calculated) return true;
+  return String(inv.due).slice(0, 10) !== calculated;
+}
+
+function ovIssuedChange(inv, nextIssued, termsDays) {
+  if (ovDueIsManual(inv, termsDays)) return { date: nextIssued };
+  return { date: nextIssued, due: ovDueFromTerms(nextIssued, termsDays), dueManual: false };
+}
+
+function ovCanShare(inv) {
+  return !!(inv && inv.participantId && ovInvoiceTotal(inv) > 0 && inv.due);
+}
+
+function ovMarkSent(inv, today) {
+  return {
+    ...inv,
+    status: "sent",
+    sentAt: inv.sentAt && !inv.sentAtEstimated ? inv.sentAt : today,
+    sentAtEstimated: false,
+  };
+}
+
+// Uploaded for automatic reminders: sent, still unpaid, and has a sent date.
+function ovSyncInvoice(inv) {
+  return !!(inv && inv.sentAt && ovIsAwaiting(inv));
+}
+
+// "off"     TRACKER_AUTOSEND_ENABLED is not true. The sender returns before it logs.
+// "dry-run" enabled, but TRACKER_AUTOSEND_DRY_RUN is not the string false. Nothing is emailed.
+// ""        real sends are allowed by the server flags.
+function ovSyncNotice(flags) {
+  if (!flags || !flags.autosendServer) return "off";
+  if (flags.autosendDryRun) return "dry-run";
+  return "";
+}
+/* @@INVOICE_RULES_END */
+// Thin wrappers so the rest of the app keeps calling one name. The bodies
+// live in invoice-overdue-rules.js (inlined above by build-app.mjs).
+const hasAmountPaid = (i) => ovHasAmountPaid(i);
+const invAmountPaid = (i) => ovAmountReceived(i);
+const isPartPaid = (i) => ovIsPartPaid(i);
+const isFullyPaid = (i) => ovIsFullyPaid(i);
+const isAwaitingPayment = (i) => ovIsAwaiting(i);
+const isOverdue = (i) => ovIsOverdue(i, localToday());
+const invStatusKey = (i) => ovStatusKey(i, localToday());
 const INV_STATUS_LABEL = { draft: "Not sent yet", sent: "Waiting", overdue: "Overdue", paid: "Paid", part: "Part paid" };
 const TRACKER_PREVIEW_FLAG = "sf_tracker_preview_v1"; // owner testing: ?trackerpreview=1 / =0
 const TRACKER_API = "/.netlify/functions/tracker";
@@ -2056,7 +2197,7 @@ const trackerSettingsOf = (data) => ({
 });
 // Chase state of one invoice: business days since sent, stage 0-3, label.
 function invoiceChase(i, data, asOf) {
-  if (i.status !== "sent" || !i.sentAt) return null;
+  if (!isAwaitingPayment(i) || !i.sentAt) return null;
   const pt = data.participants.find((x) => x.id === i.participantId);
   const payerType = trackerPayerType(pt?.planType);
   const s = trackerSettingsOf(data);
@@ -2111,6 +2252,39 @@ function trackerMessages(i, data) {
   };
 }
 
+function trackerSyncUserMessage(d) {
+  const kind = ovSyncNotice({ autosendServer: !!d?.autosendServer, autosendDryRun: !!d?.autosendDryRun });
+  if (kind === "off") return "Automatic sending is switched off on the server for now. Nothing will be sent until SupportFlow turns it on.";
+  if (kind === "dry-run") return "Automatic reminders are on, but SupportFlow is still in test mode and is not emailing anyone yet.";
+  return "";
+}
+function trackerSyncRecords(data, prefs) {
+  const s = { ...trackerSettingsOf(data), ...(prefs || {}) };
+  return data.invoices.filter(ovSyncInvoice).map((i) => {
+    const r = resolve(i, data);
+    const msgs = trackerMessages(i, data);
+    return {
+      id: i.id, sentAt: i.sentAt, due: i.due || null, payerType: msgs.payerType, paused: !!(i.chase && i.chase.paused),
+      thresholds: s.thresholds?.[msgs.payerType] || null, invoiceNo: String(i.number), amount: invTotal(i).toFixed(2),
+      recipientEmail: msgs.to || "", recipientName: msgs.payerType === "plan" ? (r.mgr?.name || "") : "",
+      messages: { 1: msgs[1], 2: msgs[2], 3: { subject: msgs[3].subject, body: msgs[3].body } },
+    };
+  });
+}
+async function syncTrackerNow(data, access, prefsOverride, setServer) {
+  const prefs = { ...trackerSettingsOf(data), ...(prefsOverride || {}) };
+  const { status, data: d } = await access.post({
+    action: "sync",
+    prefs: { enabled: !!prefs.autoSend, replyTo: prefs.replyTo, workerName: data.profile.name, state: prefs.state, notifyPush: prefs.notifyPush, notifyEmail: prefs.notifyEmail !== false },
+    records: trackerSyncRecords(data, prefs),
+  });
+  if (setServer) {
+    if (status >= 400) setServer((c) => ({ ...c, msg: d.error || "Couldn't sync." }));
+    else setServer((c) => ({ ...c, status: d.status || {}, msg: trackerSyncUserMessage(d) }));
+  }
+  return status < 400;
+}
+
 // Pattern rules P1-P4, P6 (brief s6), computed on the device.
 function trackerPatterns(data) {
   const s = trackerSettingsOf(data);
@@ -2123,9 +2297,9 @@ function trackerPatterns(data) {
     const key = payerType === "plan" ? "m:" + (r.mgr?.id || "?") : payerType === "agency" ? "ndia" : "p:" + (r.pt?.id || "?");
     const name = payerType === "plan" ? (r.mgr?.name || "Plan manager") : payerType === "agency" ? "NDIA (agency-managed)" : (r.client || "Participant");
     const g = groups[key] || (groups[key] = { key, name, payerType, inv: [] });
-    const end = i.status === "paid" ? (i.paidAt || null) : asOf;
+    const end = isFullyPaid(i) ? (i.paidAt || null) : asOf;
     const bd = end ? businessDaysBetween(i.sentAt, end, s.state) : null;
-    g.inv.push({ i, bd, late: bd != null && bd > 12, open: i.status === "sent" });
+    g.inv.push({ i, bd, late: bd != null && bd > 12, open: isAwaitingPayment(i) });
   });
   return Object.values(groups).map((g) => {
     const late12m = g.inv.filter((x) => x.late && x.i.sentAt >= yearAgo);
@@ -2133,7 +2307,7 @@ function trackerPatterns(data) {
     const median = paidBds.length ? paidBds[Math.floor(paidBds.length / 2)] : null;
     const avg = g.inv.filter((x) => x.bd != null).reduce((n, x, _, a) => n + x.bd / a.length, 0);
     const openInv = g.inv.filter((x) => x.open);
-    const owed = openInv.reduce((n, x) => n + invTotal(x.i), 0);
+    const owed = openInv.reduce((n, x) => n + ovBalanceDue(x.i), 0);
     const silent = openInv.filter((x) => {
       const ev = (data.chaseEvents || []).filter((e) => e.invoiceId === x.i.id);
       return ev.filter((e) => /^nudge|auto/.test(e.type)).length >= 2 && !ev.some((e) => e.type === "reply");
@@ -3774,8 +3948,8 @@ function HomeDashboard({ data, m, go }) {
     .sort((a, b) => (a.date + (a.start || "")).localeCompare(b.date + (b.start || "")))[0] || null;
   const nextPt = nextShift ? ptOf(nextShift.participantId) : null;
   const nextDay = nextShift ? (nextShift.date === t ? "Today" : new Date(nextShift.date + "T00:00:00").toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" })) : "";
-  const waiting = data.invoices.filter((i) => i.status === "sent");
-  const owed = waiting.reduce((n, i) => n + invTotal(i), 0);
+  const waiting = data.invoices.filter(isAwaitingPayment);
+  const owed = m.outstanding;
   const overdue = waiting.filter(isOverdue).length;
   const fy = fyOf(t);
   const invMonth = (i) => String(i.date || i.sentAt || "").slice(0, 7);
@@ -3810,7 +3984,7 @@ function HomeDashboard({ data, m, go }) {
         <Tile label="Next shift" value={nextShift ? nextDay : "None"} sub={nextShift ? `${nextShift.start || ""}${nextShift.end ? "\u2013" + nextShift.end : ""}${nextPt ? " \u00b7 " + nextPt.name : ""}` : "Nothing scheduled"} onClick={() => go("invoices", "shifts")} />
         <Tile neutral label="Uninvoiced work" value={mny(uninvoiced)} sub={uninvoiced > 0 ? `${unbilled.length} shift${unbilled.length === 1 ? "" : "s"}${unbilledTrips.length ? ` + ${unbilledTrips.length} trip${unbilledTrips.length === 1 ? "" : "s"}` : ""} \u00b7 ${uninvoicedHours.toFixed(1)}h` : "All caught up"} />
         <Tile label="Expenses this FY" value={mny(fyExpenses)} sub={`Costs · ${fyLabel(fy)}`} />
-        <Tile neutral label="Outstanding" value={mny(owed)} sub={waiting.length ? `${waiting.length} invoice${waiting.length === 1 ? "" : "s"}${overdue ? ` \u00b7 ${overdue} overdue` : ""}` : "Nobody owes you"} tone={overdue ? "var(--warn)" : null} onClick={() => go("summary", "tracker")} />
+        <Tile neutral label="Outstanding" value={mny(owed)} sub={waiting.length ? `${waiting.length} invoice${waiting.length === 1 ? "" : "s"}${overdue ? ` \u00b7 ${overdue} overdue` : ""}` : "Nobody owes you"} tone={overdue ? "var(--warn)" : null} onClick={() => go("summary", "invoices", { invoiceFilter: "owing" })} />
         <Tile neutral label="Tax estimate" value={mny(m.setAside)} sub="Put aside this year" />
       </div>
     </div>
@@ -3880,6 +4054,8 @@ function App() {
   const [askPin, setAskPin] = useState(() => { try { return localStorage.getItem(ASK_PIN_FLAG) === "1" || (isMemberDevice() && !readLock()); } catch (e) { return false; } });
   const [claimSeed, setClaimSeed] = useState("");
   const [editing, setEditing] = useState(null);
+  const [invoiceListFilter, setInvoiceListFilter] = useState(null);
+  const [trackerServer, setTrackerServer] = useState({ status: {}, log: null, msg: "" });
   const [data, setData] = useState(BLANK);
 
   /* ---------------- trial / subscription status ---------------- */
@@ -4221,7 +4397,7 @@ function App() {
     const gstNear = !gstReg && !gstDue && turnover >= GST_THRESHOLD * 0.8;
     const noAgreement = data.participants.filter((x) => !x.agreement);
     const agReview = data.participants.filter((x) => x.agreement && x.agreementReview && x.agreementReview <= addDays(today(), 30));
-    return { inv, income, invoiced, outstanding: invoiced - income, expenses, km, deductibleKm, car, carOn, carRate, kmRate, overCap,
+    return { inv, income, invoiced, outstanding: ovOutstanding(data.invoices), expenses, km, deductibleKm, car, carOn, carRate, kmRate, overCap,
       turnover, gstReg, gstDue, gstNear, noAgreement, agReview, priorIncome, priorExpenses, priorKm,
       taxableIncome, deductions, taxable, setAside, eff: taxable > 0 ? (setAside / taxable) * 100 : 0,
       logbookEstimate, centsEstimate, vehicleExpenseFY, logbookPct, vehicleGstFY, vehicleGstCredit,
@@ -4247,10 +4423,19 @@ function App() {
     return () => document.removeEventListener("visibilitychange", onVis);
   }, []);
 
-  const go = (t, sub) => {
+  const go = (t, sub, opts) => {
     setTab(t); setEditing(null); if (t !== "settings") setOpenPane(null);
     if (sub) { if (t === "summary") setSumTab(sub); if (t === "invoices") setInvTab(sub); if (t === "people") setPplTab(sub); }
+    setInvoiceListFilter(opts && opts.invoiceFilter ? opts.invoiceFilter : null);
   };
+  const trackerSyncSig = !loaded ? "" : data.invoices.map((i) => (ovSyncInvoice(i) ? [i.id, i.sentAt, i.due || "", i.status, i.amountPaid ?? "", invTotal(i), i.number, i.chase && i.chase.paused ? 1 : 0].join(":") : "")).join("|") + "\n" + JSON.stringify(trackerSettingsOf(data));
+  useEffect(() => {
+    // Sync open sent invoices even when the Payment Tracker screen is closed.
+    if (!loaded || trackerAccess.phase !== "unlocked" || trackerAccess.preview) return;
+    if (!trackerSettingsOf(data).autoSend) return;
+    const t = setTimeout(() => { syncTrackerNow(data, trackerAccess, null, setTrackerServer).catch(() => {}); }, 1500);
+    return () => clearTimeout(t);
+  }, [trackerSyncSig, trackerAccess.phase, trackerAccess.preview, loaded]);
   const goHub = (t) => { setTab(t); setEditing(null); setOpenPane(null); setMenuOpen(false); setHelpMenuOpen(false); };
   const navActive = (k) => k === "home" ? tab === "home"
     : k === "workhub" ? (tab === "workhub" || tab === "invoices")
@@ -4407,7 +4592,7 @@ function App() {
    }
   });
 
-  const saveInvoice = (inv) => {
+  const saveInvoice = (inv, opts) => {
     const clean = { ...inv }; delete clean._new; delete clean._prefilled;
     clean.tripIds = inv.tripIds || [];
     clean.shiftIds = inv.shiftIds || [];
@@ -4415,7 +4600,7 @@ function App() {
     const invoices = exists ? data.invoices.map((i) => (i.id === inv.id ? clean : i)) : [...data.invoices, clean];
     const profile = inv._new ? { ...data.profile, nextInv: Number(inv.number) + 1 } : data.profile;
     save({ ...data, invoices, profile });
-    setEditing(null);
+    if (!(opts && opts.keepOpen)) setEditing(null);
   };
 
   // Raised in error, never actually issued to anyone, so the number it
@@ -4673,9 +4858,9 @@ function App() {
                 title={({ invoices: "Invoices", expenses: "Expenses", position: "Tax", bas: "BAS", tracker: "Overdue invoice payment tracker" })[sumTab] || "Money"}
                 onBack={() => { setClaimSeed(""); goHub("moneyhub"); }}
               />
-              {sumTab === "invoices" && <InvoiceList data={data} m={m} fy={fy} save={save} newInvoice={newInvoice} open={setEditing} go={go} billTick={billTick} setBillTick={setBillTick} />}
+              {sumTab === "invoices" && <InvoiceList data={data} m={m} fy={fy} save={save} newInvoice={newInvoice} open={setEditing} go={go} billTick={billTick} setBillTick={setBillTick} listFilter={invoiceListFilter} />}
               {sumTab === "bas" && <BAS data={data} fy={fy} />}
-              {sumTab === "tracker" && <PaymentTracker data={data} save={save} go={go} access={trackerAccess} />}
+              {sumTab === "tracker" && <PaymentTracker data={data} save={save} go={go} access={trackerAccess} server={trackerServer} setServer={setTrackerServer} />}
               {sumTab === "position" && <Summary data={data} save={save} m={m} go={go} newInvoice={newInvoice} resume={() => setTab("setup")}              snoozeBackup={() => save({ ...data, profile: { ...data.profile, remindedOn: today() } })}
                 dismissBackupNotice={() => save({ ...data, profile: { ...data.profile, backupNoticeSeen: true } })}
                 daysUntilTrialEnd={daysUntilTrialEnd} onSubscribe={() => setShowTrialNotice(true)} claimSeed={claimSeed} />}
@@ -5537,7 +5722,7 @@ function useTrackerAccess() {
       if (status === 401) { setSt((c) => ({ ...c, cfg, preview, phase: preview ? "unlocked" : "signedout" })); return; }
       if (status >= 400) throw new Error(data.error || "error");
       try { localStorage.setItem("sf_tracker_access_v1", JSON.stringify({ unlocked: !!data.unlocked, product: data.product, sub: ref.current.session.sub })); } catch (e) { }
-      setSt((c) => ({ ...c, cfg, preview, session: ref.current.session, phase: data.unlocked || preview ? "unlocked" : "locked", paid: !!data.paid, devices: data.devices || 0, sms: data.sms || null, deviceLimit: !!data.deviceLimit, product: data.product, serverPrefs: data.prefs, autosendServer: !!data.autosendServer }));
+      setSt((c) => ({ ...c, cfg, preview, session: ref.current.session, phase: data.unlocked || preview ? "unlocked" : "locked", paid: !!data.paid, devices: data.devices || 0, sms: data.sms || null, deviceLimit: !!data.deviceLimit, product: data.product, serverPrefs: data.prefs, autosendServer: !!data.autosendServer, autosendDryRun: !!data.autosendDryRun }));
     } catch (e) {
       setSt((c) => ({ ...c, cfg, preview, session: ref.current.session, phase: preview || cachedUnlocked ? "unlocked" : "offline" }));
     }
@@ -5621,51 +5806,29 @@ const urlB64ToUint8 = (b) => { const s = atob((b + "=".repeat((4 - (b.length % 4
 const isIOS = () => /iPhone|iPad/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
 
 /* ---------------- Payment tracker (brief screens 2-8) ---------------- */
-function PaymentTracker({ data, save, go, access }) {
+function PaymentTracker({ data, save, go, access, server, setServer }) {
   const [view, setView] = useState("list");
   const [sel, setSel] = useState(null);       // invoice id
   const [stageSel, setStageSel] = useState(1);
-  const [filter, setFilter] = useState(() => (data.invoices.some((i) => i.status === "sent" && invoiceChase(i, data, localToday())?.stage >= 1) ? "action" : "all"));
+  const [filter, setFilter] = useState(() => (data.invoices.some((i) => isAwaitingPayment(i) && invoiceChase(i, data, localToday())?.stage >= 1) ? "action" : "all"));
   const [paying, setPaying] = useState(null);
   const [logForm, setLogForm] = useState(null);
-  const [server, setServer] = useState({ status: {}, log: null, msg: "" });
   const s = trackerSettingsOf(data);
   const setS = (p) => save({ ...data, trackerSettings: { ...s, ...p } });
   const asOf = localToday();
-  const open = data.invoices.filter((i) => i.status === "sent");
+  const open = data.invoices.filter(isAwaitingPayment);
   const rows = data.invoices.filter((i) => i.status !== "draft").map((i) => ({ i, c: invoiceChase(i, data, asOf), r: resolve(i, data) }));
   const needs = (x) => x.c && x.c.stage >= 1 && !x.c.paused;
-  const shown = rows.filter((x) => (filter === "all" ? x.i.status === "sent" : filter === "paid" ? x.i.status === "paid" : needs(x)))
+  const shown = rows.filter((x) => (filter === "all" ? isAwaitingPayment(x.i) : filter === "paid" ? isFullyPaid(x.i) : needs(x)))
     .sort((a, b) => (b.c?.bd || 0) - (a.c?.bd || 0) || (a.i.paidAt < b.i.paidAt ? 1 : -1));
-  const owed = open.reduce((n, i) => n + invTotal(i), 0);
+  const owed = open.reduce((n, i) => n + ovBalanceDue(i), 0);
   const inv = sel ? data.invoices.find((i) => i.id === sel) : null;
   const setInv = (id, p) => save({ ...data, invoices: data.invoices.map((i) => (i.id === id ? { ...i, ...p } : i)) });
   const addEvent = (ev) => save({ ...data, chaseEvents: [...(data.chaseEvents || []), { id: uid(), at: localToday(), ...ev }] });
 
-  // Sync minimised records for server-side auto-send (only when switched on).
-  const syncNow = async (prefsOverride) => {
-    const prefs = { ...s, ...(prefsOverride || {}) };
-    const records = open.map((i) => {
-      const r = resolve(i, data); const msgs = trackerMessages(i, data);
-      if (!i.sentAt) return null;
-      return {
-        id: i.id, sentAt: i.sentAt, due: i.due || null, payerType: msgs.payerType, paused: !!(i.chase && i.chase.paused),
-        thresholds: prefs.thresholds?.[msgs.payerType] || null, invoiceNo: String(i.number), amount: invTotal(i).toFixed(2),
-        recipientEmail: msgs.to || "", recipientName: msgs.payerType === "plan" ? (r.mgr?.name || "") : "",
-        messages: { 1: msgs[1], 2: msgs[2], 3: { subject: msgs[3].subject, body: msgs[3].body } },
-      };
-    }).filter(Boolean);
-    const { status, data: d } = await access.post({ action: "sync", prefs: { enabled: !!prefs.autoSend, replyTo: prefs.replyTo, workerName: data.profile.name, state: prefs.state, notifyPush: prefs.notifyPush, notifyEmail: prefs.notifyEmail !== false }, records });
-    if (status >= 400) { setServer((c) => ({ ...c, msg: d.error || "Couldn't sync." })); return false; }
-    setServer((c) => ({ ...c, status: d.status || {}, msg: d.autosendServer ? "" : "Automatic sending is switched off on the server for now. Nothing will be sent until SupportFlow turns it on." }));
-    return true;
-  };
-  const sig = JSON.stringify(open.map((i) => [i.id, i.sentAt, i.due, i.chase])) + JSON.stringify(s);
-  useEffect(() => {
-    if (access.phase !== "unlocked" || access.preview || !s.autoSend) return;
-    const t = setTimeout(() => { syncNow().catch(() => {}); }, 1500);
-    return () => clearTimeout(t);
-  }, [sig, access.phase]);
+  // Turning automatic reminders on syncs immediately. Later changes sync from
+  // App, so a sent invoice is uploaded even if this screen is not open.
+  const syncNow = (prefsOverride) => syncTrackerNow(data, access, prefsOverride, setServer);
 
   if (access.phase !== "unlocked") return <TrackerUpsell access={access} owed={owed} count={open.length} go={go} />;
 
@@ -5701,7 +5864,7 @@ function PaymentTracker({ data, save, go, access }) {
             {ev.map((e) => <div key={e.id}>{fmtAu(e.at)} · {CHASE_TYPES[e.type] || e.type}{e.summary ? ` · ${e.summary}` : ""}</div>)}
           </div>
         </div>
-        {inv.status === "sent" && (
+        {isAwaitingPayment(inv) && (
           <div style={{ display: "grid", gap: 8 }}>
             {[1, 2].map((n) => <button key={n} className={"btn" + (c && c.stage === n ? "" : " ghost")} style={{ minHeight: 48 }} onClick={() => { setStageSel(n); setView("message"); }}>
               {c?.payerType === "agency" ? (n === 1 ? "Portal check reminder" : "Hold/rejection check") : n === 1 ? "Review reminder 1 (day 7)" : "Review reminder 2 (day 12)"}</button>)}
@@ -5860,7 +6023,7 @@ function PaymentTracker({ data, save, go, access }) {
   }
 
   const needCount = rows.filter(needs).length;
-  const hasSent = rows.some((x) => x.i.status === "sent");
+  const hasSent = rows.some((x) => x.i.status === "sent" || isAwaitingPayment(x.i));
   const emailOk = /^\S+@\S+\.\S+$/.test(s.replyTo || "");
   return (
     <div className="band">
@@ -5875,7 +6038,11 @@ function PaymentTracker({ data, save, go, access }) {
             <b>Automatic reminders: {s.autoSend ? "On" : "Off"}</b>
             <div style={{ color: "var(--tx-2)", fontSize: 12.5 }}>
               {s.autoSend
-                ? `Day 7 and day 12 emails go out for you. Replies come to ${s.replyTo || "your email"}.`
+                ? (access.autosendServer === false
+                  ? "Automatic reminders are switched on here, but sending is switched off on the server for now."
+                  : access.autosendDryRun
+                    ? "Automatic reminders are on, but SupportFlow is still in test mode and is not emailing anyone yet."
+                    : `Day 7 and day 12 emails go out for you. Replies come to ${s.replyTo || "your email"}.`)
                 : emailOk ? "Switch on to send day 7 and day 12 reminders for you. Until then you review and send each one." : "Add your email in Settings to turn on day 7 and day 12 reminders. Until then you review and send each one."}
             </div>
           </div>
@@ -5898,10 +6065,10 @@ function PaymentTracker({ data, save, go, access }) {
           <button style={{ all: "unset", cursor: "pointer", display: "block", width: "100%" }} onClick={() => { setSel(i.id); setView("detail"); }} aria-label={`Open invoice ${i.number}`}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
               <div style={{ fontWeight: 600, fontSize: 14.5 }}>{r.billToName || "No payer"}</div>
-              <div className="num" style={{ fontWeight: 600 }}>{money(invTotal(i))}</div>
+              <div className="num" style={{ fontWeight: 600 }}>{money(isAwaitingPayment(i) ? ovBalanceDue(i) : invTotal(i))}</div>
             </div>
             <div style={{ fontSize: 13, color: "var(--tx-2)", marginTop: 3 }}>
-              #{i.number} · {(r.client || "").split(/\s+/).map((w) => w[0]).join("")} · {i.status === "paid" ? `Paid ${i.paidAt ? fmtAu(i.paidAt) : ""}` : c ? `Sent ${c.bd} business day${c.bd === 1 ? "" : "s"} ago` : "No sent date"}
+              #{i.number} · {(r.client || "").split(/\s+/).map((w) => w[0]).join("")} · {isFullyPaid(i) ? `Paid ${i.paidAt ? fmtAu(i.paidAt) : ""}` : isPartPaid(i) ? `Part paid · ${money(ovBalanceDue(i))} still owed` : c ? `Sent ${c.bd} business day${c.bd === 1 ? "" : "s"} ago` : "No sent date"}
               {c && <> · <span className={"pill " + STAGE_TONE[c.stage]}>{c.paused ? "Paused" : c.label}</span></>}
             </div>
           </button>
@@ -5948,13 +6115,15 @@ function TrackerReport({ data, onBack }) {
   );
 }
 
-function InvoiceList({ data, m, fy, save, newInvoice, open, go, billTick, setBillTick }) {
-  const [invFilter, setInvFilter] = useState("all");
+function InvoiceList({ data, m, fy, save, newInvoice, open, go, billTick, setBillTick, listFilter }) {
+  const [invFilter, setInvFilter] = useState(listFilter || "all");
+  useEffect(() => { if (listFilter) setInvFilter(listFilter); }, [listFilter]);
   const [paying, setPaying] = useState(null);
   const allRows = [...m.inv].reverse();
   const FILTERS = [["all", "All"], ["draft", "Not sent"], ["sent", "Waiting"], ["overdue", "Overdue"], ["paid", "Paid"]];
-  const inFilter = (i, k) => k === "all" || (k === "paid" ? i.status === "paid" : k === "sent" ? i.status === "sent" : invStatusKey(i) === k);
-  const rows = allRows.filter((i) => inFilter(i, invFilter));
+  const inFilter = (i, k) => ovInFilter(i, k, localToday());
+  const register = invFilter === "owing" ? [...data.invoices].reverse() : allRows;
+  const rows = register.filter((i) => inFilter(i, invFilter));
   const nameOf = (id) => (data.participants.find((x) => x.id === id) || {}).name || "No participant";
   const unbilled = data.shifts.filter((x) => isBillable(x) && !shiftInvoice(x, data.invoices))
     .sort((a, b) => (a.date < b.date ? -1 : 1));
@@ -6046,8 +6215,8 @@ function InvoiceList({ data, m, fy, save, newInvoice, open, go, billTick, setBil
       )}
 
       {m.outstanding > 0 && (() => {
-        // Sent and not yet paid only: a draft was never sent, so it isn't owed (review D5/I1).
-        const unpaid = [...m.inv].filter((i) => i.status === "sent" && i.due).sort((a, b) => (a.due < b.due ? -1 : 1));
+        // Sent and not yet paid in full. Drafts were never sent. A part payment stays here until the balance is gone.
+        const unpaid = data.invoices.filter(isAwaitingPayment).sort((a, b) => ((a.due || "9999") < (b.due || "9999") ? -1 : 1));
         if (!unpaid.length) return null;
         return (
           <div className="band" style={{ paddingTop: 0 }}>
@@ -6066,10 +6235,12 @@ function InvoiceList({ data, m, fy, save, newInvoice, open, go, billTick, setBil
                       </div>
                       <div style={{ fontSize: overdue ? 12 : 11, fontWeight: overdue ? 700 : 400, color: overdue ? "var(--req)" : "var(--tx-3)", marginTop: 2 }}>
                         {overdue && <span className="pill overdue" role="img" aria-label="Warning: overdue" style={{ marginRight: 6, border: "1px solid var(--req)" }}>&#9888; Overdue</span>}
-                        {overdue ? "Overdue since " : "Due "}{fmtDate(i.due)}
+                        {isPartPaid(i) && <span className="pill lower part" style={{ marginRight: 6 }}>Part paid</span>}
+                        {i.due ? (overdue ? "Overdue since " : "Due ") + fmtDate(i.due) : "No due date"}
+                        {isPartPaid(i) ? ` · ${money(invAmountPaid(i))} received` : ""}
                       </div>
                     </div>
-                    <div className="num" style={{ fontSize: 13.5, fontWeight: 600 }}>{money(invTotal(i))}</div>
+                    <div className="num" style={{ fontSize: 13.5, fontWeight: 600 }}>{money(ovBalanceDue(i))}</div>
                   </div>
                 );
               })}
@@ -6078,7 +6249,7 @@ function InvoiceList({ data, m, fy, save, newInvoice, open, go, billTick, setBil
         );
       })()}
 
-      {allRows.length > 0 && (
+      {(allRows.length > 0 || invFilter === "owing") && (
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }} role="group" aria-label="Filter invoices">
           {FILTERS.map(([k, l]) => (
             <button key={k} className={"btn tiny" + (invFilter === k ? "" : " ghost")} style={{ minHeight: 40 }} aria-pressed={invFilter === k} onClick={() => setInvFilter(k)}>
@@ -6087,9 +6258,10 @@ function InvoiceList({ data, m, fy, save, newInvoice, open, go, billTick, setBil
           ))}
         </div>
       )}
+      {invFilter === "owing" && <div style={{ fontSize: 12.5, color: "var(--tx-2)", margin: "-4px 0 10px" }}>Showing invoices still owed: waiting and overdue.</div>}
       <div className="band">
-        {allRows.length > 0 && rows.length === 0 && <div className="empty">No invoices match this filter.</div>}
-        {allRows.length === 0
+        {register.length > 0 && rows.length === 0 && <div className="empty">No invoices match this filter.</div>}
+        {register.length === 0
           ? (
             <div className="empty">
               No invoices yet this year.<br />
@@ -6108,12 +6280,13 @@ function InvoiceList({ data, m, fy, save, newInvoice, open, go, billTick, setBil
                   <div style={{ fontSize: 14, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{resolve(i, data).client || "Untitled"}</div>
                   <div style={{ fontSize: 11, color: "var(--tx-3)", marginTop: 3, display: "flex", gap: 8, alignItems: "center" }}>
                     <span className="mono">#{i.number}</span><span>{fmtDate(i.date)}</span><span className={"pill lower " + displayStatus}>{INV_STATUS_LABEL[displayStatus]}</span>
+                    {isPartPaid(i) && displayStatus !== "part" && <span className="pill lower part">Part paid</span>}
                     {chase && chase.stage >= 1 && <span className={"pill lower " + STAGE_TONE[chase.stage]}>{chase.label}</span>}
                   </div>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <div className="num" style={{ fontSize: 15, fontWeight: 600 }}>{money(invTotal(i))}</div>
-                  {i.status === "sent" && <button className="btn ghost" style={{ marginTop: 6, minHeight: 44 }} onClick={() => setPaying(i.id)}>Mark paid</button>}
+                  <div className="num" style={{ fontSize: 15, fontWeight: 600 }}>{money(isAwaitingPayment(i) ? ovBalanceDue(i) : invTotal(i))}</div>
+                  {isAwaitingPayment(i) && <button className="btn ghost" style={{ marginTop: 6, minHeight: 44 }} onClick={() => setPaying(i.id)}>Mark paid</button>}
                 </div>
               </div>
               {paying === i.id && <MarkPaidSheet inv={i} onCancel={() => setPaying(null)} onSave={(pp) => { save(markPaid(data, i.id, pp)); setPaying(null); }} />}
@@ -6162,7 +6335,7 @@ function Editor({ inv, setInv, onSave, onCancel, onDelete, profile, data, go }) 
             const np = data.participants.find((x) => x.id === e.target.value);
             const kept = inv.lines.filter((l) => l.id !== "auto-travel" && l.id !== "auto-travel-time");
             const cleaned = kept.filter((l) => !String(l.id).startsWith("auto-shift"));
-            set({ participantId: e.target.value, tripIds: [], shiftIds: [], due: dueFrom(inv.date, np, data), lines: cleaned });
+            set({ participantId: e.target.value, tripIds: [], shiftIds: [], due: dueFrom(inv.date, np, data), dueManual: false, lines: cleaned });
           }}>
             <option value="">Choose from your directory…</option>
             {data.participants.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -6186,10 +6359,10 @@ function Editor({ inv, setInv, onSave, onCancel, onDelete, profile, data, go }) 
           </div>
         )}
         <div className="three" style={{ marginBottom: 0 }}>
-          <label className="f" style={{ marginBottom: 0 }}><span>Issued</span><AuDateInput value={inv.date} onChange={(v) => set({ date: v })} /></label>
+          <label className="f" style={{ marginBottom: 0 }}><span>Issued</span><AuDateInput value={inv.date} onChange={(v) => { const pt = data.participants.find((x) => x.id === inv.participantId); set(ovIssuedChange(inv, v, payerTermsDays(pt, data))); }} /></label>
           <label className="f" style={{ marginBottom: 0 }}>
             <span style={{ color: inv.due ? undefined : "var(--req)" }}>Due{inv.due ? "" : " (required)"}</span>
-            <AuDateInput value={inv.due} style={inv.due ? {} : { borderColor: "var(--req)" }} onChange={(v) => set({ due: v })} />
+            <AuDateInput value={inv.due} style={inv.due ? {} : { borderColor: "var(--req)" }} onChange={(v) => set({ due: v, dueManual: true })} />
           </label>
           <label className="f" style={{ marginBottom: 0 }}><span>Status</span>
             <select value={inv.status} onChange={(e) => {
@@ -6276,7 +6449,7 @@ function Editor({ inv, setInv, onSave, onCancel, onDelete, profile, data, go }) 
         </label>
       </div>
 
-      <SendPanel inv={inv} profile={profile} r={r} onSent={() => { const next = { ...inv, status: "sent", sentAt: inv.sentAt && !inv.sentAtEstimated ? inv.sentAt : localToday(), sentAtEstimated: false }; setInv(next); onSave(next); }} />
+      <SendPanel inv={inv} profile={profile} r={r} onSent={() => { const next = ovMarkSent(inv, localToday()); setInv(next); onSave(next, { keepOpen: true }); }} />
 
       {(() => {
         const gaps = [];
@@ -6397,11 +6570,13 @@ function SendPanel({ inv, profile, r, onSent }) {
   const [pdf, setPdf] = useState(null);
   const [previewing, setPreviewing] = useState(false);
   const [creditBlock, setCreditBlock] = useState(null); // null | "no_credits" | "error"
-  const ready = inv.participantId && invTotal(inv) > 0;
+  const hasBody = inv.participantId && invTotal(inv) > 0;
+  const ready = ovCanShare(inv);
 
   // Share the real PDF through the device's own share sheet, so Gmail,
   // Outlook, Messages and the rest receive it as a genuine attachment.
   const share = async () => {
+    if (!ovCanShare(inv)) { setPdf("needdue"); return; }
     setPdf("working");
     setCreditBlock(null);
     const gate = await chargeInvoiceCredit(inv.number);
@@ -6418,9 +6593,11 @@ function SendPanel({ inv, profile, r, onSent }) {
         onSent && onSent();
         return;
       }
-      // No file sharing on this device: fall back to the download that does work.
+      // No file sharing on this device: fall back to the download that does work,
+      // then mark Sent on the same path as a completed share.
       await makeInvoicePDF(inv, profile, r);
       setPdf("fellback");
+      onSent && onSent();
     } catch (e) {
       // Cancelling the share sheet is a normal user action, not a failure.
       if (e && e.name === "AbortError") { setPdf(null); return; }
@@ -6471,20 +6648,22 @@ function SendPanel({ inv, profile, r, onSent }) {
     <div className="panel">
       <div className="bandhead" style={{ marginBottom: 12 }}>
         <div className="eyebrow">Send it</div>
-        {!ready && <div style={{ fontSize: 11.5, color: "var(--tx-3)" }}>Add a participant and an amount first</div>}
+        {!hasBody && <div style={{ fontSize: 11.5, color: "var(--tx-3)" }}>Add a participant and an amount first</div>}
       </div>
 
-      {ready ? (
+      {hasBody ? (
         <>
-          <button className="btn" style={{ width: "100%" }} onClick={share} disabled={pdf === "working"}>
+          <button className="btn" style={{ width: "100%" }} onClick={share} disabled={!ready || pdf === "working"}>
             {pdf === "working" ? "Building…" : "Share invoice"}
           </button>
+          {!inv.due && <div style={{ fontSize: 12.5, color: "var(--req)", marginTop: 9, lineHeight: 1.6 }}>Add a due date before sharing. Save needs one too.</div>}
           <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
             <button className="btn ghost tiny" onClick={preview} disabled={previewing}>{previewing ? "Opening…" : "Preview PDF"}</button>
           </div>
           {pdf === "fellback" && <div style={{ fontSize: 12.5, color: "var(--tx-2)", marginTop: 9, lineHeight: 1.6 }}>
-            Sharing isn't supported on this device. The invoice PDF has been downloaded instead, and you can attach it to your email from Downloads.
+            Sharing isn't supported on this device. The invoice PDF has been downloaded, and this invoice is marked Sent. Attach the PDF to your email from Downloads.
           </div>}
+          {pdf === "needdue" && <div style={{ fontSize: 12.5, color: "var(--req)", marginTop: 9 }}>Add a due date before sharing.</div>}
           {pdf === "fail" && <div style={{ fontSize: 12.5, color: "var(--warn)", marginTop: 9 }}>Couldn't build the PDF. Try again in a moment.</div>}
           <CreditNotice kind={creditBlock} />
           <div style={{ fontSize: 11.5, color: "var(--tx-3)", marginTop: 12, lineHeight: 1.6 }}>
@@ -7685,8 +7864,7 @@ function ParticipantHistory({ pt, data }) {
 
   const invoices = data.invoices.filter((i) => i.participantId === pt.id && inFY(i.date, fy));
   const invoiced = invoices.reduce((s, i) => s + invTotal(i), 0);
-  const paid = invoices.filter((i) => i.status === "paid").reduce((s, i) => s + invTotal(i), 0);
-  const outstanding = invoiced - paid;
+  const outstanding = invoices.filter(isAwaitingPayment).reduce((s, i) => s + ovBalanceDue(i), 0);
 
   const hasAgreement = !!pt.agreement;
   const reviewDue = pt.agreementReview && pt.agreementReview < today();
@@ -8901,7 +9079,7 @@ function Shifts({ data, save, fy, newInvoice, canCreate, onBlocked, onShiftSaved
             return (
               <div className="row" key={x.id}>
                 <span className="dot" style={{ background: confirm ? "var(--warn)"
-                  : billed ? (billed.status === "paid" ? "var(--good)" : overdue ? "var(--warn)" : "var(--brass)")
+                  : billed ? (isFullyPaid(billed) ? "var(--good)" : overdue ? "var(--warn)" : "var(--brass)")
                   : isBillable(x) ? "var(--brass)" : statusColour(st) }} />
                 <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => setF({ ...x })}>
                   <div style={{ fontSize: 13.5, fontWeight: 500 }}>{nameOf(x.participantId)}</div>
@@ -8909,11 +9087,13 @@ function Shifts({ data, save, fy, newInvoice, canCreate, onBlocked, onShiftSaved
                     {fmtDate(x.date)} · {x.start}–{x.end}
                     {st === "cancelled" ? <span style={{ color: "var(--warn)" }}> · cancelled</span>
                       : confirm ? <span style={{ color: "var(--warn)" }}> · did this go ahead?</span>
-                      : billed ? (billed.status === "paid"
+                      : billed ? (isFullyPaid(billed)
                           ? <span style={{ color: "var(--good)" }}> · paid, invoice #{billed.number}</span>
                           : overdue
                             ? <span style={{ color: "var(--warn)" }}> · overdue, invoice #{billed.number}</span>
-                            : <span style={{ color: "var(--brass)" }}> · invoiced #{billed.number}</span>)
+                            : isPartPaid(billed)
+                              ? <span style={{ color: "var(--brass)" }}> · part paid, invoice #{billed.number}</span>
+                              : <span style={{ color: "var(--brass)" }}> · invoiced #{billed.number}</span>)
                       : isBillable(x) ? <span style={{ color: "var(--brass)" }}> · ready to invoice</span>
                       : st === "scheduled" ? <span style={{ color: "var(--tx-3)" }}> · scheduled</span>
                       : <span style={{ color: "var(--good)" }}> · completed</span>}
@@ -9156,15 +9336,19 @@ function Trips({ data, save, m, fy, canCreate, onBlocked, prefill, onSaved }) {
           const on = tripInvoice(t, data.invoices);
           return (
             <div className="row" key={t.id}>
-              <span className="dot" style={{ background: on ? (on.status === "paid" ? "var(--good)" : "var(--brass)") : t.billable ? "var(--brass)" : "var(--tx-3)" }} />
+              <span className="dot" style={{ background: on ? (isFullyPaid(on) ? "var(--good)" : isOverdue(on) ? "var(--warn)" : "var(--brass)") : t.billable ? "var(--brass)" : "var(--tx-3)" }} />
               <div style={{ flex: 1, minWidth: 0, cursor: on ? "default" : "pointer" }} onClick={() => !on && startEdit(t)}>
                 <div style={{ fontSize: 13.5, fontWeight: 500 }}>{nameOf(t)}</div>
                 <div style={{ fontSize: 11, color: "var(--tx-3)", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {fmtDate(t.date)}
                   {!t.billable && " · private"}
-                  {on && (on.status === "paid"
+                  {on && (isFullyPaid(on)
                     ? <span style={{ color: "var(--good)" }}> · paid, invoice #{on.number}</span>
-                    : <span style={{ color: "var(--brass)" }}> · invoiced #{on.number}</span>)}
+                    : isOverdue(on)
+                      ? <span style={{ color: "var(--warn)" }}> · overdue, invoice #{on.number}</span>
+                      : isPartPaid(on)
+                        ? <span style={{ color: "var(--brass)" }}> · part paid, invoice #{on.number}</span>
+                        : <span style={{ color: "var(--brass)" }}> · invoiced #{on.number}</span>)}
                   {!on && t.billable && t.participantId && <span style={{ color: "var(--brass)" }}> · ready to invoice</span>}
                 </div>
               </div>
