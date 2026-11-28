@@ -2119,6 +2119,13 @@ function ovOutstanding(invoices) {
   return round2((invoices || []).filter(ovIsAwaiting).reduce((n, i) => n + ovBalanceDue(i), 0));
 }
 
+// What a payment reminder should quote: the balance still owed while the
+// invoice is open, and the invoice total once it is fully paid.
+function ovReminderAmount(inv) {
+  if (ovIsAwaiting(inv)) return ovBalanceDue(inv);
+  return round2(ovInvoiceTotal(inv));
+}
+
 function ovPad2(n) { return String(n).padStart(2, "0"); }
 
 // Local calendar arithmetic. Do not use toISOString(): UTC shifts an
@@ -2218,7 +2225,7 @@ function trackerVars(i, data) {
   const history = (data.chaseEvents || []).filter((e) => e.invoiceId === i.id).sort((a, b) => (a.at < b.at ? -1 : 1))
     .map((e) => `${fmtAu(e.at)}: ${CHASE_TYPES[e.type] || e.type}${e.summary ? `, ${e.summary}` : ""}`).join("\n");
   return {
-    invoice_no: i.number, amount: invTotal(i).toFixed(2), sent_date: fmtAu(i.sentAt), participant,
+    invoice_no: i.number, amount: ovReminderAmount(i).toFixed(2), sent_date: fmtAu(i.sentAt), participant,
     ndis_bit: s.includeNdis && r.participantNo ? ` (NDIS ${r.participantNo})` : "",
     ndis_number: s.includeNdis ? r.participantNo : "",
     service_bit: period ? `, ${period}` : "", service_period: period,
@@ -2244,10 +2251,20 @@ function trackerMessages(i, data) {
   };
   const base = (n) => (payerType === "agency" ? agency[n] : trackerTemplate(payerType, n, v));
   const draft = trackerNdiaDraft(payerType, v);
+  const receivedNote = (msg) => {
+    if (!msg || !isPartPaid(i)) return msg;
+    const received = money(invAmountPaid(i));
+    const left = money(ovBalanceDue(i));
+    let body = String(msg.body || "")
+      .replace("I have not received payment.", `${received} has already been received. ${left} is still outstanding.`)
+      .replace("I haven't received payment yet.", `${received} has already been received. ${left} is still outstanding.`);
+    if (!body.includes("already been received")) body += `\n\n${received} has already been received. ${left} is still outstanding.`;
+    return { ...msg, body };
+  };
   return {
     payerType,
-    1: custom[1] || base(1), 2: custom[2] || base(2),
-    3: custom[3] ? { ...draft, ...custom[3] } : draft,
+    1: custom[1] || receivedNote(base(1)), 2: custom[2] || receivedNote(base(2)),
+    3: custom[3] ? { ...draft, ...custom[3] } : receivedNote(draft),
     to: payerType === "agency" ? "" : resolve(i, data).billToEmail,
   };
 }
@@ -2265,7 +2282,7 @@ function trackerSyncRecords(data, prefs) {
     const msgs = trackerMessages(i, data);
     return {
       id: i.id, sentAt: i.sentAt, due: i.due || null, payerType: msgs.payerType, paused: !!(i.chase && i.chase.paused),
-      thresholds: s.thresholds?.[msgs.payerType] || null, invoiceNo: String(i.number), amount: invTotal(i).toFixed(2),
+      thresholds: s.thresholds?.[msgs.payerType] || null, invoiceNo: String(i.number), amount: ovReminderAmount(i).toFixed(2),
       recipientEmail: msgs.to || "", recipientName: msgs.payerType === "plan" ? (r.mgr?.name || "") : "",
       messages: { 1: msgs[1], 2: msgs[2], 3: { subject: msgs[3].subject, body: msgs[3].body } },
     };
@@ -2303,7 +2320,7 @@ function trackerPatterns(data) {
   });
   return Object.values(groups).map((g) => {
     const late12m = g.inv.filter((x) => x.late && x.i.sentAt >= yearAgo);
-    const paidBds = g.inv.filter((x) => x.i.status === "paid" && x.bd != null).map((x) => x.bd).sort((a, b) => a - b);
+    const paidBds = g.inv.filter((x) => isFullyPaid(x.i) && x.bd != null).map((x) => x.bd).sort((a, b) => a - b);
     const median = paidBds.length ? paidBds[Math.floor(paidBds.length / 2)] : null;
     const avg = g.inv.filter((x) => x.bd != null).reduce((n, x, _, a) => n + x.bd / a.length, 0);
     const openInv = g.inv.filter((x) => x.open);
@@ -4428,7 +4445,7 @@ function App() {
     if (sub) { if (t === "summary") setSumTab(sub); if (t === "invoices") setInvTab(sub); if (t === "people") setPplTab(sub); }
     setInvoiceListFilter(opts && opts.invoiceFilter ? opts.invoiceFilter : null);
   };
-  const trackerSyncSig = !loaded ? "" : data.invoices.map((i) => (ovSyncInvoice(i) ? [i.id, i.sentAt, i.due || "", i.status, i.amountPaid ?? "", invTotal(i), i.number, i.chase && i.chase.paused ? 1 : 0].join(":") : "")).join("|") + "\n" + JSON.stringify(trackerSettingsOf(data));
+  const trackerSyncSig = !loaded ? "" : data.invoices.map((i) => (ovSyncInvoice(i) ? [i.id, i.sentAt, i.due || "", i.status, i.amountPaid ?? "", ovReminderAmount(i), i.number, i.chase && i.chase.paused ? 1 : 0, JSON.stringify((i.chase && i.chase.custom) || null)].join(":") : "")).join("|") + "\n" + JSON.stringify(trackerSettingsOf(data));
   useEffect(() => {
     // Sync open sent invoices even when the Payment Tracker screen is closed.
     if (!loaded || trackerAccess.phase !== "unlocked" || trackerAccess.preview) return;
@@ -5661,16 +5678,22 @@ function BAS({ data, fy }) {
 /* ---------------- Mark paid (date + amount, app-flow-review D3) ---------------- */
 function MarkPaidSheet({ inv, onSave, onCancel }) {
   const [paidAt, setPaidAt] = useState(localToday());
-  const [amount, setAmount] = useState(invTotal(inv).toFixed(2));
+  const already = hasAmountPaid(inv) ? Number(inv.amountPaid) : 0;
+  const [amount, setAmount] = useState((already > 0 ? already : invTotal(inv)).toFixed(2));
   return (
     <div className="callout" style={{ marginTop: 8, textAlign: "left" }}>
       <div style={{ fontWeight: 600, marginBottom: 8 }}>Mark invoice #{inv.number} paid</div>
       <div className="two" style={{ marginBottom: 8 }}>
         <label className="f" style={{ marginBottom: 0 }}><span>Date the money arrived</span><AuDateInput value={paidAt} onChange={setPaidAt} /></label>
-        <label className="f" style={{ marginBottom: 0 }}><span>Amount received</span><input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
+        <label className="f" style={{ marginBottom: 0 }}><span>Total received so far</span><input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
+      </div>
+      <div style={{ fontSize: 12.5, color: "var(--tx-2)", marginBottom: 8, lineHeight: 1.5 }}>
+        {already > 0
+          ? `${money(already)} is already recorded. Enter the total received so far, including that amount. If another $20 arrives, add it to ${money(already)} and enter the new total.`
+          : "Enter the total received. Leave the invoice total if it has been paid in full."}
       </div>
       <div style={{ display: "flex", gap: 8 }}>
-        <button className="btn" style={{ minHeight: 44 }} disabled={!paidAt || isNaN(Number(amount))} onClick={() => onSave({ paidAt, amountPaid: Number(amount) })}>Save as paid</button>
+        <button className="btn" style={{ minHeight: 44 }} disabled={!paidAt || isNaN(Number(amount))} onClick={() => onSave({ paidAt, amountPaid: Number(amount) })}>Save total received</button>
         <button className="btn ghost" style={{ minHeight: 44 }} onClick={onCancel}>Cancel</button>
       </div>
     </div>
@@ -5679,7 +5702,7 @@ function MarkPaidSheet({ inv, onSave, onCancel }) {
 const markPaid = (data, id, { paidAt, amountPaid }) => ({
   ...data,
   invoices: data.invoices.map((i) => (i.id === id ? { ...i, status: "paid", paidAt, amountPaid } : i)),
-  chaseEvents: [...(data.chaseEvents || []), { id: uid(), invoiceId: id, type: "paid", at: paidAt, summary: money(amountPaid) }],
+  chaseEvents: [...(data.chaseEvents || []), { id: uid(), invoiceId: id, type: "paid", at: paidAt, summary: `total received ${money(amountPaid)}` }],
 });
 
 /* ---------------- Payment tracker access (paywall) ----------------

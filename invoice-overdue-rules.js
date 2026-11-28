@@ -77,6 +77,13 @@ export function ovOutstanding(invoices) {
   return round2((invoices || []).filter(ovIsAwaiting).reduce((n, i) => n + ovBalanceDue(i), 0));
 }
 
+// What a payment reminder should quote: the balance still owed while the
+// invoice is open, and the invoice total once it is fully paid.
+export function ovReminderAmount(inv) {
+  if (ovIsAwaiting(inv)) return ovBalanceDue(inv);
+  return round2(ovInvoiceTotal(inv));
+}
+
 function ovPad2(n) { return String(n).padStart(2, "0"); }
 
 // Local calendar arithmetic. Do not use toISOString(): UTC shifts an

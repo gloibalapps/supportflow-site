@@ -87,6 +87,17 @@ test("changing the issued date recalculates due from payment terms unless the du
   assert.equal(ov.ovDueFromTerms("2026-11-28", 7), "2026-12-05");
 });
 
+test("a reminder quotes the balance still owed, and a part payment is not a finished payment time", () => {
+  const part = inv({ status: "paid", amountPaid: 40, sentAt: "2026-11-01" });
+  const sent = inv({ status: "sent", lines: [line(1, 80)], sentAt: "2026-11-01" });
+  const paid = inv({ status: "paid", amountPaid: 100, sentAt: "2026-11-01" });
+  assert.equal(ov.ovReminderAmount(part), 60);
+  assert.equal(ov.ovReminderAmount(sent), 80);
+  assert.equal(ov.ovReminderAmount(paid), 100);
+  assert.equal(ov.ovIsFullyPaid(part), false);
+  assert.equal(ov.ovIsFullyPaid(paid), true);
+});
+
 test("open sent invoices, including part-paid ones, are what the reminder sync uploads", () => {
   const today = "2026-11-28";
   const sent = inv({ id: "s", status: "sent", sentAt: "2026-11-01" });
@@ -142,6 +153,10 @@ test("app shell applies the rules on share, issued date, filters, outstanding, a
   assert.ok(appFn > 0 && trackerFn > appFn);
   const appBody = src.slice(appFn, trackerFn);
   assert.match(appBody, /Sync open sent invoices even when the Payment Tracker screen is closed/);
+  assert.match(appBody, /chase\.custom/);
+  assert.match(src, /ovReminderAmount\(i\)/);
+  assert.match(src, /isFullyPaid\(x\.i\)/);
+  assert.match(src, /Total received so far/);
   assert.match(src, /invoiceFilter:\s*"owing"/);
   const outstanding = src.slice(src.indexOf('label="Outstanding"'), src.indexOf('label="Outstanding"') + 700);
   assert.match(outstanding, /invoiceFilter:\s*"owing"/);
